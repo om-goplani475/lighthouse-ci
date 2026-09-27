@@ -1,8 +1,9 @@
-# Current plan
+# Current plan — structured-data-validation
 
-No feature in flight.
-
-<!-- Written by Agent 03, updated by Agent 04 as each task completes. Format:
-- [ ] task-01: <title> — pending
-- [x] task-02: <title> — complete
--->
+- [ ] task-01: Scaffold @lhci/seo-audits package + shared types — pending
+- [ ] task-02: Implement the StructuredDataJsonLd gatherer — pending
+- [ ] task-03: Implement the structured-data-json-ld audit — pending
+- [ ] task-04: Fixture tests for the audit — pending
+- [ ] task-05: Wire into custom Lighthouse config + extends regression test — pending
+- [ ] task-06: Assertion preset severities (flagged — touches packages/utils/src/presets) — pending
+- [ ] task-07: Package README — pending
