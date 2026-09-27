@@ -5,7 +5,7 @@
 - spec: docs/feature-specs/structured-data-validation.md
 - audit_spec: docs/audit-specs/structured-data-validation.md
 - contract: docs/feature-contracts/structured-data-validation.md
-- stage: 03-sequenced
+- stage: 04-implemented
 - task_sequence: docs/task-sequences/structured-data-validation.md
 
 <!-- Previous feature missing-meta-description closed 2026-09-27: already satisfied by upstream,
