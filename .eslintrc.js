@@ -70,4 +70,19 @@ module.exports = {
     },
     sourceType: 'script',
   },
+  overrides: [
+    {
+      // @lhci/seo-audits is ESM ("type": "module") because it's loaded directly by
+      // Lighthouse's own dynamic import()-based config/audit/gatherer loader, unlike
+      // every other package here (all CommonJS). ES modules are implicitly strict mode,
+      // so the `strict` rule's 'use strict' pragma requirement doesn't apply.
+      files: ['packages/seo-audits/**/*.js'],
+      parserOptions: {
+        sourceType: 'module',
+      },
+      rules: {
+        strict: 'off',
+      },
+    },
+  ],
 };
