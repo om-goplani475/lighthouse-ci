@@ -31,19 +31,23 @@ before committing.
 
 ## The `.ai-agents/` pipeline
 
-New features in `packages/seo-audits` are built through a 10-stage agent pipeline, not ad-hoc
+New features in `packages/seo-audits` are built through a 9-stage agent pipeline, not ad-hoc
 prompting. Start with `AGENTS.md` for the full map. In short:
 
 1. Every stage's output is a **file** (`docs/...` or `.ai-agents/state/...`), not conversation memory —
    read the actual files, don't assume context carries over between stages.
 2. Stages run through slash commands (`/intake`, `/design-audit`, `/design-contract`, `/sequence-tasks`,
-   `/implement`, `/validate-fixtures`, `/write-qa`, `/security-review`, `/ci-integration`,
-   `/write-changelog`) — see `.claude/commands/`.
+   `/implement`, `/write-qa`, `/security-review`, `/ci-integration`, `/write-changelog`) — see
+   `.claude/commands/`. (`/validate-fixtures` still exists as an optional second pass; fixture
+   coverage is checked by default at Gate 3 instead.)
 3. Manual gates (`.ai-agents/gates/gate-{0..3}-checklist.md`) sit between stages — don't auto-advance
    past one.
 4. Before designing a new audit or gatherer, check it against current upstream Lighthouse APIs — see
    `.ai-agents/prompts/upstream-sync.md`. Upstream can change the LHR schema or extension points out
    from under a stale design.
+5. **Merged ≠ done** — run `/write-qa`, `/security-review`, and `/ci-integration` promptly after
+   merging, not deferred. `/write-qa` should verify against a real `lhci collect`/`lhci assert` run,
+   not just unit tests.
 
 ## Rules for this fork specifically
 

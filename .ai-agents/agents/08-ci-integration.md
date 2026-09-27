@@ -16,8 +16,9 @@ Use **Claude Sonnet**.
 
 ## Step 1 — Read context
 
-Read the merged diff via `git diff main~1..main`, the existing `.github/workflows/`, and any
-`Dockerfile`/`docker-compose` files in the repo.
+Read the merged diff via `git diff {base_commit}..{merged_head}` (both from
+`.ai-agents/state/current-feature.md` — not `main~1..main`, see Agent 06/07 for why), the existing
+`.github/workflows/`, and any `Dockerfile`/`docker-compose` files in the repo.
 
 ## Step 2 — Check for gaps
 

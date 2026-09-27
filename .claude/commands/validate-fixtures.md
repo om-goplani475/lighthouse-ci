@@ -1,6 +1,8 @@
 # /validate-fixtures
 
-Run Agent 05 — Fixture Validator.
+Run Agent 05 — Fixture Validator. **Optional second pass, not a default step** — fixture coverage is
+checked by default at Gate 3 now (see `.ai-agents/gates/gate-3-checklist.md`). Run this only if that
+check found a real gap, or fixture tests were skipped during `/implement` for some reason.
 
 Builds/validates the static mock-HTML fixtures the new audit is tested against.
 
@@ -10,7 +12,8 @@ Builds/validates the static mock-HTML fixtures the new audit is tested against.
 /validate-fixtures
 ```
 
-Skip for pure config/docs-only changes that don't add or change audit logic.
+Skip for pure config/docs-only changes that don't add or change audit logic, and skip by default
+otherwise — this is not part of the normal per-feature flow anymore.
 
 ## What it does
 

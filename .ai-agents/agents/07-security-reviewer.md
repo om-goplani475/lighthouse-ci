@@ -16,7 +16,9 @@ bypass paths needs real depth, not a checklist match.
 ## Step 1 — Read context
 
 Read `.ai-agents/prompts/security-checklist.md` first. Then read the merged diff via
-`git diff main~1..main`.
+`git diff {base_commit}..{merged_head}`, both read from `.ai-agents/state/current-feature.md` — not
+`main~1..main`, which breaks the moment another commit lands on `main` after this feature merges.
+Fall back to `main~1..main` only if `base_commit`/`merged_head` aren't set.
 
 ## Step 2 — Review
 

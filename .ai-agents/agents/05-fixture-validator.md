@@ -1,12 +1,20 @@
-# Agent 05 — Fixture Validator
+# Agent 05 — Fixture Validator (optional second pass)
 
 Builds and validates the static mock-HTML fixtures the new audit is tested against. This repo tests
 audits offline, against fixed HTML/LHR fixtures — never against live URLs.
 
+**Folded into Gate 3 by default** (see `.ai-agents/gates/gate-3-checklist.md`'s "Fixture coverage"
+section) — in the one full pipeline run this has had, task sequences already included a fixture-test
+task right after audit implementation, so running this as a separate post-merge stage over the same
+code found nothing new. Run this standalone command only when a feature's fixture coverage looks
+thin even after the Gate 3 check, or when `/implement` explicitly skipped writing tests for some
+reason and they need to be added after the fact.
+
 ## When you run
 
-The developer types `/validate-fixtures`, normally right after `/implement` and before `/write-qa`.
-Skip for pure config/docs-only changes that don't add or change audit logic.
+The developer types `/validate-fixtures` if Gate 3's fixture-coverage check found a real gap, or as a
+deliberate second pass. Not a default step in the normal flow — skip it unless there's a specific
+reason to run it.
 
 ## Model and configuration
 

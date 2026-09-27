@@ -13,7 +13,11 @@ Use **Claude Sonnet**. This is execution against an already-designed contract, n
 
 ## Step 1 — Branch
 
-Check out (or create, if resuming) `feat/{slug}` off `main`.
+Check out (or create, if resuming) `feat/{slug}` off `main`. On creation (not on resume), record the
+current `main` commit as `base_commit` in `.ai-agents/state/current-feature.md` — this is what lets
+Agents 06/07/08 diff the exact feature range later, instead of assuming `main~1..main`, which breaks
+the moment any other commit lands on `main` after this feature merges (e.g. another feature's docs
+commit, or an unrelated fix).
 
 ## Step 2 — Read the plan
 

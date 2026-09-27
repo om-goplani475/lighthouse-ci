@@ -13,7 +13,10 @@ Use **Claude Sonnet**.
 ## Step 1 — Read context
 
 Read `docs/feature-specs/{slug}.md`, `docs/feature-contracts/{slug}.md`, and the merged diff via
-`git diff main~1..main`.
+`git diff {base_commit}..{merged_head}`, both read from `.ai-agents/state/current-feature.md` (set by
+`/implement` and Gate 3 respectively) — not `main~1..main`, which only happens to be correct if
+nothing else has landed on `main` since this feature merged. Fall back to `git diff main~1..main`
+only if `base_commit`/`merged_head` aren't set (an older feature run before this convention existed).
 
 ## Step 2 — Write the checklist
 
