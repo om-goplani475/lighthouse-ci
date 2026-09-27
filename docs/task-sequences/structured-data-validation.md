@@ -83,19 +83,22 @@
   "Resolved for Agent 04" section calls for, not just a manual check.
 - commit_message: "feat(seo-audits): wire structured-data-json-ld into custom lighthouse config"
 
-### task-06: Assertion preset severities — **flagged, touches outside `packages/seo-audits`**
+### task-06: Assertion preset severities — **reverted during implementation**
 
-- scope_whitelist: [packages/utils/src/presets/all.js, packages/utils/src/presets/recommended.js]
-- depends_on: task-05
-- **Flag for Gate 2**: this is the one task in this sequence whose `scope_whitelist` reaches outside
-  `packages/seo-audits`, per `.ai-agents/prompts/monorepo-rules.md`. Justified and pre-approved in
-  `docs/feature-contracts/structured-data-validation.md`'s "Important scope note" — a one-line
-  addition to each of two files, not a structural change, and inert for any consumer who doesn't
-  opt into `configPath`. Flagging here again so it isn't missed at Gate 2 review.
-- description: Add `'structured-data-json-ld': ['error', {}]` to `all.js`; add
-  `'structured-data-json-ld': ['warn', {}]` to `recommended.js`'s override list (it otherwise inherits
-  `all.js`'s value via spread, so an explicit override is required to get `warn` instead of `error`).
-- commit_message: "feat(presets): add structured-data-json-ld assertion severities"
+- **Correction (caught while implementing, not anticipated at `/sequence-tasks` or
+  `/design-contract` time)**: attempted the edit described below, then found it breaks a
+  pre-existing invariant enforced by `packages/utils/test/presets.test.js` — that test dynamically
+  imports `lighthouse` and asserts every audit id referenced in `all.js`/`recommended.js`/`no-pwa.js`
+  is one of Lighthouse's own default audits. `structured-data-json-ld` is never part of Lighthouse's
+  default config (it only exists when a consumer opts into `configPath`), so adding it to the shared
+  presets fails that test — the first time any fork-specific opt-in audit has hit this, since this
+  fork never added its own audit before this feature.
+- **Decision**: revert the preset edits entirely rather than weaken `presets.test.js` with an
+  allowlist exception. Assertion severity for `structured-data-json-ld` is left to the consumer's own
+  `.lighthouserc.js` (documented in task-07's README) — `packages/utils/src/presets/` stays untouched.
+  Original description, kept for the record: add `'structured-data-json-ld': ['error', {}]` to
+  `all.js` and `['warn', {}]` to `recommended.js`. Not implemented.
+- No commit for this task.
 
 ### task-07: Package README
 

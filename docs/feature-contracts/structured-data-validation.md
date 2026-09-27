@@ -93,13 +93,20 @@ Concrete assertion line for `all.js` (inherited unmodified by `recommended.js` v
 'structured-data-json-ld': ['warn', {}],
 ```
 
-**Important scope note for Gate 2/Agent 03**: editing `packages/utils/src/presets/all.js` and
-`recommended.js` touches files *outside* `packages/seo-audits`. Per `.ai-agents/prompts/monorepo-rules.md`,
-this must be flagged as a higher-risk task, not silently included. It's necessary here only because
-this fork's own default presets are meant to cover its own added audits — but only fires for
-consumers who actually opt into `configPath`, so it's inert for anyone who doesn't. Flagging, not
-blocking: this is a deliberate, narrow, justified exception (one line added to each of two files,
-not a structural change), matching the "rare and explicit" bar `monorepo-rules.md` sets.
+**Superseded during implementation** (`/implement`, task-06): the plan above was tried and reverted.
+`packages/utils/test/presets.test.js` asserts every audit id in `all.js`/`recommended.js`/`no-pwa.js`
+is one of Lighthouse's own default audits — `structured-data-json-ld` never is, since it's opt-in via
+`configPath`. Adding it broke that test. Decision: leave `packages/utils/src/presets/` untouched;
+assertion severity for this audit is the consumer's own choice in their `.lighthouserc.js`, documented
+in the package README instead. See `docs/task-sequences/structured-data-validation.md`'s task-06 for
+the full record. This also means the earlier "Important scope note" below no longer applies — kept
+for the record, not as current guidance:
+
+~~Editing `packages/utils/src/presets/all.js` and `recommended.js` touches files *outside*
+`packages/seo-audits`. Per `.ai-agents/prompts/monorepo-rules.md`, this must be flagged as a
+higher-risk task, not silently included. It's necessary here only because this fork's own default
+presets are meant to cover its own added audits — but only fires for consumers who actually opt into
+`configPath`, so it's inert for anyone who doesn't.~~
 
 ## Public exports
 
