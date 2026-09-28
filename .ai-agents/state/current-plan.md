@@ -1,16 +1,12 @@
-# Current plan — structured-data-rule-engine
+# Current plan — structured-data-remaining-types
 
-- [x] task-01: Rule-engine types + ajv dependency — complete
-- [x] task-02: Ruleset JSON Schemas — complete
-- [x] task-03: Rule-engine modules (schema-org, google-requirements, eligibility) — complete
-- [x] task-04: Rule registry — complete
-- [x] task-05: Ruleset data — Product + Article, all three namespaces — complete
-- [x] task-06: Rule-engine and registry unit tests — complete
-- [x] task-07: Migrate structured-data-json-ld onto the schema-org engine — complete (unit tests + real lhci collect/assert re-verified, identical behavior)
-- [x] task-08: New audit — structured-data-schema-properties — complete
-- [x] task-09: Fixture tests for the new audit — complete
-- [x] task-10: Wire into custom Lighthouse config + regression test — complete
-- [x] task-11: Package README update — complete
-- [x] (unplanned) Codify registry.js Jest/import.meta + JSDoc @type gotchas into lighthouse-conventions.md — complete, flagged as touching outside packages/seo-audits
-
-All tasks done. Feature ready for Gate 3 review.
+- [ ] task-01: 2026-10 ruleset skeleton — carry forward Product/Article — pending
+- [ ] task-02: Add BreadcrumbList, Organization, LocalBusiness — pending
+- [ ] task-03: Add Recipe, Review — pending
+- [ ] task-04: Add Event, JobPosting — pending
+- [ ] task-05: Add VideoObject, HowTo — pending
+- [ ] task-06: Add FAQPage (isolated — shallow-nesting gap + restricted eligibility) — pending
+- [ ] task-07: Bump current.json to 2026-10 — pending
+- [ ] task-08: Update existing registry test for the 12-type reality — pending
+- [ ] task-09: Fixture tests for the 10 new types through the existing audit — pending
+- [ ] task-10: Package README update — pending
