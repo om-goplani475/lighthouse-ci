@@ -5,6 +5,12 @@
  */
 
 import {Audit} from 'lighthouse/core/audits/audit.js';
+import {validate as validateSchemaOrg} from '../rule-engine/schema-org-engine.js';
+import {resolveSchemaOrgRuleset} from '../rule-engine/registry.js';
+
+// Resolved once at module load — the ruleset doesn't change within a single audit run, and
+// re-reading/re-validating the file on every block would be wasted work.
+const schemaOrgRuleset = resolveSchemaOrgRuleset();
 
 const UIStrings = {
   title: 'Structured data (JSON-LD) is valid',
@@ -45,9 +51,19 @@ function evaluateBlock(entry, index) {
     return {index, valid: false, reason: UIStrings.reasonInvalidJson, snippet};
   }
 
-  const hasRequiredFields =
-    typeof parsed === 'object' && parsed !== null && '@context' in parsed && '@type' in parsed;
-  if (!hasRequiredFields) {
+  if (typeof parsed !== 'object' || parsed === null) {
+    return {index, valid: false, reason: UIStrings.reasonMissingFields, snippet};
+  }
+
+  // Migrated onto the schema-org rule engine (was an inline '@context'/'@type' presence
+  // check). Collapsed to the same fixed message regardless of which field(s) are missing,
+  // preserving the exact pre-migration behavior/wording rather than surfacing the engine's
+  // more granular per-property findings here.
+  const findings = validateSchemaOrg(
+    /** @type {Record<string, unknown>} */ (parsed),
+    schemaOrgRuleset
+  );
+  if (findings.length > 0) {
     return {index, valid: false, reason: UIStrings.reasonMissingFields, snippet};
   }
 
@@ -104,6 +120,12 @@ class StructuredDataJsonLd extends Audit {
 
     const tableItems = results.map(r => ({...r, valid: r.valid ? 'Yes' : 'No'}));
     const details = Audit.makeTableDetails(headings, tableItems);
+    // Reproducibility stamp (mirrors Lighthouse's own `lighthouseVersion` on the LHR) — not
+    // part of Lighthouse's `Details.Table` type, so it won't render in the HTML report, but
+    // it survives in the raw LHR JSON, which is what matters for reproducing an old audit
+    // against the ruleset version that produced it.
+    // @ts-expect-error - rulesetVersions isn't part of Lighthouse's Details.Table type.
+    details.rulesetVersions = {schemaOrg: schemaOrgRuleset.version};
 
     return {
       score: Number(allValid),
