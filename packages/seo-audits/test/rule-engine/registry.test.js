@@ -59,15 +59,41 @@ describe('rule registry — real production rulesets', () => {
     expect(schemaOrg.version).toBe('2026-09');
     expect(schemaOrg.universal.required).toEqual(['@context', '@type']);
 
-    expect(Object.keys(google.types).sort()).toEqual(['Article', 'Product']);
+    expect(Object.keys(google.types).sort()).toEqual([
+      'Article',
+      'BreadcrumbList',
+      'Event',
+      'FAQPage',
+      'HowTo',
+      'JobPosting',
+      'LocalBusiness',
+      'Organization',
+      'Product',
+      'Recipe',
+      'Review',
+      'VideoObject',
+    ]);
     expect(google.types.Product.nested.offers.required).toEqual([
       'price',
       'priceCurrency',
       'availability',
     ]);
+    // Array-nested property (structured-data-remaining-types) — BreadcrumbList.itemListElement
+    // is a list of ListItem, not a single object; confirms the engine's one-level nesting check
+    // applies per-instance, same as a single nested object.
+    expect(google.types.BreadcrumbList.nested.itemListElement.required).toEqual([
+      'position',
+      'name',
+      'item',
+    ]);
 
     expect(eligibility.types.Product.supported).toBe(true);
     expect(eligibility.types.Article.supported).toBe(true);
+    // FAQPage/HowTo are deliberately marked unsupported — Google restricts both to a narrow
+    // authoritative-site category the current boolean eligibility schema can't express as
+    // "restricted" rather than "not supported" (see docs/audit-specs/structured-data-remaining-types.md).
+    expect(eligibility.types.FAQPage.supported).toBe(false);
+    expect(eligibility.types.HowTo.supported).toBe(false);
   }, 30000);
 
   it('every checked-in ruleset file under rules/ validates against its own schema', () => {
