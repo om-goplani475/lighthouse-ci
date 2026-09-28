@@ -80,6 +80,20 @@ it). `packages/utils/test/presets.test.js` already worked around this by shellin
 pattern for any test that needs to exercise real Lighthouse config resolution (see
 `packages/seo-audits/test/lighthouse-config.test.js` for a worked example).
 
+**This also applies to `packages/seo-audits/src/rule-engine/registry.js` itself** (added by the
+`structured-data-rule-engine` feature) — it uses `import.meta.url` at module scope to locate
+`rules/`. This is a compile-time constraint, not a runtime one: TypeScript cannot emit `import.meta`
+under this repo's shared `module: "commonjs"` tsconfig, so ts-jest's transform fails on
+`registry.js`'s source itself. **Any audit file that imports `registry.js`, even transitively
+(directly, or via a rule-engine module that imports it), can never be loaded with a plain top-level
+Jest `import` — the whole module fails to parse.** Use the same shell-out pattern for its tests, but
+go one step further than `lighthouse-config.test.js`'s inline `-e` string: write the artifacts/args to
+temp files and run a small driver script file instead of interpolating JSON into a shell string
+directly — JSON containing quotes (e.g. a malformed-JSON test fixture) does not survive multi-layer
+shell/JS string escaping reliably. See `packages/seo-audits/test/audits/structured-data-json-ld.test.js`
+or `structured-data-schema-properties.test.js` for the worked pattern (`fs.mkdtempSync` + a small
+`.mjs` driver script + `execFile`, no shell string interpolation of data).
+
 ## TypeScript boundary: closed `Artifacts`/`GathererArtifacts` types
 
 A custom gatherer's `getArtifact` return type and a custom audit's `requiredArtifacts`/`artifacts`
@@ -104,6 +118,15 @@ resolve through it — `node_modules` isn't in this repo's `tsconfig.json` progr
 Lighthouse's own types explicitly instead: `import('lighthouse/types/audit.js').default.Meta`,
 `import('lighthouse/types/gatherer.js').default.Context`, `import('lighthouse/types/config.js').default`,
 etc.
+
+## JSDoc comments mentioning `@type`/`@context` in prose
+
+Easy to hit repeatedly in this package specifically, since its whole subject is JSON-LD's `@type`
+and `@context` keys: writing them as plain prose inside a `/** ... */` block comment (e.g. "checks
+the @type field") gets misparsed by TypeScript's JSDoc tag scanner as an actual `@type {...}` tag,
+producing confusing "Cannot find name" / "Type expected" errors pointing at unrelated-looking code.
+Reword to avoid the bare `@` — e.g. "the schema type" instead of "the `@type`", or "JSON-LD's type
+and context keys" instead of "`@type`/`@context`" — rather than fighting the parser.
 
 ## LHR (Lighthouse Result)
 
