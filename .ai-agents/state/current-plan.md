@@ -1,8 +1,8 @@
 # Current plan — structured-data-remaining-types
 
 - [x] task-01: 2026-10 ruleset skeleton — carry forward Product/Article — complete
-- [ ] task-02: Add BreadcrumbList, Organization, LocalBusiness — pending
-- [ ] task-03: Add Recipe, Review — pending
+- [x] task-02: Add BreadcrumbList, Organization, LocalBusiness — complete
+- [x] task-03: Add Recipe, Review — complete
 - [ ] task-04: Add Event, JobPosting — pending
 - [ ] task-05: Add VideoObject, HowTo — pending
 - [ ] task-06: Add FAQPage (isolated — shallow-nesting gap + restricted eligibility) — pending

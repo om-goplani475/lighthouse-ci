@@ -20,6 +20,14 @@
     "LocalBusiness": {
       "supported": true,
       "richResultFeature": "Local business rich results"
+    },
+    "Recipe": {
+      "supported": true,
+      "richResultFeature": "Recipe rich results"
+    },
+    "Review": {
+      "supported": true,
+      "richResultFeature": "Review snippet"
     }
   }
 }

@@ -40,6 +40,29 @@
         }
       },
       "conditional": []
+    },
+    "Recipe": {
+      "required": ["name", "image", "author", "recipeIngredient", "recipeInstructions"],
+      "nested": {},
+      "conditional": []
+    },
+    "Review": {
+      "required": ["itemReviewed", "author", "reviewRating"],
+      "nested": {
+        "itemReviewed": {
+          "type": "Thing",
+          "required": ["name"]
+        },
+        "author": {
+          "type": "Person",
+          "required": ["name"]
+        },
+        "reviewRating": {
+          "type": "Rating",
+          "required": ["ratingValue"]
+        }
+      },
+      "conditional": []
     }
   }
 }
