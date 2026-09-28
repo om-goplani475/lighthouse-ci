@@ -53,16 +53,18 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('meta-description');
     expect(auditIds).toContain('document-title');
 
-    // And the new audit is actually added, not just defaults preserved.
+    // And both of this fork's audits are actually added, not just defaults preserved.
     expect(auditIds).toContain('structured-data-json-ld');
+    expect(auditIds).toContain('structured-data-schema-properties');
   }, 30000);
 
-  it('adds the seo-extended category without touching the core seo category', async () => {
+  it('adds the seo-extended category with both audits, without touching the core seo category', async () => {
     const {categories} = await resolveConfig();
 
     expect(categories['seo-extended']).toBeDefined();
-    expect(categories['seo-extended'].auditRefs.map(ref => ref.id)).toEqual([
+    expect(categories['seo-extended'].auditRefs.map(ref => ref.id).sort()).toEqual([
       'structured-data-json-ld',
+      'structured-data-schema-properties',
     ]);
     expect(categories['seo']).toBeDefined();
   }, 30000);

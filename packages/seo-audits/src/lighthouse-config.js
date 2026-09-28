@@ -5,7 +5,8 @@
  *
  * Custom Lighthouse config consumers reference via .lighthouserc.js's `configPath`
  * setting (a first-class Lighthouse setting — see docs/configuration.md). Adds the
- * structured-data-json-ld gatherer/audit on top of Lighthouse's default set.
+ * structured-data-json-ld and structured-data-schema-properties gatherer/audits on top
+ * of Lighthouse's default set.
  *
  * Paths below are plain relative strings, not require.resolve() calls: this file is
  * ESM (no bare `require`), and Lighthouse's own module resolver
@@ -21,11 +22,14 @@
 const config = {
   extends: 'lighthouse:default',
   artifacts: [{id: 'StructuredDataJsonLd', gatherer: './gatherers/structured-data-json-ld.js'}],
-  audits: ['./audits/structured-data-json-ld.js'],
+  audits: ['./audits/structured-data-json-ld.js', './audits/structured-data-schema-properties.js'],
   categories: {
     'seo-extended': {
       title: 'Extended SEO (fork)',
-      auditRefs: [{id: 'structured-data-json-ld', weight: 1}],
+      auditRefs: [
+        {id: 'structured-data-json-ld', weight: 1},
+        {id: 'structured-data-schema-properties', weight: 1},
+      ],
     },
   },
 };
