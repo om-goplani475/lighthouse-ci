@@ -8,6 +8,18 @@
     "Article": {
       "supported": true,
       "richResultFeature": "Article rich results"
+    },
+    "BreadcrumbList": {
+      "supported": true,
+      "richResultFeature": "Breadcrumb rich results"
+    },
+    "Organization": {
+      "supported": true,
+      "richResultFeature": "Organization knowledge panel logo"
+    },
+    "LocalBusiness": {
+      "supported": true,
+      "richResultFeature": "Local business rich results"
     }
   }
 }

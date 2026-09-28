@@ -15,6 +15,31 @@
       "required": ["headline", "image", "datePublished"],
       "nested": {},
       "conditional": []
+    },
+    "BreadcrumbList": {
+      "required": ["itemListElement"],
+      "nested": {
+        "itemListElement": {
+          "type": "ListItem",
+          "required": ["position", "name", "item"]
+        }
+      },
+      "conditional": []
+    },
+    "Organization": {
+      "required": ["name", "url", "logo"],
+      "nested": {},
+      "conditional": []
+    },
+    "LocalBusiness": {
+      "required": ["name", "address"],
+      "nested": {
+        "address": {
+          "type": "PostalAddress",
+          "required": ["streetAddress", "addressLocality"]
+        }
+      },
+      "conditional": []
     }
   }
 }
