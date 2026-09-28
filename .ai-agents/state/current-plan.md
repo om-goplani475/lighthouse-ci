@@ -3,7 +3,7 @@
 - [x] task-01: 2026-10 ruleset skeleton — carry forward Product/Article — complete
 - [x] task-02: Add BreadcrumbList, Organization, LocalBusiness — complete
 - [x] task-03: Add Recipe, Review — complete
-- [ ] task-04: Add Event, JobPosting — pending
+- [x] task-04: Add Event, JobPosting — complete
 - [ ] task-05: Add VideoObject, HowTo — pending
 - [ ] task-06: Add FAQPage (isolated — shallow-nesting gap + restricted eligibility) — pending
 - [ ] task-07: Bump current.json to 2026-10 — pending

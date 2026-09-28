@@ -28,6 +28,14 @@
     "Review": {
       "supported": true,
       "richResultFeature": "Review snippet"
+    },
+    "Event": {
+      "supported": true,
+      "richResultFeature": "Event rich results"
+    },
+    "JobPosting": {
+      "supported": true,
+      "richResultFeature": "Job posting rich results"
     }
   }
 }

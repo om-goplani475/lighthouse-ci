@@ -63,6 +63,30 @@
         }
       },
       "conditional": []
+    },
+    "Event": {
+      "required": ["name", "startDate", "location"],
+      "nested": {
+        "location": {
+          "type": "Place",
+          "required": ["name", "address"]
+        }
+      },
+      "conditional": []
+    },
+    "JobPosting": {
+      "required": ["title", "description", "datePosted", "hiringOrganization", "jobLocation"],
+      "nested": {
+        "hiringOrganization": {
+          "type": "Organization",
+          "required": ["name"]
+        },
+        "jobLocation": {
+          "type": "Place",
+          "required": ["address"]
+        }
+      },
+      "conditional": []
     }
   }
 }
