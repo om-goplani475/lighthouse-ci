@@ -1,5 +1,32 @@
 # Security findings
 
+## 2026-09-28 — structured-data-remaining-types
+
+**No findings.** Reviewed against `.ai-agents/prompts/security-checklist.md`. This feature's entire
+diff (`f97606c..00e6f71`) is 9 files: two JSON ruleset files, two `current.json` version pointers, a
+README, and three test files — confirmed via `git diff --name-only`, zero matches for
+`fetch|http\.|https\.|child_process|exec|eval\(` across the changed non-test files.
+
+- SSRF / network fetch: not applicable — no code changes at all (audit, engines, gatherer, registry
+  all untouched by this feature). The same "registry.js only reads local files, never attacker
+  input" reasoning from `structured-data-rule-engine`'s review still holds; this feature adds rows to
+  those already-reviewed files, not new file-reading logic.
+- New dependency: **none** — `packages/seo-audits/package.json` has no diff in this feature. The
+  `ajv` dependency reviewed for the prior feature is unchanged and still only validates this fork's
+  own checked-in files.
+- Prototype pollution: unchanged from the prior review — no merge/assign operation was introduced;
+  this feature is pure data.
+- Report data exposure: the 10 new types extend the same fixed-allowlist mechanism already reviewed
+  — `googleRuleset.types[schemaType]` must match one of the 12 tracked types before any row is
+  generated, so an attacker-controlled `@type` value still can't get echoed into the report
+  unless it happens to be one of the 12 known type names, same guarantee as before. Property/message
+  text for the 10 new types is this fork's own authored ruleset content (Google's published
+  guidelines as documented in `docs/audit-specs/structured-data-remaining-types.md`), not derived
+  from page content.
+- Restricted-eligibility data (`FAQPage`/`HowTo` → `supported: false`) is informational text only,
+  no new surface — reviewed as a correctness/accuracy decision at design time
+  (`docs/audit-specs/structured-data-remaining-types.md`), not a security concern.
+
 ## 2026-09-28 — structured-data-rule-engine
 
 **No findings.** Reviewed against `.ai-agents/prompts/security-checklist.md`:

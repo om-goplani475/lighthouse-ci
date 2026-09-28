@@ -1,5 +1,15 @@
 # CI backlog
 
+## 2026-09-28 — structured-data-remaining-types
+
+- item: no gap found. This feature is additive JSON ruleset data plus test-file changes only — no
+  new dependency (`packages/seo-audits/package.json` untouched, confirmed via diff), no new native/
+  system dependency, no new build step. `2026-10.json`'s files are picked up automatically by the
+  existing generic schema-validation test (it `readdirSync`s the `rules/` directories rather than
+  naming files), and the existing `test:typecheck`/`test:lint`/`test:unit` pipeline already covers
+  everything touched. No Dockerfile exists to update. No CI changes made.
+- status: done (nothing to do)
+
 ## 2026-09-28 — structured-data-rule-engine
 
 - item: no gap found. New `ajv` dependency (task-01) is a pure-JS npm package, no native bindings,

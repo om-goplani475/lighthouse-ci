@@ -8,8 +8,11 @@
 - task_sequence: docs/task-sequences/structured-data-remaining-types.md
 - base_commit: f97606c
 - merged_head: 00e6f71
+- qa: docs/qa/structured-data-remaining-types.md
+- security_review: recorded in .ai-agents/state/security-findings.md, 2026-09-28, no findings
+- ci_integration: recorded in .ai-agents/state/ci-backlog.md, 2026-09-28, no gap found
 
-Merged, not yet done — /write-qa, /security-review, /ci-integration, /write-changelog still to run.
+Merged, QA verified live via real lhci collect/assert. /write-changelog still to run.
 
 <!-- structured-data-rule-engine closed 2026-09-28: complete, all 9 stages run, merged bce25fb,
 QA'd live, see docs/qa/structured-data-rule-engine.md. Shipped the rule-engine foundation plus the
