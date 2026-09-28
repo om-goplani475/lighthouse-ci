@@ -1,12 +1,15 @@
 # Current feature
 
 - slug: structured-data-remaining-types
-- stage: 03-sequenced
+- stage: 04-implemented-merged
 - spec: docs/feature-specs/structured-data-remaining-types.md
 - audit_spec: docs/audit-specs/structured-data-remaining-types.md
 - contract: docs/feature-contracts/structured-data-remaining-types.md
 - task_sequence: docs/task-sequences/structured-data-remaining-types.md
 - base_commit: f97606c
+- merged_head: 00e6f71
+
+Merged, not yet done — /write-qa, /security-review, /ci-integration, /write-changelog still to run.
 
 <!-- structured-data-rule-engine closed 2026-09-28: complete, all 9 stages run, merged bce25fb,
 QA'd live, see docs/qa/structured-data-rule-engine.md. Shipped the rule-engine foundation plus the
