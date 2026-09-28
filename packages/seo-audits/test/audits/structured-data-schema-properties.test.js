@@ -79,6 +79,80 @@ const ARTICLE_MISSING_DATE = JSON.stringify({
   image: 'https://example.com/a.jpg',
 });
 
+// Array-nested property (nested rule applied per-instance, not to a single object).
+const VALID_BREADCRUMB_LIST = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    {position: 1, name: 'Home', item: 'https://example.com/'},
+    {position: 2, name: 'Widgets', item: 'https://example.com/widgets'},
+  ],
+});
+
+const BREADCRUMB_LIST_MISSING_ITEM_NAME = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    {position: 1, name: 'Home', item: 'https://example.com/'},
+    {position: 2, item: 'https://example.com/widgets'},
+  ],
+});
+
+// Flat-only type, no nested sub-objects.
+const VALID_RECIPE = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'Recipe',
+  name: 'Soup',
+  image: 'https://example.com/soup.jpg',
+  author: 'Chef',
+  recipeIngredient: ['water', 'salt'],
+  recipeInstructions: 'Boil it.',
+});
+
+const RECIPE_MISSING_INGREDIENT = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'Recipe',
+  name: 'Soup',
+  image: 'https://example.com/soup.jpg',
+  author: 'Chef',
+  recipeInstructions: 'Boil it.',
+});
+
+// Single nested object.
+const VALID_EVENT = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'Event',
+  name: 'Conference',
+  startDate: '2026-11-01',
+  location: {name: 'Convention Center', address: '123 Main St'},
+});
+
+const EVENT_MISSING_LOCATION_ADDRESS = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'Event',
+  name: 'Conference',
+  startDate: '2026-11-01',
+  location: {name: 'Convention Center'},
+});
+
+// Multiple distinct nested objects on one type.
+const JOB_POSTING_MISSING_JOB_LOCATION_ADDRESS = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'JobPosting',
+  title: 'Engineer',
+  description: 'Build things.',
+  datePosted: '2026-09-01',
+  hiringOrganization: {name: 'Acme'},
+  jobLocation: {},
+});
+
+// FAQPage: shallow nesting only checks acceptedAnswer's *presence*, not its own .text.
+const FAQ_PAGE_ACCEPTED_ANSWER_MISSING_TEXT = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [{name: 'Question?', acceptedAnswer: {}}],
+});
+
 describe('structured-data-schema-properties audit', () => {
   it('passes a Product with all required properties including nested offers', async () => {
     const result = await runAudit([{content: VALID_PRODUCT}]);
@@ -129,8 +203,85 @@ describe('structured-data-schema-properties audit', () => {
   it('stamps rulesetVersions for both namespaces into details for reproducibility', async () => {
     const result = await runAudit([{content: VALID_PRODUCT}]);
     expect(result.details.rulesetVersions).toEqual({
-      googleStructuredData: '2026-09',
-      eligibility: '2026-09',
+      googleStructuredData: '2026-10',
+      eligibility: '2026-10',
     });
+  }, 30000);
+
+  it('passes a BreadcrumbList with all itemListElement entries complete', async () => {
+    const result = await runAudit([{content: VALID_BREADCRUMB_LIST}]);
+    expect(result.score).toBe(1);
+  }, 30000);
+
+  it('fails a BreadcrumbList when one itemListElement entry is missing name, naming its index', async () => {
+    const result = await runAudit([{content: BREADCRUMB_LIST_MISSING_ITEM_NAME}]);
+    expect(result.score).toBe(0);
+    const failure = result.details.items.find(
+      /** @param {any} item */ item => item.namespace === 'google-requirements'
+    );
+    expect(failure.property).toBe('itemListElement[1].name');
+  }, 30000);
+
+  it('passes a Recipe with all required flat properties', async () => {
+    const result = await runAudit([{content: VALID_RECIPE}]);
+    expect(result.score).toBe(1);
+  }, 30000);
+
+  it('fails a Recipe missing a required flat property (recipeIngredient)', async () => {
+    const result = await runAudit([{content: RECIPE_MISSING_INGREDIENT}]);
+    expect(result.score).toBe(0);
+    const failure = result.details.items.find(
+      /** @param {any} item */ item => item.namespace === 'google-requirements'
+    );
+    expect(failure.property).toBe('recipeIngredient');
+  }, 30000);
+
+  it('passes an Event with a complete nested location', async () => {
+    const result = await runAudit([{content: VALID_EVENT}]);
+    expect(result.score).toBe(1);
+  }, 30000);
+
+  it('fails an Event missing a nested location property (location.address)', async () => {
+    const result = await runAudit([{content: EVENT_MISSING_LOCATION_ADDRESS}]);
+    expect(result.score).toBe(0);
+    const failure = result.details.items.find(
+      /** @param {any} item */ item => item.namespace === 'google-requirements'
+    );
+    expect(failure.property).toBe('location.address');
+  }, 30000);
+
+  it('fails a JobPosting missing properties across two distinct nested objects', async () => {
+    const result = await runAudit([{content: JOB_POSTING_MISSING_JOB_LOCATION_ADDRESS}]);
+    expect(result.score).toBe(0);
+    const failures = result.details.items
+      .filter(/** @param {any} item */ item => item.namespace === 'google-requirements')
+      .map(/** @param {any} item */ item => item.property);
+    expect(failures).toEqual(expect.arrayContaining(['jobLocation.address']));
+  }, 30000);
+
+  it('does not flag FAQPage.mainEntity.acceptedAnswer.text — one level of nesting only', async () => {
+    const result = await runAudit([{content: FAQ_PAGE_ACCEPTED_ANSWER_MISSING_TEXT}]);
+    // acceptedAnswer is present (just empty), so the shallow check passes — this is the
+    // documented, accepted limitation from docs/audit-specs/structured-data-remaining-types.md,
+    // not a bug: the engine only verifies mainEntity[].acceptedAnswer is present, never
+    // recurses into acceptedAnswer.text.
+    expect(result.score).toBe(1);
+  }, 30000);
+
+  it('reports FAQPage and HowTo eligibility as unsupported, not hedged-supported', async () => {
+    const result = await runAudit([
+      {
+        content: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'FAQPage',
+          mainEntity: [{name: 'Q', acceptedAnswer: {text: 'A'}}],
+        }),
+      },
+    ]);
+    const eligibilityRow = result.details.items.find(
+      /** @param {any} item */ item => item.namespace === 'eligibility'
+    );
+    expect(eligibilityRow).toBeDefined();
+    expect(eligibilityRow.message).toContain('not currently documented as supported');
   }, 30000);
 });
