@@ -6,6 +6,7 @@
   "main": "src/lighthouse-config.js",
   "private": true,
   "dependencies": {
+    "ajv": "6.12.6",
     "lighthouse": "12.6.1"
   }
 }
