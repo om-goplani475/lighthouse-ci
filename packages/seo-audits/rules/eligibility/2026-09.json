@@ -1,0 +1,13 @@
+{
+  "version": "2026-09",
+  "types": {
+    "Product": {
+      "supported": true,
+      "richResultFeature": "Product snippets"
+    },
+    "Article": {
+      "supported": true,
+      "richResultFeature": "Article rich results"
+    }
+  }
+}
