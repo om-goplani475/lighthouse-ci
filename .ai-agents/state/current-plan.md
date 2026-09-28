@@ -1,12 +1,13 @@
-# Current plan — structured-data-validation
+# Current plan — structured-data-rule-engine
 
-- [x] task-01: Scaffold @lhci/seo-audits package + shared types — complete
-- [x] task-01b: ESLint ESM override for packages/seo-audits (flagged, discovered mid-implementation) — complete
-- [x] task-02: Implement the StructuredDataJsonLd gatherer — complete
-- [x] task-03: Implement the structured-data-json-ld audit — complete
-- [x] task-04: Fixture tests for the audit — complete
-- [x] task-05: Wire into custom Lighthouse config + extends regression test — complete
-- [x] task-06: Assertion preset severities — reverted during implementation, see task-sequence doc — no commit
-- [x] task-07: Package README — complete
-
-All tasks done. Feature ready for Gate 3 review.
+- [ ] task-01: Rule-engine types + ajv dependency — pending
+- [ ] task-02: Ruleset JSON Schemas — pending
+- [ ] task-03: Rule-engine modules (schema-org, google-requirements, eligibility) — pending
+- [ ] task-04: Rule registry — pending
+- [ ] task-05: Ruleset data — Product + Article, all three namespaces — pending
+- [ ] task-06: Rule-engine and registry unit tests — pending
+- [ ] task-07: Migrate structured-data-json-ld onto the schema-org engine — pending
+- [ ] task-08: New audit — structured-data-schema-properties — pending
+- [ ] task-09: Fixture tests for the new audit — pending
+- [ ] task-10: Wire into custom Lighthouse config + regression test — pending
+- [ ] task-11: Package README update — pending
