@@ -1,5 +1,12 @@
 # CI backlog
 
+## 2026-09-28 — structured-data-rule-engine
+
+- item: no gap found. New `ajv` dependency (task-01) is a pure-JS npm package, no native bindings,
+  no system dependency — `yarn install` in existing CI already handles it, confirmed via a fresh
+  `npm run test:typecheck`/`test:lint` pass. No Dockerfile exists to update. No CI changes made.
+- status: done (nothing to do)
+
 ## 2026-09-27 — structured-data-validation
 
 - item: no gap found. `packages/seo-audits` is picked up automatically by the existing

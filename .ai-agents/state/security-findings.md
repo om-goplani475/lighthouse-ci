@@ -1,5 +1,29 @@
 # Security findings
 
+## 2026-09-28 — structured-data-rule-engine
+
+**No findings.** Reviewed against `.ai-agents/prompts/security-checklist.md`:
+
+- SSRF / network fetch: not applicable — no network access anywhere in the new code (`registry.js`
+  only reads local files under `packages/seo-audits/rules/`; confirmed via direct grep for
+  fetch/http/exec/eval/child_process — zero matches).
+- File paths passed to `registry.js` (`rulesDir`, `schemaPath`) are always hardcoded by the calling
+  audit, never derived from page content or any attacker-influenced input — no path-traversal
+  surface.
+- `ajv` (new dependency, task-01) only validates this fork's own checked-in `rules/*.json` files
+  against this fork's own checked-in schemas — never validates or compiles a schema derived from
+  page content. Not exposed to attacker input.
+- Prototype pollution: `google-requirements-engine.js`/`schema-org-engine.js` only read properties
+  off the page-content-derived parsed object (`property in parsedBlock`) — no merge/assign operation
+  that could combine an attacker-supplied `__proto__` key with a shared object. Plain `JSON.parse`
+  does not itself cause prototype pollution (that risk applies to merge/copy operations, not simple
+  property reads).
+- Report data exposure: the new audit's `type` column only ever contains `Product`/`Article` (an
+  exact match against the fixed tracked-type list is required before a row is generated at all —
+  untracked `@type` values are skipped entirely, never echoed into the report). `property`/`message`
+  values come from this fork's own ruleset data, not page content. No new echo-page-content-into-report
+  surface beyond what was already reviewed and accepted for `structured-data-json-ld`'s snippet field.
+
 ## 2026-09-27 — structured-data-validation
 
 - severity: low
