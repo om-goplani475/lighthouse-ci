@@ -7,6 +7,7 @@
 - contract: docs/feature-contracts/structured-data-rule-engine.md
 - stage: 03-sequenced
 - task_sequence: docs/task-sequences/structured-data-rule-engine.md
+- base_commit: 5125783
 
 <!-- structured-data-schema-properties (feature #2) paused 2026-09-28: superseded by this feature.
 Its intake spec (docs/feature-specs/structured-data-schema-properties.md) remains as reference for
