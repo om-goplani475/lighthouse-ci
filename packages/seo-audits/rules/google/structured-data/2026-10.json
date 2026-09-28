@@ -1,0 +1,20 @@
+{
+  "version": "2026-10",
+  "types": {
+    "Product": {
+      "required": ["name", "image", "offers"],
+      "nested": {
+        "offers": {
+          "type": "Offer",
+          "required": ["price", "priceCurrency", "availability"]
+        }
+      },
+      "conditional": []
+    },
+    "Article": {
+      "required": ["headline", "image", "datePublished"],
+      "nested": {},
+      "conditional": []
+    }
+  }
+}
