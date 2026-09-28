@@ -59,5 +59,33 @@ gets misparsed as an actual JSDoc tag.
 No `.lighthouserc.js` migration note needed — same reasoning as `structured-data-validation`, this
 is opt-in via the existing `configPath` mechanism.
 
+### structured-data-remaining-types (2026-09-28)
+
+**User-facing**: `structured-data-schema-properties` now checks all 12 rich-result types Google
+documents property guidance for, not just `Product`/`Article` — adds `BreadcrumbList`, `Recipe`,
+`Review`, `Event`, `JobPosting`, `VideoObject`, `Organization`, `LocalBusiness`, `FAQPage`, and
+`HowTo`. No setup change — same audit id, same `configPath`/severity wiring as before. Two things
+worth knowing if you rely on this audit: nested-property checks only go one level deep (so
+`FAQPage`'s `acceptedAnswer.text` isn't verified, only that `acceptedAnswer` itself is present), and
+`FAQPage`/`HowTo` are reported as *not* eligible for a rich result — Google currently restricts both
+to a narrow set of authoritative sites, and this audit's eligibility model can't express "eligible
+but restricted," so it reports the closer of the two available answers. See
+`packages/seo-audits/README.md` for both caveats in full.
+
+**Internal/dev**: Proof point for the rule-engine architecture from the previous feature — adding 10
+new types required zero changes to `src/audits/structured-data-schema-properties.js` or any
+`src/rule-engine/*.js` file, only new ruleset JSON (`rules/google/structured-data/2026-10.json`,
+`rules/eligibility/2026-10.json`) plus a `current.json` version bump. Confirmed the engine's
+one-level `nested` mechanism already handles array-valued properties (e.g.
+`BreadcrumbList.itemListElement`, `FAQPage.mainEntity`) with no code change, since `asObjectArray`
+already normalizes a single object or an array identically. One pre-existing test
+(`registry.test.js`) had hardcoded the tracked-type list to `['Article', 'Product']` and needed
+updating — a real regression this feature's task sequence specifically planned a task around,
+not discovered after the fact. Live-verified via `lhci collect`/`lhci assert` that the `current.json`
+version bump alone (no code deploy) was sufficient to bring all 10 new types online — see
+`docs/qa/structured-data-remaining-types.md`.
+
+No `.lighthouserc.js` migration note needed — same reasoning as the prior two features.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->
