@@ -36,6 +36,14 @@
     "JobPosting": {
       "supported": true,
       "richResultFeature": "Job posting rich results"
+    },
+    "VideoObject": {
+      "supported": true,
+      "richResultFeature": "Video rich results"
+    },
+    "HowTo": {
+      "supported": false,
+      "richResultFeature": "HowTo rich results"
     }
   }
 }

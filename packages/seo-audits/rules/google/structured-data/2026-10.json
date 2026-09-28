@@ -87,6 +87,21 @@
         }
       },
       "conditional": []
+    },
+    "VideoObject": {
+      "required": ["name", "description", "thumbnailUrl", "uploadDate"],
+      "nested": {},
+      "conditional": []
+    },
+    "HowTo": {
+      "required": ["name", "step"],
+      "nested": {
+        "step": {
+          "type": "HowToStep",
+          "required": ["text"]
+        }
+      },
+      "conditional": []
     }
   }
 }
