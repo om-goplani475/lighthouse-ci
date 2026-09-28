@@ -11,13 +11,26 @@ rationale and the agent pipeline this package was built through.
   `structured-data` audit is a manual placeholder (it just tells you to run an external tool); this
   one actually checks it. See `docs/feature-specs/structured-data-validation.md` in the repo root for
   the full spec and rationale.
-- **`structured-data-schema-properties`** — for JSON-LD blocks whose `@type` is one Google documents
-  rich-result support for (v1: `Product`, `Article`), checks that Google's required/recommended
-  properties are present, including specific nested sub-object properties (e.g.
-  `Product.offers.price`). Rule content lives as versioned data under `rules/`, not hardcoded in the
-  audit — see `docs/architecture/structured-data-rule-engine.md` for why, and
-  `docs/feature-specs/structured-data-rule-engine.md` for this audit's own spec. Adding the remaining
-  tracked types is a `rules/` data change, not new audit code.
+- **`structured-data-schema-properties`** — for JSON-LD blocks whose `@type` is one of the 12 types
+  Google documents rich-result guidance for (`Product`, `Article`, `BreadcrumbList`, `Recipe`,
+  `Review`, `Event`, `JobPosting`, `VideoObject`, `Organization`, `LocalBusiness`, `FAQPage`, `HowTo`),
+  checks that Google's required/recommended properties are present, including specific nested
+  sub-object properties (e.g. `Product.offers.price`, `Event.location.address`). Rule content lives as
+  versioned data under `rules/`, not hardcoded in the audit — see
+  `docs/architecture/structured-data-rule-engine.md` for why, `docs/feature-specs/structured-data-rule-engine.md`
+  for the original two-type audit, and `docs/audit-specs/structured-data-remaining-types.md` for the
+  per-type property lists behind the other 10. Tracking a new type is a `rules/` data change, not new
+  audit code.
+
+  Two known v1 limitations, documented so they don't get mistaken for bugs later:
+  - **Nested checks are one level deep only.** `FAQPage.mainEntity[].acceptedAnswer` is verified for
+    presence, but the engine doesn't recurse into `acceptedAnswer.text` itself — a two-level-deep
+    check, which the rule engine doesn't support by design (it's not a generic recursive schema
+    validator).
+  - **`FAQPage`/`HowTo` are reported as eligibility-`false`, not hedged-`true`.** Google restricts both
+    rich-result types to a narrow set of authoritative sites; the eligibility ruleset's schema only
+    models a boolean `supported` flag, which can't express "restricted" — `false` is the closer
+    approximation of the two, not a data-entry mistake.
 
 ### Finding namespaces
 

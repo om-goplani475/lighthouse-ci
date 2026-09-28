@@ -9,4 +9,6 @@
 - [x] task-07: Bump current.json to 2026-10 — complete (expected failures now in registry.test.js and structured-data-schema-properties.test.js, fixed by task-08/task-09)
 - [x] task-08: Update existing registry test for the 12-type reality — complete
 - [x] task-09: Fixture tests for the 10 new types through the existing audit — complete (also fixed the stale rulesetVersions '2026-09' assertion from before the current.json bump)
-- [ ] task-10: Package README update — pending
+- [x] task-10: Package README update — complete
+
+All tasks done. Feature ready for Gate 3 review.
