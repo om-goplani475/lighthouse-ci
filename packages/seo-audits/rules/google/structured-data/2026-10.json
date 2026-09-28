@@ -102,6 +102,16 @@
         }
       },
       "conditional": []
+    },
+    "FAQPage": {
+      "required": ["mainEntity"],
+      "nested": {
+        "mainEntity": {
+          "type": "Question",
+          "required": ["name", "acceptedAnswer"]
+        }
+      },
+      "conditional": []
     }
   }
 }

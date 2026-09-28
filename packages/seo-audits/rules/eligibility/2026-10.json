@@ -44,6 +44,10 @@
     "HowTo": {
       "supported": false,
       "richResultFeature": "HowTo rich results"
+    },
+    "FAQPage": {
+      "supported": false,
+      "richResultFeature": "FAQ rich results"
     }
   }
 }
