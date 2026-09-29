@@ -79,6 +79,17 @@ rationale and the agent pipeline this package was built through.
   under this approximate model," never "will be truncated" or an unqualified "is too long" — the
   audit's own report messaging is written accordingly, and any consumer surfacing these results
   should keep that hedge.
+- **`meta-description-identical-to-title`** — flags when the meta description is identical, or
+  near-identical (e.g. the title plus a trailing site name, like `"My Page Title | My Site"`), to
+  the page `<title>`. Reuses the `PixelWidth` gatherer's artifact (no new gatherer needed) for both
+  text values. Unlike `pixel-width-truncation`, this **is** scored normally (`score: 0`/`1`) — no
+  approximate-ruleset caveat applies here, either the two strings really are duplicated or they
+  aren't. Not-applicable when either title or description is absent (same boundary as every other
+  audit in this package: presence/absence is `document-title`'s/`missing-meta-description`'s
+  concern, not this one's). "Near-identical" uses a length-ratio heuristic (the shorter of the two
+  normalized strings must be at least half the longer one's length, and fully contained in it)
+  rather than exact matching alone, so a description that merely opens with a few of the same
+  words as the title before going on to say something substantively different isn't flagged.
 
 ### Finding namespaces
 
@@ -122,17 +133,17 @@ module.exports = {
 };
 ```
 
-This adds all five audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all six audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
-`pixel-width-truncation`) on top of Lighthouse's default audits (via `extends: 'lighthouse:default'`
-— see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
-any of Lighthouse's own defaults.
+`pixel-width-truncation`, `meta-description-identical-to-title`) on top of Lighthouse's default
+audits (via `extends: 'lighthouse:default'` — see `src/lighthouse-config.js`), in a new
+`seo-extended` category, without replacing or altering any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the five audits are part of this fork's shared `all`/`recommended` presets
+None of the six audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all five here are opt-in via `configPath`, so they can't be part of that guarantee. Set
+default, and all six here are opt-in via `configPath`, so they can't be part of that guarantee. Set
 severity yourself in your own `.lighthouserc.js`:
 
 ```js
@@ -149,6 +160,8 @@ module.exports = {
         'structured-data-type-conflicts': ['error', {}], // or 'warn'
         // Same informational-only caveat as structured-data-rich-result-eligibility — see below.
         'pixel-width-truncation': ['warn', {}],
+        // Scored normally, no approximate-ruleset caveat — a minScore assertion is meaningful here.
+        'meta-description-identical-to-title': ['error', {}], // or 'warn'
       },
     },
   },
