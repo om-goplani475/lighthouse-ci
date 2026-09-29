@@ -47,14 +47,15 @@ async function runScriptExpectingThrow(script) {
 describe('rule registry — real production rulesets', () => {
   it('resolves the current schema-org, google-requirements, and eligibility rulesets', async () => {
     const script = `
-      import {resolveSchemaOrgRuleset, resolveGoogleRequirementsRuleset, resolveEligibilityRuleset} from '${REGISTRY_PATH}';
+      import {resolveSchemaOrgRuleset, resolveGoogleRequirementsRuleset, resolveEligibilityRuleset, resolveTypeConflictsRuleset} from '${REGISTRY_PATH}';
       console.log(JSON.stringify({
         schemaOrg: resolveSchemaOrgRuleset(),
         google: resolveGoogleRequirementsRuleset(),
         eligibility: resolveEligibilityRuleset(),
+        typeConflicts: resolveTypeConflictsRuleset(),
       }));
     `;
-    const {schemaOrg, google, eligibility} = JSON.parse(await runScript(script));
+    const {schemaOrg, google, eligibility, typeConflicts} = JSON.parse(await runScript(script));
 
     expect(schemaOrg.version).toBe('2026-09');
     expect(schemaOrg.universal.required).toEqual(['@context', '@type']);
@@ -94,6 +95,17 @@ describe('rule registry — real production rulesets', () => {
     // "restricted" rather than "not supported" (see docs/audit-specs/structured-data-remaining-types.md).
     expect(eligibility.types.FAQPage.supported).toBe(false);
     expect(eligibility.types.HowTo.supported).toBe(false);
+
+    expect(typeConflicts.singularTypes.sort()).toEqual([
+      'BreadcrumbList',
+      'Organization',
+      'WebSite',
+    ]);
+    expect(typeConflicts.identityFields.Product).toEqual(['sku', 'gtin', 'gtin13', 'gtin8', 'mpn']);
+    // BreadcrumbList is a singular type but deliberately has no identityFields entry — it's
+    // checked for duplicate count, never for entity conflicts. Confirms the two lists are kept
+    // genuinely separate, not accidentally conflated.
+    expect(typeConflicts.identityFields.BreadcrumbList).toBeUndefined();
   }, 30000);
 
   it('every checked-in ruleset file under rules/ validates against its own schema', () => {
@@ -113,6 +125,10 @@ describe('rule registry — real production rulesets', () => {
       {
         dir: path.join(__dirname, '../../rules/eligibility'),
         schema: path.join(__dirname, '../../rules/schema/eligibility-ruleset.schema.json'),
+      },
+      {
+        dir: path.join(__dirname, '../../rules/type-conflicts'),
+        schema: path.join(__dirname, '../../rules/schema/type-conflicts-ruleset.schema.json'),
       },
     ];
 
