@@ -31,6 +31,16 @@ rationale and the agent pipeline this package was built through.
     rich-result types to a narrow set of authoritative sites; the eligibility ruleset's schema only
     models a boolean `supported` flag, which can't express "restricted" — `false` is the closer
     approximation of the two, not a data-entry mistake.
+- **`structured-data-rich-result-eligibility`** — a standalone, purely informational report: for
+  every distinct schema type found in JSON-LD on the page, one row showing whether Google currently
+  documents rich-result guidance for it and which feature if so, reusing the same `eligibility`
+  ruleset data `structured-data-schema-properties` already uses (see Finding namespaces below).
+  Distinct from that audit in two ways: it aggregates by type (a page with three `Product` blocks
+  gets one row with `count: 3`, not three rows), and it does **not** skip untracked types — a
+  `WebSite` or `Thing` block gets its own "not tracked" row, making this a complete inventory rather
+  than a pass/fail check. `score` is always `null` (`scoreDisplayMode: informative`); the only
+  not-applicable case is a page with zero parseable JSON-LD at all — a page whose JSON-LD is entirely
+  untracked types still gets a full report, not `notApplicable`.
 
 ### Finding namespaces
 
@@ -68,16 +78,17 @@ module.exports = {
 };
 ```
 
-This adds both `structured-data-json-ld` and `structured-data-schema-properties` on top of
-Lighthouse's default audits (via `extends: 'lighthouse:default'` — see `src/lighthouse-config.js`),
-in a new `seo-extended` category, without replacing or altering any of Lighthouse's own defaults.
+This adds all three audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+`structured-data-rich-result-eligibility`) on top of Lighthouse's default audits (via
+`extends: 'lighthouse:default'` — see `src/lighthouse-config.js`), in a new `seo-extended` category,
+without replacing or altering any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-Neither audit is part of this fork's shared `all`/`recommended` presets (`packages/utils/src/presets/`)
-— those presets are constrained to audits Lighthouse ships by default, and both audits here are
-opt-in via `configPath`, so they can't be part of that guarantee. Set severity yourself in your own
-`.lighthouserc.js`:
+None of the three audits are part of this fork's shared `all`/`recommended` presets
+(`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
+default, and all three here are opt-in via `configPath`, so they can't be part of that guarantee. Set
+severity yourself in your own `.lighthouserc.js`:
 
 ```js
 module.exports = {
@@ -87,8 +98,23 @@ module.exports = {
       assertions: {
         'structured-data-json-ld': ['error', {}], // or 'warn'
         'structured-data-schema-properties': ['error', {}], // or 'warn'
+        // Do NOT use ['error', {}] here — see the warning below.
+        'structured-data-rich-result-eligibility': ['warn', {minScore: 0}],
       },
     },
   },
 };
 ```
+
+**Assertion hazard specific to `structured-data-rich-result-eligibility` — read this before setting
+severity on it.** This audit is `scoreDisplayMode: informative` (it never has a pass/fail score, by
+design — see above). Lighthouse-CI's own assertion logic
+(`packages/utils/src/assertions.js`) maps an `informative` audit's value to a hardcoded `0` for
+`minScore` purposes, and *any* assertion entry that doesn't explicitly set `minScore` automatically
+gets a default `minScore: 0.9`. That means the `['error', {}]` pattern shown above for the other two
+audits — an empty options object — would make **this** audit fail on every single page that has any
+JSON-LD at all, always, since `0 >= 0.9` is never true. This isn't a bug in this audit; it's a general
+interaction between `informative` mode and Lighthouse-CI's default-minScore behavior, and it's easy
+to hit by copy-pasting the pattern above without noticing this audit is different. The safe options
+are: don't add this audit to `assertions` at all (the common case — there's nothing to gate on), or
+if you do add an entry, always set `{minScore: 0}` explicitly so the 0.9 default never applies.
