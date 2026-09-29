@@ -6,7 +6,7 @@
 - [x] task-04: type-conflicts-engine.js — findDuplicates and findConflicts — complete
 - [x] task-05: Ruleset data — type-conflicts namespace — complete
 - [x] task-06: Engine and registry unit tests — complete (correction: the "every ruleset file validates" test's directory list was hardcoded, not auto-discovering namespaces — had to add a 4th case for type-conflicts, task description's assumption that it needed no change was wrong)
-- [ ] task-07: New audit — structured-data-type-conflicts — pending
+- [x] task-07: New audit — structured-data-type-conflicts — complete
 - [ ] task-08: Fixture tests for the new audit — pending
 - [ ] task-09: Wire into custom Lighthouse config + regression test — pending
 - [ ] task-10: Package README update — pending
