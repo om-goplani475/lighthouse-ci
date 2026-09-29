@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SerpPixelBudgetsRuleSet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "title", "description"],
+  "properties": {
+    "version": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$"},
+    "title": {"$ref": "#/definitions/field"},
+    "description": {"$ref": "#/definitions/field"}
+  },
+  "definitions": {
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["font", "maxWidthPx"],
+      "properties": {
+        "font": {"type": "string"},
+        "maxWidthPx": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["desktop", "mobile"],
+          "properties": {
+            "desktop": {"type": "number"},
+            "mobile": {"type": "number"}
+          }
+        }
+      }
+    }
+  }
+}

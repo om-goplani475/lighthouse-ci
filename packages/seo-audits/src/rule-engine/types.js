@@ -50,4 +50,13 @@
  * }} TypeConflictsRuleSet
  */
 
+/** @typedef {{font: string, maxWidthPx: {desktop: number, mobile: number}}} SerpPixelBudgetsField */
+/**
+ * @typedef {{
+ *   version: string,
+ *   title: SerpPixelBudgetsField,
+ *   description: SerpPixelBudgetsField,
+ * }} SerpPixelBudgetsRuleSet
+ */
+
 export {};
