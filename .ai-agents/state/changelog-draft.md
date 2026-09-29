@@ -87,5 +87,32 @@ version bump alone (no code deploy) was sufficient to bring all 10 new types onl
 
 No `.lighthouserc.js` migration note needed — same reasoning as the prior two features.
 
+### structured-data-rich-result-eligibility (2026-09-29)
+
+**User-facing**: Added a third opt-in audit, `structured-data-rich-result-eligibility`, alongside
+`structured-data-json-ld` and `structured-data-schema-properties`. Purely informational (never a
+pass/fail score): for every distinct schema type found in JSON-LD on the page, it reports one row
+showing whether Google currently documents rich-result guidance for that type and which feature if
+so — including types `structured-data-schema-properties` doesn't check properties for, so it's a
+complete inventory, not a subset. Two blocks of the same type collapse into one row with a count,
+not duplicate rows. Same `configPath` setup as the other two audits — see
+`packages/seo-audits/README.md`. If you set a `minScore` assertion on this audit, know that it will
+always pass regardless of threshold (Lighthouse normalizes informational-audit scores to `1` before
+`lhci assert` ever sees them) — there's genuinely nothing to gate CI on here, so the common case is
+to just not assert it at all.
+
+**Internal/dev**: Uses Lighthouse's own `scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE` (the
+same mechanism core audits like `critical-request-chains` use), the first audit in this package to
+do so. Reuses the existing `eligibility-engine.js`/`eligibility` ruleset namespace as-is — no new
+rule-engine or ruleset-data changes, audit-layer only. Worth recording as a real process win: the
+design-time audit spec and contract initially claimed the *opposite* assertion behavior (that an
+unconfigured `['error', {}]` assertion would always *fail*), reasoned from reading
+`packages/utils/src/assertions.js` in isolation. Running a real `lhci assert` during `/write-qa`
+disproved that and traced the actual cause to `_normalizeAuditScore` in Lighthouse core — corrected
+across the audit spec, contract, and README rather than left wrong. See
+`docs/qa/structured-data-rich-result-eligibility.md` for the full trace.
+
+No `.lighthouserc.js` migration note needed — same reasoning as the prior three features.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->

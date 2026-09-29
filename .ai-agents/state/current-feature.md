@@ -11,9 +11,10 @@
 - qa: docs/qa/structured-data-rich-result-eligibility.md
 - security_review: recorded in .ai-agents/state/security-findings.md, 2026-09-29, no findings
 - ci_integration: recorded in .ai-agents/state/ci-backlog.md, 2026-09-29, no gap found
+- changelog: recorded in .ai-agents/state/changelog-draft.md, under Unreleased
 
-Merged, QA verified live via real lhci collect/assert (including a design-time assertion-hazard
-claim that live verification found to be wrong and corrected). /write-changelog still to run.
+Feature complete — all 9 stages run, QA verified live via real lhci collect/assert (including a
+design-time assertion-hazard claim that live verification found to be wrong and corrected).
 
 <!-- structured-data-remaining-types closed 2026-09-28: complete, all 9 stages run, merged 00e6f71,
 QA'd live, see docs/qa/structured-data-remaining-types.md. Shipped all 10 remaining tracked types as
