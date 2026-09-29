@@ -1,5 +1,71 @@
 # Security findings
 
+## 2026-09-29 — favicon-and-manifest (manifest-icons, src/lib/safe-fetch.js)
+
+**The one genuinely new attack surface introduced in Phase 1**: `manifest-icons` is the first
+audit in this package to fetch a second URL discovered on the page (the web app manifest's
+`href`), rather than only reading data Lighthouse's own page load already collected. Reviewed
+against `.ai-agents/prompts/security-checklist.md`'s SSRF section in full, which exists
+specifically for this scenario.
+
+- severity: n/a — this is a review of a feature built *with* the checklist's protections from the
+  start (confirmed via blocking question before implementation that this needed real SSRF care,
+  not a quick fetch), not a finding against already-shipped code.
+- **Scheme allowlist**: only `http:`/`https:` accepted, checked before any connection attempt
+  (`safeFetchJson`). Verified via unit test (`file:///etc/passwd` rejected).
+- **Private/reserved IP blocking, after DNS resolution, not hostname string matching**: covers
+  RFC 1918 (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback, link-local (which covers
+  the `169.254.169.254` cloud metadata address specifically, and is also checked as its own case),
+  carrier-grade NAT, and the IPv6 equivalents (`::1`, `fe80::/10`, `fc00::/7`,
+  IPv4-mapped-in-IPv6). Verified via 16 unit tests directly exercising `isPrivateOrReservedIp` and
+  `safeLookup` against each range, plus two live-collect runs (see docs/qa/favicon-and-manifest.md)
+  confirming the block fires against a real fetch attempt, not just in isolation.
+- **DNS-rebinding resistance**: the IP address `safeLookup` validates is the exact one Node's
+  `http`/`https` client connects to (via the `lookup` request option), not re-resolved by a
+  separate step — closing the classic TOCTOU gap where a hostname could resolve to a safe IP
+  during validation and a private one at actual connection time.
+- **A real bug caught during development, not shipped**: Node's `http`/`https` client silently
+  skips the custom `lookup` option entirely when the URL's hostname is already a literal IP
+  address (confirmed empirically — a request to a literal `http://127.0.0.1:1/x` URL reached
+  `ECONNREFUSED` instead of being blocked, proving `safeLookup` never ran). This is the simplest
+  possible bypass of the whole protection (just put the raw IP in the URL instead of a hostname
+  that resolves to it) and was caught by the test suite itself
+  (`test/lib/safe-fetch.test.js`'s "refuses to fetch a loopback URL" case failing) before this was
+  ever wired into an audit. Fixed with an explicit pre-check for literal-IP hostnames in
+  `safeFetchJson`, independent of `safeLookup`. Recorded here because it's exactly the kind of
+  mistake this checklist exists to catch, and it *was* caught — by a test written specifically to
+  prove the protection works end-to-end, not just documented as should-work.
+- **No redirect following**: a redirect response is not followed (only a direct 2xx is accepted);
+  following redirects would reopen the origin-validation gap (validate a safe URL, get redirected
+  to a private one).
+- **Bounded**: single request, default 5s timeout, default 1MB response-size cap, both
+  configurable per-call (not exposed to the page/attacker).
+- **A related, pre-existing exposure this feature does *not* introduce, worth recording so it's
+  not mistaken for a gap in this feature's own protection**: during live verification, pointing a
+  test page's manifest link at the real `169.254.169.254` cloud-metadata address caused the
+  *entire Lighthouse collection* for that page to stall for roughly 90 seconds in this sandboxed
+  environment, before `manifest-icons`' own (correctly SSRF-protected) fetch code ever ran. This
+  points to headless Chrome itself attempting to fetch a page's declared manifest during normal
+  navigation (for its own installability-eligibility signals), independent of anything this
+  package does. That behavior is core Lighthouse/Chrome, predates this feature, and affects any
+  Lighthouse run against any page with a manifest link pointing somewhere slow/unreachable — not
+  something `manifest-icons` introduced or can fix from an audit-level check (audits run *after*
+  collection completes). Live verification was redone against a closed local port instead (fails
+  fast via instant connection-refused) to avoid repeatedly triggering this unrelated, slow
+  pre-existing behavior. Not filed as a severity-rated finding since it's out of this package's
+  control surface, but recorded so a future reader doesn't mistake the multi-minute hang for a bug
+  in this feature specifically if they encounter it again.
+- **Data exposure**: the audit's `explanation` string on failure includes the fetch-error message
+  (e.g. "refusing to fetch ... a private/reserved IP address"). This could theoretically inform an
+  attacker running their own audit against their own page that an internal-IP manifest link was
+  blocked — but they already control the page and chose that URL themselves, so this discloses
+  nothing they don't already know. No sensitive data (cookies, headers, response bodies from
+  blocked targets) is ever included; a blocked fetch never receives a response body at all.
+
+No `critical`/`high` findings. Nothing blocks the next feature — but any *future* audit/gatherer
+that needs to fetch a page-discovered URL should reuse `safe-fetch.js` rather than reimplementing
+this from scratch, given how easy the literal-IP bypass was to miss.
+
 ## 2026-09-29 — pixel-width-truncation
 
 **No findings.** Reviewed against `.ai-agents/prompts/security-checklist.md`. Merged diff range
