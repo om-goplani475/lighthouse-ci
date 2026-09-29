@@ -1,44 +1,36 @@
 # Current feature
 
-- slug: structured-data-type-conflicts
-- stage: 04-implemented-merged
-- spec: docs/feature-specs/structured-data-type-conflicts.md
-- audit_spec: docs/audit-specs/structured-data-type-conflicts.md
-- contract: docs/feature-contracts/structured-data-type-conflicts.md
-- task_sequence: docs/task-sequences/structured-data-type-conflicts.md
-- base_commit: 71e55b5
-- merged_head: 19cbbc2
-- qa: docs/qa/structured-data-type-conflicts.md
-- security_review: recorded in .ai-agents/state/security-findings.md, 2026-09-29, one low finding, fixed same sitting (prototype-safe objects, commit 19cbbc2)
-- ci_integration: recorded in .ai-agents/state/ci-backlog.md, 2026-09-29, no gap found
-- changelog: recorded in .ai-agents/state/changelog-draft.md, under Unreleased
+- slug: pixel-width-truncation
+- stage: 00-intake-complete
+- spec: docs/feature-specs/pixel-width-truncation.md
+- phase: 1 (page-metadata) — see .ai-agents/state/current-phase.md; this feature's branch will be
+  feat/pixel-width-truncation off phase-1-page-metadata, not off main
 
-Feature complete — all 9 stages run, QA verified live via real lhci collect/assert (including
-confirming duplicate-count DOES meaningfully fail lhci assert, unlike the prior feature's
-informative-only audit; and a real security finding caught and fixed same-sitting).
+<!-- structured-data-type-conflicts closed 2026-09-29: complete, all 9 stages run, merged 19cbbc2
+(includes a post-merge prototype-safety security fix), QA'd live, see
+docs/qa/structured-data-type-conflicts.md. Last feature of Phase 2 (structured data) before Phase 1
+was picked up. Corrected here: this file's `stage` field was left stale at `04-implemented-merged`
+after that feature actually completed all 9 stages — the prose said so but the field didn't; fixed
+by writing this fresh file rather than perpetuating the mismatch. -->
 
 <!-- structured-data-rich-result-eligibility closed 2026-09-29: complete, all 9 stages run, merged
-62d659c, QA'd live, see docs/qa/structured-data-rich-result-eligibility.md. Shipped the per-type
-eligibility inventory, which unblocked this feature. -->
+62d659c, QA'd live, see docs/qa/structured-data-rich-result-eligibility.md. -->
 
 <!-- structured-data-remaining-types closed 2026-09-28: complete, all 9 stages run, merged 00e6f71,
-QA'd live, see docs/qa/structured-data-remaining-types.md. Shipped all 10 remaining tracked types as
-pure ruleset data, confirming the rule-engine's data-only design promise. -->
+QA'd live, see docs/qa/structured-data-remaining-types.md. -->
 
 <!-- structured-data-rule-engine closed 2026-09-28: complete, all 9 stages run, merged bce25fb,
-QA'd live, see docs/qa/structured-data-rule-engine.md. Shipped the rule-engine foundation plus the
-real structured-data-schema-properties audit for Product+Article. -->
+QA'd live, see docs/qa/structured-data-rule-engine.md. -->
 
 <!-- structured-data-schema-properties (original feature #2, all 12 types) paused 2026-09-28:
 superseded by structured-data-rule-engine, then further split into structured-data-remaining-types
-(now closed, see above). The original spec (docs/feature-specs/structured-data-schema-properties.md)
-remains as reference. See docs/architecture/structured-data-rule-engine.md for the full decision
-record. -->
+(now closed). The original spec (docs/feature-specs/structured-data-schema-properties.md) remains
+as reference. See docs/architecture/structured-data-rule-engine.md for the full decision record. -->
 
 <!-- Previous feature structured-data-validation closed 2026-09-27: complete, all 9 stages run, see
 docs/qa/structured-data-validation.md. Previous-previous feature missing-meta-description closed
 2026-09-27: already satisfied by upstream, no implementation done. -->
 
 <!-- See docs/phases/phase-2-structured-data.md for the full structured-data feature breakdown
-this is part of (moved from docs/roadmap.md on 2026-09-29 when the per-phase-roadmap convention
-was adopted — see AGENTS.md's "Phase branches" section). -->
+(Phase 2, closed out 2026-09-29). See docs/phases/phase-1-page-metadata.md for Phase 1, the phase
+this current feature is part of. -->
