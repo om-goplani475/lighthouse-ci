@@ -5,8 +5,9 @@
  *
  * Custom Lighthouse config consumers reference via .lighthouserc.js's `configPath`
  * setting (a first-class Lighthouse setting — see docs/configuration.md). Adds the
- * structured-data-json-ld, structured-data-schema-properties, and
- * structured-data-rich-result-eligibility gatherer/audits on top of Lighthouse's default set.
+ * structured-data-json-ld, structured-data-schema-properties,
+ * structured-data-rich-result-eligibility, and structured-data-type-conflicts gatherer/audits
+ * on top of Lighthouse's default set.
  *
  * Paths below are plain relative strings, not require.resolve() calls: this file is
  * ESM (no bare `require`), and Lighthouse's own module resolver
@@ -26,6 +27,7 @@ const config = {
     './audits/structured-data-json-ld.js',
     './audits/structured-data-schema-properties.js',
     './audits/structured-data-rich-result-eligibility.js',
+    './audits/structured-data-type-conflicts.js',
   ],
   categories: {
     'seo-extended': {
@@ -34,6 +36,7 @@ const config = {
         {id: 'structured-data-json-ld', weight: 1},
         {id: 'structured-data-schema-properties', weight: 1},
         {id: 'structured-data-rich-result-eligibility', weight: 1},
+        {id: 'structured-data-type-conflicts', weight: 1},
       ],
     },
   },

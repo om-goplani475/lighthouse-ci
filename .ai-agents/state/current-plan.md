@@ -8,5 +8,5 @@
 - [x] task-06: Engine and registry unit tests — complete (correction: the "every ruleset file validates" test's directory list was hardcoded, not auto-discovering namespaces — had to add a 4th case for type-conflicts, task description's assumption that it needed no change was wrong)
 - [x] task-07: New audit — structured-data-type-conflicts — complete
 - [x] task-08: Fixture tests for the new audit — complete
-- [ ] task-09: Wire into custom Lighthouse config + regression test — pending
+- [x] task-09: Wire into custom Lighthouse config + regression test — complete
 - [ ] task-10: Package README update — pending
