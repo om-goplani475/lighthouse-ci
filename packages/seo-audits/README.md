@@ -105,6 +105,21 @@ rationale and the agent pipeline this package was built through.
   *and* there's at most one `<title>` element (the empty/missing case is core's concern) — a page
   with zero title text but two empty `<title>` elements is still flagged for that structural
   problem.
+- **`document-h1-count`** — flags when a page has zero or more than one `<h1>` element (with
+  non-empty text). Scored normally. Deliberately narrow: heading *level order* (skipped levels)
+  and *empty* headings are already covered by Lighthouse core's own `heading-order` and
+  `empty-heading` accessibility audits (confirmed by reading axe-core's source before building
+  this — same "check what's already covered" discipline as `missing-meta-description`), so this
+  audit only covers count. Uses a new `Headings` gatherer (`h1Texts: string[]`, empty-text H1s
+  filtered out at collection time since core's `empty-heading` already owns that concern).
+- **`h1-title-relevance`** — a deliberately weak, purely informational heuristic: does each `<h1>`
+  share at least one significant word (≥3 chars, common stopwords excluded) with the page
+  `<title>`? No shared words is flagged as a row, but explicitly **not** treated as confirmed
+  evidence of a problem — a genuinely relevant H1 can legitimately share zero words with its title
+  (synonyms, rephrasing), so this is `scoreDisplayMode: informative`, never gates CI. Checks each
+  `<h1>` independently when a page has more than one (which `document-h1-count` also flags as its
+  own, separate structural issue). Not-applicable when there's no title or no H1 at all — nothing
+  to compare.
 
 ### Finding namespaces
 
@@ -148,17 +163,18 @@ module.exports = {
 };
 ```
 
-This adds all seven audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all nine audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
-`pixel-width-truncation`, `meta-description-identical-to-title`, `document-title-quality`) on top
-of Lighthouse's default audits (via `extends: 'lighthouse:default'` — see `src/lighthouse-config.js`),
-in a new `seo-extended` category, without replacing or altering any of Lighthouse's own defaults.
+`pixel-width-truncation`, `meta-description-identical-to-title`, `document-title-quality`,
+`document-h1-count`, `h1-title-relevance`) on top of Lighthouse's default audits (via
+`extends: 'lighthouse:default'` — see `src/lighthouse-config.js`), in a new `seo-extended`
+category, without replacing or altering any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the seven audits are part of this fork's shared `all`/`recommended` presets
+None of the nine audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all seven here are opt-in via `configPath`, so they can't be part of that guarantee.
+default, and all nine here are opt-in via `configPath`, so they can't be part of that guarantee.
 Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
@@ -178,29 +194,34 @@ module.exports = {
         // Scored normally, no approximate-ruleset caveat — a minScore assertion is meaningful here.
         'meta-description-identical-to-title': ['error', {}], // or 'warn'
         'document-title-quality': ['error', {}], // or 'warn'
+        'document-h1-count': ['error', {}], // or 'warn'
+        // Deliberately weak heuristic, never gates CI — same informational caveat as above.
+        'h1-title-relevance': ['warn', {}],
       },
     },
   },
 };
 ```
 
-**A note on asserting `structured-data-rich-result-eligibility` and `pixel-width-truncation`**: both
-audits are `scoreDisplayMode: informative` (neither ever has a pass/fail score, by design — see
+**A note on asserting `structured-data-rich-result-eligibility`, `pixel-width-truncation`, and
+`h1-title-relevance`**: all three audits are `scoreDisplayMode: informative` (none ever has a
+pass/fail score, by design — see
 above). Verified live (`lhci collect`/`lhci assert` against a real page): Lighthouse itself
 normalizes an `informative` audit's LHR `score` to `1` before `lhci assert` ever reads it
 (`node_modules/lighthouse/core/audits/audit.js`'s `_normalizeAuditScore`) — so a `minScore`
-assertion on either audit **always passes**, at any threshold, regardless of what the report actually
-shows. This means there's genuinely nothing to gate CI on with `minScore` for either one; the common
-case is to simply not add them to `assertions` at all, since an `['error', {}]` entry will never
-actually fail — it isn't dangerous, just a no-op as a CI gate. (An earlier draft of this note
-claimed the opposite — that `['error', {}]` would always *fail* — based on reading
+assertion on any of the three **always passes**, at any threshold, regardless of what the report
+actually shows. This means there's genuinely nothing to gate CI on with `minScore` for any of them;
+the common case is to simply not add them to `assertions` at all, since an `['error', {}]` entry
+will never actually fail — it isn't dangerous, just a no-op as a CI gate. (An earlier draft of this
+note claimed the opposite — that `['error', {}]` would always *fail* — based on reading
 `packages/utils/src/assertions.js`'s `minScore` logic in isolation; that reasoning missed that
 Lighthouse core normalizes the score before `lhci assert` sees it, and was corrected after running
 a real `lhci assert` against a real collected result during `structured-data-rich-result-eligibility`'s
-QA — `pixel-width-truncation`'s design carried the already-corrected conclusion forward rather than
-re-deriving and re-risking the same mistake.)
+QA — every informational audit built after that one carried the already-corrected conclusion
+forward rather than re-deriving and re-risking the same mistake.)
 
 For `pixel-width-truncation` specifically, that informational-only status isn't just a convenience
 choice — it follows directly from the ruleset-accuracy caveat above: gating CI on an unverifiable,
 reverse-engineered approximation would fail builds based on a guess this repo cannot confirm the
-accuracy of.
+accuracy of. For `h1-title-relevance`, it's because the word-overlap heuristic can produce false
+positives on a genuinely relevant H1 (synonyms, rephrasing) — see its own entry above.

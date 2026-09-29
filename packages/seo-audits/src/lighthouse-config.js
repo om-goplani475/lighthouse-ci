@@ -7,8 +7,8 @@
  * setting (a first-class Lighthouse setting — see docs/configuration.md). Adds the
  * structured-data-json-ld, structured-data-schema-properties,
  * structured-data-rich-result-eligibility, structured-data-type-conflicts,
- * pixel-width-truncation, meta-description-identical-to-title, and document-title-quality
- * gatherer/audits on top of Lighthouse's default set.
+ * pixel-width-truncation, meta-description-identical-to-title, document-title-quality,
+ * document-h1-count, and h1-title-relevance gatherer/audits on top of Lighthouse's default set.
  *
  * Paths below are plain relative strings, not require.resolve() calls: this file is
  * ESM (no bare `require`), and Lighthouse's own module resolver
@@ -26,6 +26,7 @@ const config = {
   artifacts: [
     {id: 'StructuredDataJsonLd', gatherer: './gatherers/structured-data-json-ld.js'},
     {id: 'PixelWidth', gatherer: './gatherers/pixel-width.js'},
+    {id: 'Headings', gatherer: './gatherers/headings.js'},
   ],
   audits: [
     './audits/structured-data-json-ld.js',
@@ -35,6 +36,8 @@ const config = {
     './audits/pixel-width-truncation.js',
     './audits/meta-description-identical-to-title.js',
     './audits/document-title-quality.js',
+    './audits/document-h1-count.js',
+    './audits/h1-title-relevance.js',
   ],
   categories: {
     'seo-extended': {
@@ -47,6 +50,8 @@ const config = {
         {id: 'pixel-width-truncation', weight: 1},
         {id: 'meta-description-identical-to-title', weight: 1},
         {id: 'document-title-quality', weight: 1},
+        {id: 'document-h1-count', weight: 1},
+        {id: 'h1-title-relevance', weight: 1},
       ],
     },
   },
