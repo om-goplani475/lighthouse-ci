@@ -1,6 +1,6 @@
 # Current plan — structured-data-type-conflicts
 
-- [ ] task-01: type-conflicts typedefs (additive) — pending
+- [x] task-01: type-conflicts typedefs (additive) — complete
 - [ ] task-02: type-conflicts ruleset JSON Schema — pending
 - [ ] task-03: Registry — add resolveTypeConflictsRuleset() (touches shared file) — pending
 - [ ] task-04: type-conflicts-engine.js — findDuplicates and findConflicts — pending

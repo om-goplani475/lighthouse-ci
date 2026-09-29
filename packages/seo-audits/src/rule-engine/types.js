@@ -5,7 +5,8 @@
  */
 
 /**
- * @typedef {'schema-org' | 'google-requirements' | 'eligibility'} FindingNamespace
+ * @typedef {'schema-org' | 'google-requirements' | 'eligibility' | 'duplicate-count' |
+ *   'conflicting-entity'} FindingNamespace
  * @typedef {'error' | 'info'} FindingSeverity
  */
 
@@ -39,6 +40,14 @@
 /** @typedef {{supported: boolean, richResultFeature: string}} EligibilityRuleSetTypeRule */
 /**
  * @typedef {{version: string, types: Record<string, EligibilityRuleSetTypeRule>}} EligibilityRuleSet
+ */
+
+/**
+ * @typedef {{
+ *   version: string,
+ *   singularTypes: string[],
+ *   identityFields: Record<string, string[]>,
+ * }} TypeConflictsRuleSet
  */
 
 export {};
