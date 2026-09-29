@@ -147,6 +147,18 @@ describe('structured-data-type-conflicts audit', () => {
     expect(result.details.rulesetVersions).toEqual({typeConflicts: '2026-10'});
   }, 30000);
 
+  it('does not crash or misbehave on a page with "@type": "__proto__" (security regression)', async () => {
+    const protoBlock = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': '__proto__',
+      x: 'y',
+    });
+    const result = await runAudit([{content: protoBlock}, {content: ORG_A}]);
+    // "__proto__" isn't a tracked type, so it's simply ignored — Organization alone is clean.
+    expect(result.score).toBe(1);
+    expect(result.details.items).toEqual([]);
+  }, 30000);
+
   it('both a real duplicate and a real conflict can be reported together on one page', async () => {
     const result = await runAudit([
       {content: ORG_A},

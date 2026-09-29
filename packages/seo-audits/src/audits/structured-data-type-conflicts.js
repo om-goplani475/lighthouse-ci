@@ -66,10 +66,16 @@ class StructuredDataTypeConflicts extends Audit {
    * @return {import('lighthouse/types/audit.js').default.Product}
    */
   static audit(artifacts) {
+    // Object.create(null) rather than {} — the key is the page's own JSON-LD "@type" value,
+    // fully attacker/page-controlled. A block declaring "@type": "__proto__" against a plain
+    // object literal would silently reassign that object's own prototype via the inherited
+    // __proto__ setter (confirmed: doesn't pollute the global Object.prototype, but does
+    // corrupt this object's own behavior) instead of creating a normal "__proto__" property.
+    // A null-prototype object has no such setter, so every key behaves as a plain data key.
     /** @type {Record<string, number>} */
-    const typeCounts = {};
+    const typeCounts = Object.create(null);
     /** @type {Record<string, Record<string, unknown>[]>} */
-    const blocksByType = {};
+    const blocksByType = Object.create(null);
 
     artifacts.StructuredDataJsonLd.forEach(block => {
       const parsed = tryParse(block.content);
