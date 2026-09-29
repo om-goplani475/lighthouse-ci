@@ -10,7 +10,8 @@ A new SEO audit in `packages/seo-audits` that, for each JSON-LD block on a page 
 of 12 tracked rich-result-eligible types, validates that the properties Google's structured-data
 guidelines call for (both required and recommended — treated as one severity, see below) are present,
 including specific well-known nested sub-object properties (e.g. `Product.offers.price`). This is
-feature #2 from the structured-data roadmap breakdown (`docs/roadmap.md`) — it builds on the existing
+feature #2 from the structured-data roadmap breakdown (`docs/phases/phase-2-structured-data.md`,
+moved from `docs/roadmap.md` 2026-09-29) — it builds on the existing
 `structured-data-json-ld` audit's JSON-LD parsing, but is a separate audit, not a change to it.
 
 Tracked types (all 12, per the roadmap decision to cover the full list in v1): `Article`, `Product`,

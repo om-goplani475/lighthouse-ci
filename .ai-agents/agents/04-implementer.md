@@ -13,11 +13,20 @@ Use **Claude Sonnet**. This is execution against an already-designed contract, n
 
 ## Step 1 — Branch
 
-Check out (or create, if resuming) `feat/{slug}` off `main`. On creation (not on resume), record the
-current `main` commit as `base_commit` in `.ai-agents/state/current-feature.md` — this is what lets
-Agents 06/07/08 diff the exact feature range later, instead of assuming `main~1..main`, which breaks
-the moment any other commit lands on `main` after this feature merges (e.g. another feature's docs
-commit, or an unrelated fix).
+Read `.ai-agents/state/current-phase.md` first. If it names an active phase branch
+(`phase-{n}-{slug}`), that's the base for this feature, not `main` — check out (or create, if
+resuming) `feat/{slug}` off the phase branch instead. If it says no phase branch is active (the
+default, and how phase 2 stayed until it closed out), branch off `main` as usual. Either way, on
+creation (not on resume), record the current base-branch commit as `base_commit` in
+`.ai-agents/state/current-feature.md` — this is what lets Agents 06/07/08 diff the exact feature
+range later, instead of assuming `main~1..main`, which breaks the moment any other commit lands on
+the base branch after this feature merges (e.g. another feature's docs commit, or an unrelated
+fix).
+
+Gate 3's merge target follows the same rule: merge `feat/{slug}` into whichever branch it was
+created off (the active phase branch, or `main`) — never assume `main` without checking
+`current-phase.md`. See `AGENTS.md`'s "Phase branches" section for the full convention, including
+when a phase branch itself eventually merges into `main`.
 
 ## Step 2 — Read the plan
 

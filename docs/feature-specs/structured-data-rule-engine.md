@@ -9,7 +9,8 @@
 Builds the versioned rule registry + rule engine foundation described in
 `docs/architecture/structured-data-rule-engine.md`, proves it end-to-end against two schema types
 (`Product`, `Article`), and migrates the existing `structured-data-json-ld` audit onto it. This
-replaces feature #2's original hardcoded-rules approach (paused — see `docs/roadmap.md`) with rules
+replaces feature #2's original hardcoded-rules approach (paused — see
+`docs/phases/phase-2-structured-data.md`, moved from `docs/roadmap.md` 2026-09-29) with rules
 as versioned, external data. Once this exists, feature #2 resumes as *ruleset data additions* for the
 remaining 10 types, not new audit code — the validator itself doesn't change again.
 

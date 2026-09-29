@@ -39,4 +39,6 @@ record. -->
 docs/qa/structured-data-validation.md. Previous-previous feature missing-meta-description closed
 2026-09-27: already satisfied by upstream, no implementation done. -->
 
-<!-- See docs/roadmap.md for the full structured-data feature breakdown this is part of. -->
+<!-- See docs/phases/phase-2-structured-data.md for the full structured-data feature breakdown
+this is part of (moved from docs/roadmap.md on 2026-09-29 when the per-phase-roadmap convention
+was adopted — see AGENTS.md's "Phase branches" section). -->

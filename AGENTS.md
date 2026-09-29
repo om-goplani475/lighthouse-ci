@@ -87,12 +87,48 @@ not "eventually."
 Gates are manual — you (the developer) read the checklist and the stage's output, then decide
 whether to move on. Nothing here auto-approves.
 
+## Phase branches (2026-09-29 convention)
+
+Work is grouped into **phases** — broad feature areas (structured data, page metadata, robots.txt/
+sitemap, etc.), each with its own tracked roadmap file at `docs/phases/phase-{n}-{slug}.md`. That
+file is the live source of truth for the phase: current status per feature, plus three explicit
+buckets — **Deferred** (a choice, could change), **To do later** (planned, just sequenced after
+something), and **Not possible / permanently out of scope** (a real technical or policy
+constraint, not a priority call). This replaced the old single `docs/roadmap.md`, which only
+covered structured data; see `docs/phases/phase-2-structured-data.md` for that file's new home
+and the reasoning behind the split.
+
+**Git workflow, from the phase a branch is opened for onward**:
+
+1. When a phase is picked up with its own branch, create `phase-{n}-{slug}` off `main` and record
+   it in `.ai-agents/state/current-phase.md`.
+2. Every feature within that phase still runs the full 9-stage pipeline exactly as documented
+   above — the only difference is `feat/{slug}` branches off `phase-{n}-{slug}` (not `main`), and
+   Gate 3's merge target is the phase branch (not `main`). Agent 04
+   (`.ai-agents/agents/04-implementer.md`, Step 1) reads `current-phase.md` to know which.
+3. Post-merge stages (`/write-qa`, `/security-review`, `/ci-integration`, `/write-changelog`) work
+   exactly as before, just diffing against commits that live on the phase branch until it's merged.
+4. **The phase branch only merges into `main` once every item in its `docs/phases/{file}.md` is
+   either done, or explicitly filed under Deferred/To do later/Not possible** — not on any other
+   cadence. This is a deliberate choice (decided 2026-09-29): `main` lags behind until a phase is
+   genuinely closed out, rather than catching up feature-by-feature. Merge with `--ff-only` and
+   delete the phase branch, same discipline as every other merge in this pipeline.
+5. Update `docs/phases/phase-{n}-{slug}.md`'s status and `current-phase.md` (clear it, or point at
+   the next phase) as part of that close-out — don't leave `current-phase.md` stale.
+
+**Phase 2 (structured data) is the one exception**: all of its work was built and merged straight
+to `main` before this convention existed. The decision (2026-09-29) was not to retroactively create
+a `phase-2-structured-data` branch — phase 2 keeps using the plain `feat/{slug}` → `main` flow for
+any further work, for consistency with its own history. `current-phase.md` records this explicitly
+so a future session doesn't assume a phase-2 branch exists and go looking for it.
+
 ## State files (`.ai-agents/state/`)
 
 | File | Tracks |
 |------|--------|
 | `current-feature.md` | The feature slug currently in flight, which stage it's at, and (from `/implement` and Gate 3) `base_commit`/`merged_head` — the exact commit range Agents 06/07/08 diff against. |
 | `current-plan.md` | The task list from `/sequence-tasks`, with each task's status (`pending`/`complete`) — `/implement` resumes from here if interrupted. |
+| `current-phase.md` | Which phase (if any) has an active phase branch open, and its `docs/phases/{file}.md` path — see "Phase branches" above. Read by Agent 04 to decide what `feat/{slug}` branches off. |
 | `security-findings.md` | Running log of findings from `/security-review`; a `critical` entry blocks the next `/intake` until resolved. |
 | `ci-backlog.md` | Advisory CI/build findings from `/ci-integration` that don't block merge. |
 | `changelog-draft.md` | Unreleased changelog entries, consolidated at release time. |
