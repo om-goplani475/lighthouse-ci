@@ -5,7 +5,8 @@ just structured data. Update this whenever a feature closes (stage `09-changelog
 `.ai-agents/state/current-feature.md`) or a new area gets broken down into features.
 
 Status values: **done** (merged + QA'd live, not just unit-tested) · **in progress** · **planned** ·
-**deferred** (deliberately not scoped yet, with a reason).
+**deferred** (deliberately not scoped yet, with a reason). See "Deferred and built-for-later" below
+for the consolidated list of everything intentionally not built, across all feature areas, with why.
 
 ## Structured data
 
@@ -23,13 +24,43 @@ property-validation behavior and stays as reference for the rule-engine feature 
 |---|---------|--------|--------------|
 | 0 | JSON-LD parsing, JSON validity, `@context`/`@type` presence | **done** | `structured-data-validation` — `docs/feature-specs/structured-data-validation.md` |
 | — | **Structured-data rule engine** (versioned registry + engine; also builds the real `structured-data-schema-properties` audit, scoped to `Product`+`Article`, and migrates `structured-data-json-ld` onto it) | **done** | `structured-data-rule-engine` — `docs/feature-specs/structured-data-rule-engine.md`, QA'd live `docs/qa/structured-data-rule-engine.md` |
-| 1 | Rich-result type detection (Article, Product, FAQ, HowTo, BreadcrumbList, Recipe, Review, Event, JobPosting, VideoObject, Organization, LocalBusiness) | planned | engine now available — this is mostly a report-formatting feature over data the engine already resolves |
+| 1 | Rich-result eligibility report (per-type inventory: which of the 12 tracked types are on the page, and whether Google currently documents rich-result support for each) | **done** | `structured-data-rich-result-eligibility` — `docs/feature-specs/structured-data-rich-result-eligibility.md`, QA'd live `docs/qa/structured-data-rich-result-eligibility.md`. Built as a genuinely separate, purely-informational audit (`scoreDisplayMode: informative`) rather than closing this as already-covered by the eligibility rows already inside `structured-data-schema-properties` — see that spec's "redundancy question" section for the reasoning Gate 0 weighed. |
 | 2 | Required/recommended property validation per schema type — all 12 types | **done** | `structured-data-remaining-types` — `docs/feature-specs/structured-data-remaining-types.md`, QA'd live `docs/qa/structured-data-remaining-types.md`. Shipped as pure ruleset data (`rules/*/2026-10.json`) with zero audit/engine code changes, confirming the rule-engine's core design promise. Original full-scope reference spec: `docs/feature-specs/structured-data-schema-properties.md`. |
-| 3 | Duplicate/conflicting `@type` detection | planned | depends on #1 existing first |
-| 4 | Cross-check structured data claims against visible page content (spam/policy risk detection) | deferred | fundamentally different kind of check (DOM-content comparison, real false-positive risk); needs its own careful spec, not bundled with the others |
-| 5 | Match Google's Rich Results Test rules exactly | deferred | Google's Rich Results Test is a closed validator, not a published spec — true parity isn't realistic. #2 (using Google's own published per-type guidelines) gets most of the practical value instead |
-| 6 | Microdata/RDFa support | deferred | separate markup format from JSON-LD, needs its own gatherer; JSON-LD is what Google actually recommends and what's dominant in practice — revisit only if a specific site needs it |
-| — | Automated Google-doc change detection, LLM-assisted rule extraction, autonomous rule publishing | **do not build yet** (detection/extraction: build later, once rule engine has run in practice; autonomous publishing: real no for now) | `docs/architecture/structured-data-rule-engine.md` |
+| 3 | Duplicate/conflicting `@type` detection | planned, now unblocked | depended on #1 existing first — #1 shipped 2026-09-29, so this can be intake'd next whenever picked up |
+| 4 | Cross-check structured data claims against visible page content (spam/policy risk detection) | deferred | see "Deferred and built-for-later" below |
+| 5 | Match Google's Rich Results Test rules exactly | deferred | see "Deferred and built-for-later" below |
+| 6 | Microdata/RDFa support | deferred | see "Deferred and built-for-later" below |
+
+## Deferred and built-for-later
+
+Everything intentionally *not* built, across all feature areas, consolidated in one place so it
+doesn't have to be re-discovered by reading every architecture doc and feature spec individually.
+Two different kinds of "not now," kept distinct:
+
+- **Deferred** — deliberately out of scope, with a real reason; may never get built unless that
+  reason changes.
+- **Built for later** — scoped, understood, and genuinely intended to happen, just not yet (usually
+  because it depends on something else shipping first, or on real-world usage data this pipeline
+  doesn't have yet).
+
+### Deferred
+
+| Item | Why deferred | Reference |
+|---|---|---|
+| Cross-check structured data claims against visible page content (spam/policy risk detection) — roadmap #4 | Fundamentally different kind of check (DOM-content comparison, not markup validation) with real false-positive risk; needs its own careful spec, not bundled with the structured-data property/eligibility work | `docs/roadmap.md` (this file) |
+| Exact parity with Google's Rich Results Test — roadmap #5 | It's a closed validator, not a published spec — true parity isn't realistically achievable from outside Google. Using Google's own *published* per-type guidelines (what `structured-data-schema-properties` already does) captures most of the practical value without chasing an unreachable target | `docs/roadmap.md` (this file) |
+| Microdata/RDFa support — roadmap #6 | Separate markup format from JSON-LD, needs its own gatherer from scratch. JSON-LD is what Google actually recommends and what's dominant in practice — revisit only if a specific real site actually needs it | `docs/roadmap.md` (this file) |
+| Autonomous rule publishing (rule-engine ruleset changes auto-merged without human review) | A real "no" for now, not just "not yet" — publishing ruleset changes that affect scoring without a human in the loop is a standing risk this pipeline isn't willing to take on, independent of tooling maturity | `docs/architecture/structured-data-rule-engine.md` |
+| Eligibility ruleset's boolean `supported` model (can't express "restricted to a narrow site category," only true/false) | `FAQPage`/`HowTo` are currently approximated as `supported: false` because Google actually restricts both to a narrow authoritative-site category and the schema has no middle state. Extending to a three-state schema (`supported: 'restricted'` + a note field) was raised as an option and explicitly deferred rather than folded into either shipped feature, to keep each one data-only/scope-contained | `docs/audit-specs/structured-data-remaining-types.md` |
+
+### Built for later
+
+| Item | What unblocks it / when it's intended | Reference |
+|---|---|---|
+| Duplicate/conflicting `@type` detection — roadmap #3 | Depended on rich-result type/eligibility data being resolvable per page, which `structured-data-rich-result-eligibility` now provides (shipped 2026-09-29). Unblocked — next in line whenever picked up | `docs/roadmap.md` (this file) |
+| Automated Google-doc change detection (notice when Google's published structured-data guidelines change) | Intended to build once the rule engine has run in practice for a while — needs real usage first to know what "detected a change" should actually trigger (a PR draft? a backlog item? nothing automatic?) rather than guessing that workflow up front | `docs/architecture/structured-data-rule-engine.md` |
+| LLM-assisted rule extraction (turn a detected Google doc change into a ruleset JSON diff automatically) | Same timing as automated detection above — deliberately sequenced after it, not built in parallel, since extraction without reliable change-detection first would have nothing trustworthy to extract from | `docs/architecture/structured-data-rule-engine.md` |
+| Remaining 10 types' `Recipe`/`Event`/`JobPosting` property lists — lower-confidence entries not folded into `required` (e.g. `Recipe.aggregateRating`/`nutrition`, `Event.offers`, `JobPosting.validThrough`) | Deliberately left out of v1 to avoid over-claiming confidence in Google's exact required/recommended boundary for these three types, which hedges more than `Product`/`Article`/the others did. Candidate additions for the next ruleset version once there's real signal on whether they matter | `docs/audit-specs/structured-data-remaining-types.md` |
 
 ## Other audit areas
 
