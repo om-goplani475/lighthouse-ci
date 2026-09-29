@@ -8,7 +8,8 @@
  * structured-data-json-ld, structured-data-schema-properties,
  * structured-data-rich-result-eligibility, structured-data-type-conflicts,
  * pixel-width-truncation, meta-description-identical-to-title, document-title-quality,
- * document-h1-count, and h1-title-relevance gatherer/audits on top of Lighthouse's default set.
+ * document-h1-count, h1-title-relevance, robots-directives-report, robots-directives-conflict,
+ * and canonical-https gatherer/audits on top of Lighthouse's default set.
  *
  * Paths below are plain relative strings, not require.resolve() calls: this file is
  * ESM (no bare `require`), and Lighthouse's own module resolver
@@ -38,6 +39,9 @@ const config = {
     './audits/document-title-quality.js',
     './audits/document-h1-count.js',
     './audits/h1-title-relevance.js',
+    './audits/robots-directives-report.js',
+    './audits/robots-directives-conflict.js',
+    './audits/canonical-https.js',
   ],
   categories: {
     'seo-extended': {
@@ -52,6 +56,9 @@ const config = {
         {id: 'document-title-quality', weight: 1},
         {id: 'document-h1-count', weight: 1},
         {id: 'h1-title-relevance', weight: 1},
+        {id: 'robots-directives-report', weight: 1},
+        {id: 'robots-directives-conflict', weight: 1},
+        {id: 'canonical-https', weight: 1},
       ],
     },
   },

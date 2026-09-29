@@ -120,6 +120,31 @@ rationale and the agent pipeline this package was built through.
   `<h1>` independently when a page has more than one (which `document-h1-count` also flags as its
   own, separate structural issue). Not-applicable when there's no title or no H1 at all — nothing
   to compare.
+- **`robots-directives-report`** — lists every directive found in `<meta name="robots">` and/or
+  the `X-Robots-Tag` HTTP response header, each with a plain-English explanation of what it
+  actually does (`noindex`, `nofollow`, `nosnippet`, `noarchive`, `max-snippet`,
+  `max-image-preview`, `max-video-preview`, and a few others). Purely informational — having
+  directives isn't inherently good or bad (a deliberately noindexed staging page is fine); this is
+  a report, not a pass/fail check. An unrecognized token (a likely typo) is still listed, flagged
+  as unrecognized, rather than silently dropped. No new gatherer — reads Lighthouse core's own
+  `MetaElements` artifact plus the main document's response headers via core's `MainResource`
+  computed artifact (the same one core's own `canonical` audit already uses).
+- **`robots-directives-conflict`** — scored. Flags when the meta robots tag and the
+  `X-Robots-Tag` header disagree on indexability (one says `noindex`/`none`, the other doesn't).
+  Google honors the more restrictive of the two, but a mismatch is usually unintentional (e.g. a
+  CDN or server config adding a blanket header that contradicts an intentionally-indexable page's
+  meta tag) rather than a deliberate editorial choice, so this is worth failing a build over.
+  Not-applicable unless **both** sources have at least one directive — a page with only a meta tag
+  or only a header has nothing to conflict with, which is the normal case for most pages.
+- **`canonical-https`** — flags a canonical URL that uses `http://` instead of `https://`.
+  Deliberately narrow: Lighthouse core's own `canonical` audit already checks presence, validity,
+  absoluteness, multiple-conflicting-canonicals, hreflang mismatches, and the "points to domain
+  root" mistake (confirmed by reading its source before building this) — this audit only adds the
+  HTTPS check. **Does not** re-fetch the canonical URL to confirm it actually resolves (200, not
+  redirected/404/blocked) or chase canonical chains (A→B→A) — both would require a new
+  outbound-fetch capability this package has never had, with real SSRF-prevention obligations (see
+  `.ai-agents/prompts/security-checklist.md`); recorded as a "to do later" item in
+  `docs/phases/phase-1-page-metadata.md` rather than built now.
 
 ### Finding namespaces
 
@@ -163,18 +188,19 @@ module.exports = {
 };
 ```
 
-This adds all nine audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all twelve audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `pixel-width-truncation`, `meta-description-identical-to-title`, `document-title-quality`,
-`document-h1-count`, `h1-title-relevance`) on top of Lighthouse's default audits (via
+`document-h1-count`, `h1-title-relevance`, `robots-directives-report`,
+`robots-directives-conflict`, `canonical-https`) on top of Lighthouse's default audits (via
 `extends: 'lighthouse:default'` — see `src/lighthouse-config.js`), in a new `seo-extended`
 category, without replacing or altering any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the nine audits are part of this fork's shared `all`/`recommended` presets
+None of the twelve audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all nine here are opt-in via `configPath`, so they can't be part of that guarantee.
+default, and all twelve here are opt-in via `configPath`, so they can't be part of that guarantee.
 Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
@@ -197,19 +223,24 @@ module.exports = {
         'document-h1-count': ['error', {}], // or 'warn'
         // Deliberately weak heuristic, never gates CI — same informational caveat as above.
         'h1-title-relevance': ['warn', {}],
+        // Purely informational, always passes — see below.
+        'robots-directives-report': ['warn', {}],
+        // A real technical conflict, scored normally.
+        'robots-directives-conflict': ['error', {}], // or 'warn'
+        'canonical-https': ['error', {}], // or 'warn'
       },
     },
   },
 };
 ```
 
-**A note on asserting `structured-data-rich-result-eligibility`, `pixel-width-truncation`, and
-`h1-title-relevance`**: all three audits are `scoreDisplayMode: informative` (none ever has a
-pass/fail score, by design — see
+**A note on asserting `structured-data-rich-result-eligibility`, `pixel-width-truncation`,
+`h1-title-relevance`, and `robots-directives-report`**: all four audits are
+`scoreDisplayMode: informative` (none ever has a pass/fail score, by design — see
 above). Verified live (`lhci collect`/`lhci assert` against a real page): Lighthouse itself
 normalizes an `informative` audit's LHR `score` to `1` before `lhci assert` ever reads it
 (`node_modules/lighthouse/core/audits/audit.js`'s `_normalizeAuditScore`) — so a `minScore`
-assertion on any of the three **always passes**, at any threshold, regardless of what the report
+assertion on any of the four **always passes**, at any threshold, regardless of what the report
 actually shows. This means there's genuinely nothing to gate CI on with `minScore` for any of them;
 the common case is to simply not add them to `assertions` at all, since an `['error', {}]` entry
 will never actually fail — it isn't dangerous, just a no-op as a CI gate. (An earlier draft of this

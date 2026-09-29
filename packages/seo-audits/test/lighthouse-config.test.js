@@ -53,7 +53,7 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('meta-description');
     expect(auditIds).toContain('document-title');
 
-    // And all nine of this fork's audits are actually added, not just defaults preserved.
+    // And all twelve of this fork's audits are actually added, not just defaults preserved.
     expect(auditIds).toContain('structured-data-json-ld');
     expect(auditIds).toContain('structured-data-schema-properties');
     expect(auditIds).toContain('structured-data-rich-result-eligibility');
@@ -63,18 +63,24 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('document-title-quality');
     expect(auditIds).toContain('document-h1-count');
     expect(auditIds).toContain('h1-title-relevance');
+    expect(auditIds).toContain('robots-directives-report');
+    expect(auditIds).toContain('robots-directives-conflict');
+    expect(auditIds).toContain('canonical-https');
   }, 30000);
 
-  it('adds the seo-extended category with all nine audits, without touching the core seo category', async () => {
+  it('adds the seo-extended category with all twelve audits, without touching the core seo category', async () => {
     const {categories} = await resolveConfig();
 
     expect(categories['seo-extended']).toBeDefined();
     expect(categories['seo-extended'].auditRefs.map(ref => ref.id).sort()).toEqual([
+      'canonical-https',
       'document-h1-count',
       'document-title-quality',
       'h1-title-relevance',
       'meta-description-identical-to-title',
       'pixel-width-truncation',
+      'robots-directives-conflict',
+      'robots-directives-report',
       'structured-data-json-ld',
       'structured-data-rich-result-eligibility',
       'structured-data-schema-properties',
