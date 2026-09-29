@@ -58,6 +58,27 @@ rationale and the agent pipeline this package was built through.
   - Not-applicable only when there are zero blocks of any singular type *and* zero blocks of any
     identity-field-bearing type — a page with everything correctly non-duplicated/non-conflicting
     scores 1, it isn't skipped.
+- **`pixel-width-truncation`** — flags when the page's `<title>` or meta description would likely be
+  visually truncated in Google's search results, based on **real rendered pixel width** measured via
+  an off-screen canvas in the page's own browser context (a new gatherer, `PixelWidth` — not a
+  character-count approximation). Google truncates SERP snippets by pixel width, not character
+  count, so two texts of the same length can truncate differently depending on which characters they
+  contain. `score` is always `null` (`scoreDisplayMode: informative`) — see "A note on asserting
+  informational audits" below for why, and read it before wiring this into CI. Not-applicable only
+  when both title and description are absent from the page (a missing title/description is
+  `document-title`'s/`missing-meta-description`'s concern, not this audit's); a single absent field
+  is simply skipped, not treated as not-applicable.
+
+  **The reference font/size and pixel budgets are an unverified approximation, stated plainly, not
+  buried**: Google does not officially publish the exact font, size, or pixel budget it uses to
+  render/truncate SERP snippets, and these are known to vary over time and by device. The values in
+  `rules/serp-pixel-budgets/` are a widely-cited industry-SEO-tooling convention, not verified Google
+  documentation — a materially weaker confidence basis than every other ruleset in this package (those
+  at least approximate a *published* Google guideline; this approximates an *unpublished* rendering
+  detail with no official source to check against at all). A flagged row means "may be truncated
+  under this approximate model," never "will be truncated" or an unqualified "is too long" — the
+  audit's own report messaging is written accordingly, and any consumer surfacing these results
+  should keep that hedge.
 
 ### Finding namespaces
 
@@ -74,6 +95,10 @@ concerns it came from — never blended into one undifferentiated list:
   (`@context`/`@type` presence), not by `structured-data-schema-properties`.
 - **`duplicate-count`**/**`conflicting-entity`** — used by `structured-data-type-conflicts` (see
   above); `duplicate-count` drives that audit's score, `conflicting-entity` never does.
+
+`pixel-width-truncation` deliberately does **not** use the `Finding` model at all — it reports a
+direct measured-pixel-width-vs-budget table, not a namespaced finding, since `Finding`'s shape
+doesn't fit that data naturally.
 
 Rule content is versioned (`rules/{namespace}/{version}.json`, e.g. `2026-09`) — every audit result
 stamps which ruleset version(s) it used into `details.rulesetVersions`, so an old report can be
@@ -97,16 +122,17 @@ module.exports = {
 };
 ```
 
-This adds all four audits (`structured-data-json-ld`, `structured-data-schema-properties`,
-`structured-data-rich-result-eligibility`, `structured-data-type-conflicts`) on top of Lighthouse's
-default audits (via `extends: 'lighthouse:default'` — see `src/lighthouse-config.js`), in a new
-`seo-extended` category, without replacing or altering any of Lighthouse's own defaults.
+This adds all five audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+`structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
+`pixel-width-truncation`) on top of Lighthouse's default audits (via `extends: 'lighthouse:default'`
+— see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
+any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the four audits are part of this fork's shared `all`/`recommended` presets
+None of the five audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all four here are opt-in via `configPath`, so they can't be part of that guarantee. Set
+default, and all five here are opt-in via `configPath`, so they can't be part of that guarantee. Set
 severity yourself in your own `.lighthouserc.js`:
 
 ```js
@@ -121,22 +147,31 @@ module.exports = {
         'structured-data-rich-result-eligibility': ['warn', {}],
         // Has a real scored component (duplicate-count) — a minScore assertion is meaningful here.
         'structured-data-type-conflicts': ['error', {}], // or 'warn'
+        // Same informational-only caveat as structured-data-rich-result-eligibility — see below.
+        'pixel-width-truncation': ['warn', {}],
       },
     },
   },
 };
 ```
 
-**A note on asserting `structured-data-rich-result-eligibility`**: this audit is
-`scoreDisplayMode: informative` (it never has a pass/fail score, by design — see above). Verified
-live (`lhci collect`/`lhci assert` against a real page): Lighthouse itself normalizes an
-`informative` audit's LHR `score` to `1` before `lhci assert` ever reads it
+**A note on asserting `structured-data-rich-result-eligibility` and `pixel-width-truncation`**: both
+audits are `scoreDisplayMode: informative` (neither ever has a pass/fail score, by design — see
+above). Verified live (`lhci collect`/`lhci assert` against a real page): Lighthouse itself
+normalizes an `informative` audit's LHR `score` to `1` before `lhci assert` ever reads it
 (`node_modules/lighthouse/core/audits/audit.js`'s `_normalizeAuditScore`) — so a `minScore`
-assertion on this audit **always passes**, at any threshold, regardless of what the report actually
-shows. This means there's genuinely nothing to gate CI on with `minScore` here; the common case is
-to simply not add this audit to `assertions` at all, since a `['error', {}]` entry will never
+assertion on either audit **always passes**, at any threshold, regardless of what the report actually
+shows. This means there's genuinely nothing to gate CI on with `minScore` for either one; the common
+case is to simply not add them to `assertions` at all, since an `['error', {}]` entry will never
 actually fail — it isn't dangerous, just a no-op as a CI gate. (An earlier draft of this note
 claimed the opposite — that `['error', {}]` would always *fail* — based on reading
 `packages/utils/src/assertions.js`'s `minScore` logic in isolation; that reasoning missed that
 Lighthouse core normalizes the score before `lhci assert` sees it, and was corrected after running
-a real `lhci assert` against a real collected result during this feature's QA.)
+a real `lhci assert` against a real collected result during `structured-data-rich-result-eligibility`'s
+QA — `pixel-width-truncation`'s design carried the already-corrected conclusion forward rather than
+re-deriving and re-risking the same mistake.)
+
+For `pixel-width-truncation` specifically, that informational-only status isn't just a convenience
+choice — it follows directly from the ruleset-accuracy caveat above: gating CI on an unverifiable,
+reverse-engineered approximation would fail builds based on a guess this repo cannot confirm the
+accuracy of.
