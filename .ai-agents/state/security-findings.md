@@ -1,5 +1,40 @@
 # Security findings
 
+## 2026-09-29 — structured-data-type-conflicts
+
+- severity: low
+- finding: `structured-data-type-conflicts.js`'s `audit()` originally built `typeCounts` and
+  `blocksByType` as plain `{}` object literals keyed directly by the page's own JSON-LD `@type`
+  value — fully page/attacker-controlled. A block declaring `"@type": "__proto__"` against a plain
+  object literal triggers the inherited `__proto__` accessor, silently reassigning that specific
+  object's own prototype instead of creating a normal data property. Confirmed via direct Node
+  test: does **not** pollute the global `Object.prototype` (other objects/audits are unaffected —
+  the effect is contained to that one local object), but it is undefined-ish, unintended behavior a
+  page shouldn't be able to trigger at all.
+- status: **resolved**, fixed in the same sitting rather than deferred to backlog (cheap fix, real
+  code I'd just written) — both objects now use `Object.create(null)`, which has no `__proto__`
+  setter, so every `@type` string behaves as an ordinary data key. Verified live: a page with
+  `"@type": "__proto__"` now audits cleanly (score 1, no findings — the type simply isn't tracked,
+  same as any other unrecognized type). Added a regression test
+  (`structured-data-type-conflicts.test.js`) asserting this specific case, not just reasoning about
+  it.
+- other checklist items reviewed, no findings:
+  - SSRF / network fetch: not applicable — no network code anywhere in the diff (confirmed via
+    grep for `fetch|http\.|https\.|child_process|exec\(|eval\(` across the new audit, engine, and
+    registry addition — zero matches).
+  - New dependency: **none** — `package.json` untouched.
+  - `registry.js`'s modification (adding `resolveTypeConflictsRuleset()`) is additive-only, reviewed
+    against the three already-shipped `resolve*Ruleset` functions — no shared-code risk introduced.
+  - Report data exposure (worth noting, not fixing): `conflicting-entity` findings embed the full,
+    unbounded field *values* that differ (e.g. both prices in a price conflict) into the report
+    message — broader than `structured-data-json-ld`'s existing 80-char-capped snippet. Assessed as
+    low risk under the same "JSON-LD is public, crawler-facing markup the site owner already
+    published" reasoning accepted for that snippet, but unlike the snippet this has no length cap —
+    a pathological page with a very large field value could produce an unusually large report
+    entry. Not fixed now (truncating could remove the exact information a developer needs to
+    resolve the conflict), but worth a length cap if this proves to matter in practice — recorded
+    for a future revision, not blocking.
+
 ## 2026-09-29 — structured-data-rich-result-eligibility
 
 **No findings.** Reviewed against `.ai-agents/prompts/security-checklist.md`. This feature's entire

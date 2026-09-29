@@ -1,5 +1,14 @@
 # CI backlog
 
+## 2026-09-29 — structured-data-type-conflicts
+
+- item: no gap found. New rule-engine module, new ruleset namespace, and a new audit — no new
+  dependency (`package.json` untouched, confirmed via diff), no native/system dependency, no new
+  build step. `registry.js`'s modification is additive (one new exported function) and doesn't
+  change CI requirements. Existing `test:typecheck`/`test:lint`/`test:unit` pipeline already covers
+  everything touched. No Dockerfile exists to update. No CI changes made.
+- status: done (nothing to do)
+
 ## 2026-09-29 — structured-data-rich-result-eligibility
 
 - item: no gap found. New audit file + test + README/config changes only — no new dependency
