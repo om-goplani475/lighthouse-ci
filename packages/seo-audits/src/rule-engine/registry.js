@@ -136,3 +136,17 @@ export function resolveTypeConflictsRuleset(versionOrCurrent = 'current') {
     )
   );
 }
+
+/**
+ * @param {string} [versionOrCurrent]
+ * @return {import('./types.js').SerpPixelBudgetsRuleSet}
+ */
+export function resolveSerpPixelBudgetsRuleset(versionOrCurrent = 'current') {
+  return /** @type {import('./types.js').SerpPixelBudgetsRuleSet} */ (
+    resolveRuleset(
+      path.join(RULES_ROOT, 'serp-pixel-budgets'),
+      path.join(RULES_ROOT, 'schema', 'serp-pixel-budgets-ruleset.schema.json'),
+      versionOrCurrent
+    )
+  );
+}
