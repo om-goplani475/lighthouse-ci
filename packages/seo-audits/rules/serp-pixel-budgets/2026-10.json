@@ -1,0 +1,11 @@
+{
+  "version": "2026-10",
+  "title": {
+    "font": "400 20px Arial, sans-serif",
+    "maxWidthPx": {"desktop": 600, "mobile": 580}
+  },
+  "description": {
+    "font": "400 14px Arial, sans-serif",
+    "maxWidthPx": {"desktop": 920, "mobile": 680}
+  }
+}
