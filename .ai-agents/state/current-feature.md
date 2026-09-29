@@ -1,14 +1,18 @@
 # Current feature
 
 - slug: pixel-width-truncation
-- stage: 03-sequenced
+- stage: 04-implemented-merged
 - spec: docs/feature-specs/pixel-width-truncation.md
 - audit_spec: docs/audit-specs/pixel-width-truncation.md
 - contract: docs/feature-contracts/pixel-width-truncation.md
 - task_sequence: docs/task-sequences/pixel-width-truncation.md
-- phase: 1 (page-metadata) — see .ai-agents/state/current-phase.md; this feature's branch is
+- phase: 1 (page-metadata) — see .ai-agents/state/current-phase.md; branch was
   feat/pixel-width-truncation off phase-1-page-metadata, not off main
 - base_commit: 1729f7c904bc0ba44ed753c6aa3dc19d9f251e05 (phase-1-page-metadata, at branch creation)
+- merged: 5fea5d1 (fast-forward into phase-1-page-metadata, merged locally — no PR/CI gate for this
+  one, per explicit developer instruction to merge locally and push directly)
+
+<!-- Next: /write-qa and /security-review, per AGENTS.md's "merged != done" rule — not deferred. -->
 
 <!-- structured-data-type-conflicts closed 2026-09-29: complete, all 9 stages run, merged 19cbbc2
 (includes a post-merge prototype-safety security fix), QA'd live, see
