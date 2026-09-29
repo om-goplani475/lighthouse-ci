@@ -1,18 +1,20 @@
 # Current feature
 
-- slug: pixel-width-truncation
-- stage: 04-implemented-merged
-- spec: docs/feature-specs/pixel-width-truncation.md
-- audit_spec: docs/audit-specs/pixel-width-truncation.md
-- contract: docs/feature-contracts/pixel-width-truncation.md
-- task_sequence: docs/task-sequences/pixel-width-truncation.md
-- phase: 1 (page-metadata) — see .ai-agents/state/current-phase.md; branch was
-  feat/pixel-width-truncation off phase-1-page-metadata, not off main
-- base_commit: 1729f7c904bc0ba44ed753c6aa3dc19d9f251e05 (phase-1-page-metadata, at branch creation)
-- merged: 5fea5d1 (fast-forward into phase-1-page-metadata, merged locally — no PR/CI gate for this
-  one, per explicit developer instruction to merge locally and push directly)
+- slug: none — pixel-width-truncation closed out below
+- phase: 1 (page-metadata), still in progress — see docs/phases/phase-1-page-metadata.md for the
+  next item to intake (1b: meta description identical/near-identical to page title)
 
-<!-- Next: /write-qa and /security-review, per AGENTS.md's "merged != done" rule — not deferred. -->
+<!-- pixel-width-truncation closed 2026-09-29: complete, all 9 stages run, merged 5fea5d1 locally
+onto phase-1-page-metadata (no PR/CI gate — explicit developer instruction to merge locally and
+push directly), QA'd live via real lhci collect/assert runs (see docs/qa/pixel-width-truncation.md,
+including live resolution of the audit spec's flagged fallback-font risk), security-reviewed with
+no findings (see .ai-agents/state/security-findings.md) — note the security review's "post as a
+comment on the closed PR" step didn't apply, since there was no PR; findings were appended directly
+to security-findings.md and reported to the developer instead. First gatherer in this package to
+depend on the rule engine (documented architectural exception, not a pattern to copy reflexively).
+spec: docs/feature-specs/pixel-width-truncation.md, audit spec:
+docs/audit-specs/pixel-width-truncation.md, contract: docs/feature-contracts/pixel-width-truncation.md,
+task sequence: docs/task-sequences/pixel-width-truncation.md. -->
 
 <!-- structured-data-type-conflicts closed 2026-09-29: complete, all 9 stages run, merged 19cbbc2
 (includes a post-merge prototype-safety security fix), QA'd live, see

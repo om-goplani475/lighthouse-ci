@@ -1,5 +1,60 @@
 # Security findings
 
+## 2026-09-29 — pixel-width-truncation
+
+**No findings.** Reviewed against `.ai-agents/prompts/security-checklist.md`. Merged diff range
+`1729f7c..5fea5d1` on `phase-1-page-metadata` (merged locally, no PR — see
+`.ai-agents/state/current-feature.md`). `git diff --name-only` scoped to `*.js` files, grepped for
+`fetch\(|http\.|https\.|child_process|exec\(|eval\(|--no-sandbox|--disable-web-security|appendChild`
+— the only matches are `child_process.exec`/`execFile` in four **test** files, the same
+already-reviewed shell-out-to-real-node pattern every audit test in this package uses to work around
+Jest's inability to load a module using `import.meta.url` (see `structured-data-validation`'s and
+`structured-data-rule-engine`'s prior reviews of this exact pattern) — hardcoded local script
+content and hardcoded local file paths only, never attacker/page-influenced input.
+
+- **SSRF / network fetch**: not applicable — the new `PixelWidth` gatherer makes zero network
+  requests. It reads `document.title` and the existing `<meta name="description">` element's
+  `content` attribute, both already present in the DOM from the page load Lighthouse's own runner
+  performs — no URL is fetched, discovered, or followed by this feature at all.
+- **Crawler / resource abuse**: not applicable — same reasoning; no additional network activity
+  beyond the single page load every gatherer already gets for free.
+- **Chromium / Puppeteer sandbox**: no new CDP session, no new Chromium flags. The gatherer reuses
+  `driver.executionContext.evaluate(fn, {args, useIsolation: true, deps: []})` — the exact same
+  mechanism `structured-data-json-ld`'s gatherer already uses (reviewed and accepted in
+  `structured-data-validation`'s security review) — with `useIsolation: true`, i.e. the evaluated
+  function runs in a CDP isolated world, not the page's own JS realm.
+- **Canvas isolation / page-observability, reviewed beyond the checklist's literal items**: the
+  off-screen `<canvas>` element the evaluated function creates via `document.createElement('canvas')`
+  is **never appended to the live DOM** (confirmed by reading `gatherers/pixel-width.js`'s
+  `collectPixelWidth` — no `appendChild`/`insertBefore` call anywhere) and the measurement itself
+  runs in an isolated world. Two independent reasons the page's own scripts (including any
+  canvas-fingerprinting-detection code a malicious/adversarial test page might run) cannot observe
+  this gatherer's canvas use at all.
+- **Data exposure**: the audit's report rows include the measured `text` (the page's own `<title>`
+  content and meta description content) — the exact same values Lighthouse core's own
+  `document-title` and `meta-description` audits already surface in every standard LHR report. No
+  new data (cookies, headers, unrelated page content) is captured; `rulesetVersions` stamps only an
+  internal version string (`"2026-10"`), never page-derived data.
+- **Rule-derived input, reviewed as a genuine architectural first**: this is the first gatherer in
+  the package to import from `rule-engine/registry.js`. The two font strings it passes as `args`
+  into the evaluated page function (`ctx.font = font`) come exclusively from this fork's own
+  checked-in, schema-validated `rules/serp-pixel-budgets/*.json` — never from page content or any
+  other attacker-influenced source — so there is no injection surface through the font value, and
+  `registry.js`'s existing file-read/schema-validation path (already reviewed in
+  `structured-data-rule-engine`) is unchanged by this addition beyond one new additive
+  `resolveSerpPixelBudgetsRuleset()` export.
+- **Minor, non-blocking observation**: `ctx.measureText(text)` is called on `document.title`/the
+  meta description's raw content with no length cap — a pathological page with an extremely long
+  title or description string could make this measurement call slower. Not a new risk: Lighthouse
+  core's own `document-title`/`meta-description` audits already read these same fields with no
+  length cap, and canvas text measurement is a bounded, non-recursive browser API call (no
+  unbounded loop, no network I/O) — the cost scales with input size but cannot hang or amplify into
+  something larger than the string itself. Recorded for completeness per the checklist's
+  data-exposure/resource-use criteria, not because it changes this feature's risk profile from any
+  existing audit in the package.
+
+No `critical`/`high`/`medium`/`low` findings requiring action. Nothing blocks the next feature.
+
 ## 2026-09-29 — structured-data-type-conflicts
 
 - severity: low
