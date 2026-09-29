@@ -1,12 +1,15 @@
 # Current feature
 
 - slug: structured-data-type-conflicts
-- stage: 03-sequenced
+- stage: 04-implemented-merged
 - spec: docs/feature-specs/structured-data-type-conflicts.md
 - audit_spec: docs/audit-specs/structured-data-type-conflicts.md
 - contract: docs/feature-contracts/structured-data-type-conflicts.md
 - task_sequence: docs/task-sequences/structured-data-type-conflicts.md
 - base_commit: 71e55b5
+- merged_head: 13257df
+
+Merged, not yet done — /write-qa, /security-review, /ci-integration, /write-changelog still to run.
 
 <!-- structured-data-rich-result-eligibility closed 2026-09-29: complete, all 9 stages run, merged
 62d659c, QA'd live, see docs/qa/structured-data-rich-result-eligibility.md. Shipped the per-type
