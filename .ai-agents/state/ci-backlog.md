@@ -1,5 +1,13 @@
 # CI backlog
 
+## 2026-09-29 — structured-data-rich-result-eligibility
+
+- item: no gap found. New audit file + test + README/config changes only — no new dependency
+  (`package.json` untouched, confirmed via diff), no native/system dependency, no new build step.
+  Existing `test:typecheck`/`test:lint`/`test:unit` pipeline already covers everything touched. No
+  Dockerfile exists to update. No CI changes made.
+- status: done (nothing to do)
+
 ## 2026-09-28 — structured-data-remaining-types
 
 - item: no gap found. This feature is additive JSON ruleset data plus test-file changes only — no

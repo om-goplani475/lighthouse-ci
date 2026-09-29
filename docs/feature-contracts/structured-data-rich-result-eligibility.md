@@ -2,6 +2,13 @@
 
 - slug: structured-data-rich-result-eligibility
 
+**Correction (2026-09-29, added during `/write-qa`)**: the "Assertion presets" section below
+originally documented a supposed `['error', {}]` failure hazard for this audit — that was wrong,
+disproven by a live `lhci assert` run (Lighthouse normalizes `informative`-mode `score` to `1`
+before `lhci assert` reads it, so a `minScore` assertion always passes). The section is left below
+unedited as the design-time record; see `docs/qa/structured-data-rich-result-eligibility.md` and
+`packages/seo-audits/README.md` for the corrected guidance.
+
 ## TypeScript types
 
 **No changes to `packages/seo-audits/src/rule-engine/types.js`.** This audit reuses

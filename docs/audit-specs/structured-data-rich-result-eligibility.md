@@ -4,6 +4,15 @@
 - upstream-sync checked against: lighthouse@12.6.1 (unchanged since the last two features —
   confirmed via `node_modules/lighthouse/package.json`, no `node_modules`/lockfile commits since).
 
+**Correction (2026-09-29, added during `/write-qa`)**: the "INFORMATIVE scoreDisplayMode and lhci
+assert" risk item below claimed `['error', {}]` would make this audit always *fail*. That was wrong
+— verified live with a real `lhci collect`/`lhci assert` run: Lighthouse core normalizes an
+`informative` audit's LHR `score` to `1` before `lhci assert` ever reads it, so a `minScore`
+assertion on this audit always *passes*, regardless of threshold. The risk item is left below
+unedited, as the record of what was reasoned about at design time; see
+`docs/qa/structured-data-rich-result-eligibility.md` for the live verification that corrected it,
+and `packages/seo-audits/README.md` for the corrected consumer-facing guidance.
+
 ## Gatherer
 
 - New gatherer: none (reusing: `StructuredDataJsonLd`,

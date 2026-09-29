@@ -1,5 +1,34 @@
 # Security findings
 
+## 2026-09-29 — structured-data-rich-result-eligibility
+
+**No findings.** Reviewed against `.ai-agents/prompts/security-checklist.md`. This feature's entire
+diff (`14fb4b0..62d659c`) is a new audit file, its fixture test, a config-registration change, and
+README/state docs — confirmed via `git diff --name-only`, zero matches for
+`fetch|http\.|https\.|child_process|exec\(|eval\(` in the new audit source.
+
+- SSRF / network fetch: not applicable — no network access, no file I/O beyond what
+  `resolveEligibilityRuleset()` already does (reviewed and accepted in the `structured-data-rule-engine`
+  review). This feature adds no new file-reading logic of its own.
+- New dependency: **none** — `packages/seo-audits/package.json` has no diff in this feature.
+- Report data exposure: the `type` column can now contain **any** `@type` string found on the page,
+  including untracked ones — this is a deliberate behavioral difference from
+  `structured-data-schema-properties` (which only echoes a fixed allowlist of 12 known type names)
+  and is worth flagging explicitly rather than waving through by precedent. Assessed as low risk:
+  `@type` values are, by definition, values a site owner already chose to publish in public,
+  crawler-facing JSON-LD markup — the same category of already-public data
+  `structured-data-json-ld`'s snippet field was reviewed and accepted for. An arbitrary string here
+  is bounded (comes from a JSON string value, rendered as a plain-text table cell, not interpreted
+  as markup/HTML) and Lighthouse's own report renderer already treats table `text` cells as
+  plain text, not raw HTML — no new XSS/injection surface introduced by widening from 12 fixed
+  values to arbitrary page-supplied strings.
+- Prototype pollution / DoS: grouping uses a plain `Map` keyed by the `@type` string (not a plain
+  object), so a page supplying `@type: "__proto__"` cannot pollute `Object.prototype` — confirmed by
+  reading the implementation, not assumed. Unbounded-growth risk (an attacker page with many
+  thousands of distinct `@type` strings inflating the report table) is the same bound every other
+  audit consuming this gatherer's artifact already accepts (bounded by whatever
+  `StructuredDataJsonLd` collects, no new gatherer here).
+
 ## 2026-09-28 — structured-data-remaining-types
 
 **No findings.** Reviewed against `.ai-agents/prompts/security-checklist.md`. This feature's entire

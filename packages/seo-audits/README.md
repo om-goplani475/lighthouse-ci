@@ -98,23 +98,24 @@ module.exports = {
       assertions: {
         'structured-data-json-ld': ['error', {}], // or 'warn'
         'structured-data-schema-properties': ['error', {}], // or 'warn'
-        // Do NOT use ['error', {}] here — see the warning below.
-        'structured-data-rich-result-eligibility': ['warn', {minScore: 0}],
+        // See the note below — a minScore assertion on this audit always passes, by design.
+        'structured-data-rich-result-eligibility': ['warn', {}],
       },
     },
   },
 };
 ```
 
-**Assertion hazard specific to `structured-data-rich-result-eligibility` — read this before setting
-severity on it.** This audit is `scoreDisplayMode: informative` (it never has a pass/fail score, by
-design — see above). Lighthouse-CI's own assertion logic
-(`packages/utils/src/assertions.js`) maps an `informative` audit's value to a hardcoded `0` for
-`minScore` purposes, and *any* assertion entry that doesn't explicitly set `minScore` automatically
-gets a default `minScore: 0.9`. That means the `['error', {}]` pattern shown above for the other two
-audits — an empty options object — would make **this** audit fail on every single page that has any
-JSON-LD at all, always, since `0 >= 0.9` is never true. This isn't a bug in this audit; it's a general
-interaction between `informative` mode and Lighthouse-CI's default-minScore behavior, and it's easy
-to hit by copy-pasting the pattern above without noticing this audit is different. The safe options
-are: don't add this audit to `assertions` at all (the common case — there's nothing to gate on), or
-if you do add an entry, always set `{minScore: 0}` explicitly so the 0.9 default never applies.
+**A note on asserting `structured-data-rich-result-eligibility`**: this audit is
+`scoreDisplayMode: informative` (it never has a pass/fail score, by design — see above). Verified
+live (`lhci collect`/`lhci assert` against a real page): Lighthouse itself normalizes an
+`informative` audit's LHR `score` to `1` before `lhci assert` ever reads it
+(`node_modules/lighthouse/core/audits/audit.js`'s `_normalizeAuditScore`) — so a `minScore`
+assertion on this audit **always passes**, at any threshold, regardless of what the report actually
+shows. This means there's genuinely nothing to gate CI on with `minScore` here; the common case is
+to simply not add this audit to `assertions` at all, since a `['error', {}]` entry will never
+actually fail — it isn't dangerous, just a no-op as a CI gate. (An earlier draft of this note
+claimed the opposite — that `['error', {}]` would always *fail* — based on reading
+`packages/utils/src/assertions.js`'s `minScore` logic in isolation; that reasoning missed that
+Lighthouse core normalizes the score before `lhci assert` sees it, and was corrected after running
+a real `lhci assert` against a real collected result during this feature's QA.)
