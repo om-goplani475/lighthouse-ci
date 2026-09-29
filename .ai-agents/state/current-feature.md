@@ -11,10 +11,11 @@
 - qa: docs/qa/structured-data-type-conflicts.md
 - security_review: recorded in .ai-agents/state/security-findings.md, 2026-09-29, one low finding, fixed same sitting (prototype-safe objects, commit 19cbbc2)
 - ci_integration: recorded in .ai-agents/state/ci-backlog.md, 2026-09-29, no gap found
+- changelog: recorded in .ai-agents/state/changelog-draft.md, under Unreleased
 
-Merged, QA verified live via real lhci collect/assert (including confirming duplicate-count DOES
-meaningfully fail lhci assert, unlike the prior feature's informative-only audit). /write-changelog
-still to run.
+Feature complete — all 9 stages run, QA verified live via real lhci collect/assert (including
+confirming duplicate-count DOES meaningfully fail lhci assert, unlike the prior feature's
+informative-only audit; and a real security finding caught and fixed same-sitting).
 
 <!-- structured-data-rich-result-eligibility closed 2026-09-29: complete, all 9 stages run, merged
 62d659c, QA'd live, see docs/qa/structured-data-rich-result-eligibility.md. Shipped the per-type

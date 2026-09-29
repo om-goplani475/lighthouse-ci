@@ -114,5 +114,40 @@ across the audit spec, contract, and README rather than left wrong. See
 
 No `.lighthouserc.js` migration note needed — same reasoning as the prior three features.
 
+### structured-data-type-conflicts (2026-09-29)
+
+**User-facing**: Added a fourth opt-in audit, `structured-data-type-conflicts`, alongside the other
+three. Two independent checks, different severity: **`duplicate-count`** (scored, can fail the
+audit) flags a schema type Google's guidance expects at most once per page —
+`Organization`/`WebSite`/`BreadcrumbList` in v1 — appearing more than once. **`conflicting-entity`**
+(informational only, never affects score) flags two blocks of the same type that share a strong
+identity field (e.g. `Product.sku`/`gtin`/`mpn`, or `url` for several other types) but disagree on
+another field — deliberately conservative: a block with no identity field for its type is never
+compared for conflicts at all, so this won't flag a product-listing page's legitimately different
+products as conflicting with each other. Same `configPath` setup as the other three — see
+`packages/seo-audits/README.md`. Unlike `structured-data-rich-result-eligibility`, a `minScore`
+assertion on this audit *is* meaningful (verified live) — `duplicate-count` genuinely drives score.
+
+**Internal/dev**: A genuine fourth rule-engine namespace (`type-conflicts`), following the
+established versioned-data pattern rather than a one-off exception — new JSON Schema, new pure
+engine module (`findDuplicates`/`findConflicts`), and the first feature to touch the shared
+`registry.js` (additive-only: one new `resolve*Ruleset` function, re-verified against the full
+`seo-audits` suite during implementation to confirm zero regression in the three already-shipped
+audits). Two Gate-0 blocking questions were asked before design started, per the newly-added
+`.ai-agents/prompts/blocking-questions.md` rule — the entity-matching heuristic (strong identity
+fields only, no name-only fallback) and the singular-type list — rather than picked unilaterally
+and only noted in the spec.
+
+A real security finding was caught during `/security-review` and fixed the same sitting, not
+deferred: `typeCounts`/`blocksByType` were built as plain object literals keyed directly by the
+page's own JSON-LD `@type` value — a block declaring `"@type": "__proto__"` would silently
+reassign that object's own prototype via the inherited setter (confirmed not to pollute the global
+`Object.prototype`, but still unintended behavior a page shouldn't be able to trigger). Fixed with
+`Object.create(null)` for both objects, with its own regression test. See
+`docs/qa/structured-data-type-conflicts.md` and `.ai-agents/state/security-findings.md` for the
+full write-up.
+
+No `.lighthouserc.js` migration note needed — same reasoning as the prior features.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->
