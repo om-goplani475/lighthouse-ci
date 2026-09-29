@@ -32,6 +32,11 @@ Ask only what's necessary to write a concrete spec. For an SEO/audit feature, th
 
 Don't ask about implementation detail — that's Agent 01/02's job.
 
+If, while drafting the spec, you hit a scope decision with more than one reasonable answer that
+would change what gets built (e.g. "is this genuinely new work, or already covered by something
+that exists?"), read `.ai-agents/prompts/blocking-questions.md` and ask before writing the spec —
+don't just note it in an "Open questions" section and move on.
+
 ## Step 3 — Write the spec
 
 Output to `docs/feature-specs/{slug}.md` following `.ai-agents/contracts/feature-spec.schema.md`.

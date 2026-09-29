@@ -31,6 +31,11 @@ If `/design-audit` has already produced `docs/audit-specs/{slug}.md`, read it an
 contract's types actually match the audit's output shape — don't design a contract in isolation from
 the audit design.
 
+If severity/threshold choices or config shape have more than one reasonable answer (per
+`.ai-agents/prompts/ci-assertion-presets.md`'s "state the concrete number, not 'a reasonable value'"
+rule — the number itself can still be a real judgment call), read
+`.ai-agents/prompts/blocking-questions.md` and ask the developer before writing the contract.
+
 ## Step 3 — Write the contract
 
 Output to `docs/feature-contracts/{slug}.md` following `.ai-agents/contracts/feature-contract.schema.md`.

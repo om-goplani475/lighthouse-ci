@@ -36,6 +36,10 @@ Each task must be:
 Typical order for a new audit: types → gatherer (if new) → audit implementation → category/config
 registration → fixture test → docs update.
 
+If task grouping or ordering has more than one reasonable answer with real tradeoffs (not just
+"which order is slightly tidier"), read `.ai-agents/prompts/blocking-questions.md` and ask before
+writing the sequence.
+
 ## Step 4 — Write the sequence
 
 Output to `docs/task-sequences/{slug}.md` following `.ai-agents/contracts/task-sequence.schema.md`.

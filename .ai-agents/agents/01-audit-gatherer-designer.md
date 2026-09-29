@@ -42,6 +42,11 @@ conventions this repo follows. Decide and document:
 - **Extension point used**: exactly how `packages/seo-audits` registers this with `@lhci/cli` /
   `@lhci/utils` config — cite the specific config key or plugin hook, don't invent one.
 
+If any of these decisions has more than one reasonable answer that would change what gets built (not
+just how it's documented — e.g. a scoring-mechanism choice with real consumer-facing consequences),
+read `.ai-agents/prompts/blocking-questions.md` and ask the developer before writing the spec. Don't
+decide unilaterally and only surface it as a recommendation in the doc's prose.
+
 ## Step 3 — Write the audit spec
 
 Output to `docs/audit-specs/{slug}.md` following `.ai-agents/contracts/audit-spec.schema.md`.

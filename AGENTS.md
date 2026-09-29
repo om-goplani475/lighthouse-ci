@@ -107,3 +107,6 @@ Read by the relevant agents on every run — see `.ai-agents/README.md` for whic
 - `ci-assertion-presets.md` — `.lighthouserc.js` assertion format and severity levels.
 - `security-checklist.md` — SSRF prevention, private-IP blocking, Puppeteer/Chromium sandbox flags.
 - `testing-patterns.md` — Jest + static mock HTML fixture conventions used across this repo.
+- `blocking-questions.md` — read by Agents 00–03: when a design decision has more than one reasonable
+  answer that changes what gets built, ask the developer with a blocking question before writing the
+  stage's output file, rather than picking an answer and only noting it in the doc's prose.
