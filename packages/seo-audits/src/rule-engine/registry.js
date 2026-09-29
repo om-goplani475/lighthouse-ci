@@ -122,3 +122,17 @@ export function resolveEligibilityRuleset(versionOrCurrent = 'current') {
     )
   );
 }
+
+/**
+ * @param {string} [versionOrCurrent]
+ * @return {import('./types.js').TypeConflictsRuleSet}
+ */
+export function resolveTypeConflictsRuleset(versionOrCurrent = 'current') {
+  return /** @type {import('./types.js').TypeConflictsRuleSet} */ (
+    resolveRuleset(
+      path.join(RULES_ROOT, 'type-conflicts'),
+      path.join(RULES_ROOT, 'schema', 'type-conflicts-ruleset.schema.json'),
+      versionOrCurrent
+    )
+  );
+}

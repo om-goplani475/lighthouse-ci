@@ -2,7 +2,7 @@
 
 - [x] task-01: type-conflicts typedefs (additive) — complete
 - [x] task-02: type-conflicts ruleset JSON Schema — complete
-- [ ] task-03: Registry — add resolveTypeConflictsRuleset() (touches shared file) — pending
+- [x] task-03: Registry — add resolveTypeConflictsRuleset() (touches shared file) — complete (full seo-audits suite re-run, 50/50 green, confirms zero regression in the three existing audits)
 - [ ] task-04: type-conflicts-engine.js — findDuplicates and findConflicts — pending
 - [ ] task-05: Ruleset data — type-conflicts namespace — pending
 - [ ] task-06: Engine and registry unit tests — pending
