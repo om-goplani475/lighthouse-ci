@@ -9,7 +9,8 @@
  * structured-data-rich-result-eligibility, structured-data-type-conflicts,
  * pixel-width-truncation, meta-description-identical-to-title, document-title-quality,
  * document-h1-count, h1-title-relevance, robots-directives-report, robots-directives-conflict,
- * and canonical-https gatherer/audits on top of Lighthouse's default set.
+ * canonical-https, favicon-presence, favicon-quality, and manifest-icons gatherer/audits on top
+ * of Lighthouse's default set.
  *
  * Paths below are plain relative strings, not require.resolve() calls: this file is
  * ESM (no bare `require`), and Lighthouse's own module resolver
@@ -28,6 +29,7 @@ const config = {
     {id: 'StructuredDataJsonLd', gatherer: './gatherers/structured-data-json-ld.js'},
     {id: 'PixelWidth', gatherer: './gatherers/pixel-width.js'},
     {id: 'Headings', gatherer: './gatherers/headings.js'},
+    {id: 'FaviconLinks', gatherer: './gatherers/favicon-links.js'},
   ],
   audits: [
     './audits/structured-data-json-ld.js',
@@ -42,6 +44,9 @@ const config = {
     './audits/robots-directives-report.js',
     './audits/robots-directives-conflict.js',
     './audits/canonical-https.js',
+    './audits/favicon-presence.js',
+    './audits/favicon-quality.js',
+    './audits/manifest-icons.js',
   ],
   categories: {
     'seo-extended': {
@@ -59,6 +64,9 @@ const config = {
         {id: 'robots-directives-report', weight: 1},
         {id: 'robots-directives-conflict', weight: 1},
         {id: 'canonical-https', weight: 1},
+        {id: 'favicon-presence', weight: 1},
+        {id: 'favicon-quality', weight: 1},
+        {id: 'manifest-icons', weight: 1},
       ],
     },
   },

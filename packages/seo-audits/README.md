@@ -145,6 +145,37 @@ rationale and the agent pipeline this package was built through.
   outbound-fetch capability this package has never had, with real SSRF-prevention obligations (see
   `.ai-agents/prompts/security-checklist.md`); recorded as a "to do later" item in
   `docs/phases/phase-1-page-metadata.md` rather than built now.
+- **`favicon-presence`** — flags when the page has no `<link rel="icon">`/`<link rel="shortcut
+  icon">`. Doesn't verify the browser's implicit `/favicon.ico` fallback (that would need a
+  network fetch this specific audit deliberately avoids).
+- **`favicon-quality`** — purely informational suggestions: whether favicon coverage includes a
+  scalable SVG or multiple declared sizes (sharper rendering across contexts), and whether an
+  `apple-touch-icon` is declared (used for iOS home-screen icons). Not-applicable when there's no
+  favicon at all — see `favicon-presence` for that.
+- **`manifest-icons`** — scored. Fetches the web app manifest referenced by `<link
+  rel="manifest">` and checks its `icons` array has at least one icon ≥192×192px (or scalable),
+  Chrome's documented minimum for PWA installability. **This is the first audit in this package
+  that fetches a second URL discovered on the page**, rather than only reading data Lighthouse's
+  own page load already collected — see "A note on the SSRF-protected fetch" below before relying
+  on or extending this. Not-applicable when there's no manifest link at all — most pages aren't
+  meant to be installable, and that's a legitimate choice.
+
+### A note on the SSRF-protected fetch (`manifest-icons`, `src/lib/safe-fetch.js`)
+
+Fetching a URL *discovered on the page* (as opposed to the page itself, which Lighthouse's own
+runner already handles) is real SSRF attack surface — an attacker-controlled page could point its
+manifest link at an internal service or a cloud metadata endpoint. `safe-fetch.js` protects
+against this: scheme allowlist (http/https only), private/reserved-IP blocking *after* DNS
+resolution (not just hostname string matching — covers RFC 1918, loopback, link-local including
+the cloud metadata address, and IPv6 equivalents), DNS-rebinding resistance (the validated IP is
+the exact one connected to, via Node's `lookup` request option, not re-resolved), no redirect
+following, and a bounded timeout + response-size cap. Verified live: fetching a manifest URL
+pointing at a closed local port was refused before any connection was attempted, with the refusal
+reason surfaced in the audit's own `explanation`. See `test/lib/safe-fetch.test.js` for the full
+protection test suite (16 cases) — including one case that caught a real bypass during
+development: Node's `http`/`https` client silently skips the custom `lookup` option when the URL's
+hostname is already a literal IP address, so a raw-IP manifest URL would have bypassed
+`safeLookup` entirely without an explicit pre-check for that case (now present, and tested).
 
 ### Finding namespaces
 
@@ -188,19 +219,20 @@ module.exports = {
 };
 ```
 
-This adds all twelve audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all fifteen audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `pixel-width-truncation`, `meta-description-identical-to-title`, `document-title-quality`,
 `document-h1-count`, `h1-title-relevance`, `robots-directives-report`,
-`robots-directives-conflict`, `canonical-https`) on top of Lighthouse's default audits (via
-`extends: 'lighthouse:default'` — see `src/lighthouse-config.js`), in a new `seo-extended`
-category, without replacing or altering any of Lighthouse's own defaults.
+`robots-directives-conflict`, `canonical-https`, `favicon-presence`, `favicon-quality`,
+`manifest-icons`) on top of Lighthouse's default audits (via `extends: 'lighthouse:default'` — see
+`src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering any of
+Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the twelve audits are part of this fork's shared `all`/`recommended` presets
+None of the fifteen audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all twelve here are opt-in via `configPath`, so they can't be part of that guarantee.
+default, and all fifteen here are opt-in via `configPath`, so they can't be part of that guarantee.
 Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
@@ -228,6 +260,10 @@ module.exports = {
         // A real technical conflict, scored normally.
         'robots-directives-conflict': ['error', {}], // or 'warn'
         'canonical-https': ['error', {}], // or 'warn'
+        'favicon-presence': ['error', {}], // or 'warn'
+        // Purely informational, always passes — see below.
+        'favicon-quality': ['warn', {}],
+        'manifest-icons': ['error', {}], // or 'warn'
       },
     },
   },
@@ -235,12 +271,12 @@ module.exports = {
 ```
 
 **A note on asserting `structured-data-rich-result-eligibility`, `pixel-width-truncation`,
-`h1-title-relevance`, and `robots-directives-report`**: all four audits are
+`h1-title-relevance`, `robots-directives-report`, and `favicon-quality`**: all five audits are
 `scoreDisplayMode: informative` (none ever has a pass/fail score, by design — see
 above). Verified live (`lhci collect`/`lhci assert` against a real page): Lighthouse itself
 normalizes an `informative` audit's LHR `score` to `1` before `lhci assert` ever reads it
 (`node_modules/lighthouse/core/audits/audit.js`'s `_normalizeAuditScore`) — so a `minScore`
-assertion on any of the four **always passes**, at any threshold, regardless of what the report
+assertion on any of the five **always passes**, at any threshold, regardless of what the report
 actually shows. This means there's genuinely nothing to gate CI on with `minScore` for any of them;
 the common case is to simply not add them to `assertions` at all, since an `['error', {}]` entry
 will never actually fail — it isn't dangerous, just a no-op as a CI gate. (An earlier draft of this
