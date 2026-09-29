@@ -7,8 +7,8 @@
  * setting (a first-class Lighthouse setting — see docs/configuration.md). Adds the
  * structured-data-json-ld, structured-data-schema-properties,
  * structured-data-rich-result-eligibility, structured-data-type-conflicts,
- * pixel-width-truncation, and meta-description-identical-to-title gatherer/audits on top of
- * Lighthouse's default set.
+ * pixel-width-truncation, meta-description-identical-to-title, and document-title-quality
+ * gatherer/audits on top of Lighthouse's default set.
  *
  * Paths below are plain relative strings, not require.resolve() calls: this file is
  * ESM (no bare `require`), and Lighthouse's own module resolver
@@ -34,6 +34,7 @@ const config = {
     './audits/structured-data-type-conflicts.js',
     './audits/pixel-width-truncation.js',
     './audits/meta-description-identical-to-title.js',
+    './audits/document-title-quality.js',
   ],
   categories: {
     'seo-extended': {
@@ -45,6 +46,7 @@ const config = {
         {id: 'structured-data-type-conflicts', weight: 1},
         {id: 'pixel-width-truncation', weight: 1},
         {id: 'meta-description-identical-to-title', weight: 1},
+        {id: 'document-title-quality', weight: 1},
       ],
     },
   },

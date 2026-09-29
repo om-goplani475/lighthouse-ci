@@ -13,7 +13,11 @@ import {resolveSerpPixelBudgetsRuleset} from '../rule-engine/registry.js';
  * @typedef {{text: string, widthPx: number} | null} PixelWidthMeasurement
  */
 /**
- * @typedef {{title: PixelWidthMeasurement, description: PixelWidthMeasurement}} PixelWidthArtifact
+ * @typedef {{
+ *   title: PixelWidthMeasurement,
+ *   description: PixelWidthMeasurement,
+ *   titleElementCount: number,
+ * }} PixelWidthArtifact
  */
 
 // A real architectural exception, documented in docs/audit-specs/pixel-width-truncation.md: every
@@ -48,6 +52,12 @@ function collectPixelWidth(titleFont, descriptionFont) {
   return {
     title: measure(document.title, titleFont),
     description: measure(descriptionEl && descriptionEl.getAttribute('content'), descriptionFont),
+    // Not pixel-width-related, but reads the same DOM in the same round-trip rather than paying
+    // for a second gatherer/evaluate call for one integer. `document.title` only ever reflects
+    // the *first* <title> element per the HTML spec, so a page with more than one needs this
+    // separate count to even be detectable — document-title-quality's "multiple <title>
+    // elements" check is why this field exists.
+    titleElementCount: document.querySelectorAll('title').length,
   };
 }
 /* c8 ignore stop */
@@ -57,7 +67,8 @@ function collectPixelWidth(titleFont, descriptionFont) {
  * off-screen canvas inside the page's own browser context — real font-metric measurement, not a
  * character-count approximation. Does not check presence/absence of either field (that's
  * document-title's and missing-meta-description's concern); a missing field is simply reported
- * as `null`.
+ * as `null`. Also reports how many <title> elements the page has, for
+ * document-title-quality's "multiple <title> elements" check.
  */
 class PixelWidth extends BaseGatherer {
   /** @type {import('lighthouse/types/gatherer.js').default.GathererMeta} */

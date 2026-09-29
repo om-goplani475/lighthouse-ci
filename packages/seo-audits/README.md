@@ -90,6 +90,21 @@ rationale and the agent pipeline this package was built through.
   normalized strings must be at least half the longer one's length, and fully contained in it)
   rather than exact matching alone, so a description that merely opens with a few of the same
   words as the title before going on to say something substantively different isn't flagged.
+- **`document-title-quality`** — beyond mere presence (already checked by core's `document-title`
+  audit), flags three specific title problems: a **generic/placeholder title** matched against a
+  fixed, hand-curated list of common template/CMS defaults (`"Untitled Document"`, `"New Page"`,
+  `"Home"`, etc. — not a pattern match, so a real short title never gets flagged just for sharing a
+  word with one of these); a **title too short** to be meaningful (under 10 characters after
+  trimming — an arbitrary but conservative threshold, tuned to rarely fire on an intentional short
+  title like a brand name alone); and **multiple `<title>` elements** (invalid — only the first is
+  used by browsers/crawlers, per the HTML spec, and this is checked independently of the other two
+  since it's a structural problem regardless of what the first title's text says). Reuses the
+  `PixelWidth` gatherer, extended with a `titleElementCount` field (same DOM round-trip, not
+  pixel-width-related itself — reading it needs the raw element count since `document.title` only
+  ever reflects the first `<title>`). Scored normally; not-applicable only when title is absent
+  *and* there's at most one `<title>` element (the empty/missing case is core's concern) — a page
+  with zero title text but two empty `<title>` elements is still flagged for that structural
+  problem.
 
 ### Finding namespaces
 
@@ -133,18 +148,18 @@ module.exports = {
 };
 ```
 
-This adds all six audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all seven audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
-`pixel-width-truncation`, `meta-description-identical-to-title`) on top of Lighthouse's default
-audits (via `extends: 'lighthouse:default'` — see `src/lighthouse-config.js`), in a new
-`seo-extended` category, without replacing or altering any of Lighthouse's own defaults.
+`pixel-width-truncation`, `meta-description-identical-to-title`, `document-title-quality`) on top
+of Lighthouse's default audits (via `extends: 'lighthouse:default'` — see `src/lighthouse-config.js`),
+in a new `seo-extended` category, without replacing or altering any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the six audits are part of this fork's shared `all`/`recommended` presets
+None of the seven audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all six here are opt-in via `configPath`, so they can't be part of that guarantee. Set
-severity yourself in your own `.lighthouserc.js`:
+default, and all seven here are opt-in via `configPath`, so they can't be part of that guarantee.
+Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
 module.exports = {
@@ -162,6 +177,7 @@ module.exports = {
         'pixel-width-truncation': ['warn', {}],
         // Scored normally, no approximate-ruleset caveat — a minScore assertion is meaningful here.
         'meta-description-identical-to-title': ['error', {}], // or 'warn'
+        'document-title-quality': ['error', {}], // or 'warn'
       },
     },
   },

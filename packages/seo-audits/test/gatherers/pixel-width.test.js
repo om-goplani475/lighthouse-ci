@@ -63,7 +63,7 @@ async function runGatherer(evaluateResolution) {
 
 describe('PixelWidth gatherer', () => {
   it('resolves the real serp-pixel-budgets font strings and passes them as args, with isolation', async () => {
-    const {calls} = await runGatherer({title: null, description: null});
+    const {calls} = await runGatherer({title: null, description: null, titleElementCount: 0});
     expect(calls).toHaveLength(1);
     expect(calls[0].useIsolation).toBe(true);
     expect(calls[0].args).toEqual(['400 20px Arial, sans-serif', '400 14px Arial, sans-serif']);
@@ -73,20 +73,31 @@ describe('PixelWidth gatherer', () => {
     const resolution = {
       title: {text: 'A Page Title', widthPx: 250.5},
       description: {text: 'A meta description.', widthPx: 400.25},
+      titleElementCount: 1,
     };
     const {artifact} = await runGatherer(resolution);
     expect(artifact).toEqual(resolution);
   }, 30000);
 
   it('returns the evaluated artifact unchanged when description is absent', async () => {
-    const resolution = {title: {text: 'A Page Title', widthPx: 250.5}, description: null};
+    const resolution = {
+      title: {text: 'A Page Title', widthPx: 250.5},
+      description: null,
+      titleElementCount: 1,
+    };
     const {artifact} = await runGatherer(resolution);
     expect(artifact).toEqual(resolution);
   }, 30000);
 
   it('returns the evaluated artifact unchanged when both fields are absent', async () => {
-    const resolution = {title: null, description: null};
+    const resolution = {title: null, description: null, titleElementCount: 0};
     const {artifact} = await runGatherer(resolution);
     expect(artifact).toEqual(resolution);
+  }, 30000);
+
+  it('passes through titleElementCount unchanged, including counts greater than one', async () => {
+    const resolution = {title: null, description: null, titleElementCount: 3};
+    const {artifact} = await runGatherer(resolution);
+    expect(artifact.titleElementCount).toBe(3);
   }, 30000);
 });
