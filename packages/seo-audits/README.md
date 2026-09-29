@@ -41,6 +41,23 @@ rationale and the agent pipeline this package was built through.
   than a pass/fail check. `score` is always `null` (`scoreDisplayMode: informative`); the only
   not-applicable case is a page with zero parseable JSON-LD at all — a page whose JSON-LD is entirely
   untracked types still gets a full report, not `notApplicable`.
+- **`structured-data-type-conflicts`** — two independent checks, with different severity:
+  - **`duplicate-count`** (scored, can fail the audit): a schema type Google's guidance expects at
+    most once per page — `Organization`, `WebSite`, `BreadcrumbList` in v1 — appears more than once.
+    Low false-positive risk; counting is unambiguous.
+  - **`conflicting-entity`** (informational only, never affects score): two or more blocks of the
+    same type share a *strong identity field* (e.g. `Product.sku`/`gtin`/`mpn`, or `url` for several
+    other types) but disagree on some other field's value. **Deliberately conservative**: a block
+    with none of its type's listed identity fields is never compared for conflicts at all, even if
+    every other field happens to match another block — this is a deliberate false-negative bias over
+    a false-positive one, so this check will miss real conflicts it has no reliable signal for rather
+    than risk flagging two legitimately different entities (e.g. two different products on a listing
+    page) as a conflict. Not every tracked type has identity fields defined — `Review`, `FAQPage`,
+    `HowTo` never get checked for conflicts at all; `BreadcrumbList` is checked for `duplicate-count`
+    but *not* `conflicting-entity` — these are two genuinely separate lists in the ruleset, not one.
+  - Not-applicable only when there are zero blocks of any singular type *and* zero blocks of any
+    identity-field-bearing type — a page with everything correctly non-duplicated/non-conflicting
+    scores 1, it isn't skipped.
 
 ### Finding namespaces
 
@@ -55,6 +72,8 @@ concerns it came from — never blended into one undifferentiated list:
   expected, not a bug.
 - **`schema-org`** — used by `structured-data-json-ld`'s own JSON-LD structural validity check
   (`@context`/`@type` presence), not by `structured-data-schema-properties`.
+- **`duplicate-count`**/**`conflicting-entity`** — used by `structured-data-type-conflicts` (see
+  above); `duplicate-count` drives that audit's score, `conflicting-entity` never does.
 
 Rule content is versioned (`rules/{namespace}/{version}.json`, e.g. `2026-09`) — every audit result
 stamps which ruleset version(s) it used into `details.rulesetVersions`, so an old report can be
@@ -78,16 +97,16 @@ module.exports = {
 };
 ```
 
-This adds all three audits (`structured-data-json-ld`, `structured-data-schema-properties`,
-`structured-data-rich-result-eligibility`) on top of Lighthouse's default audits (via
-`extends: 'lighthouse:default'` — see `src/lighthouse-config.js`), in a new `seo-extended` category,
-without replacing or altering any of Lighthouse's own defaults.
+This adds all four audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+`structured-data-rich-result-eligibility`, `structured-data-type-conflicts`) on top of Lighthouse's
+default audits (via `extends: 'lighthouse:default'` — see `src/lighthouse-config.js`), in a new
+`seo-extended` category, without replacing or altering any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the three audits are part of this fork's shared `all`/`recommended` presets
+None of the four audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all three here are opt-in via `configPath`, so they can't be part of that guarantee. Set
+default, and all four here are opt-in via `configPath`, so they can't be part of that guarantee. Set
 severity yourself in your own `.lighthouserc.js`:
 
 ```js
@@ -100,6 +119,8 @@ module.exports = {
         'structured-data-schema-properties': ['error', {}], // or 'warn'
         // See the note below — a minScore assertion on this audit always passes, by design.
         'structured-data-rich-result-eligibility': ['warn', {}],
+        // Has a real scored component (duplicate-count) — a minScore assertion is meaningful here.
+        'structured-data-type-conflicts': ['error', {}], // or 'warn'
       },
     },
   },

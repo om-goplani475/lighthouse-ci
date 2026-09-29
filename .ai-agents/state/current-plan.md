@@ -9,4 +9,6 @@
 - [x] task-07: New audit — structured-data-type-conflicts — complete
 - [x] task-08: Fixture tests for the new audit — complete
 - [x] task-09: Wire into custom Lighthouse config + regression test — complete
-- [ ] task-10: Package README update — pending
+- [x] task-10: Package README update — complete
+
+All tasks done. Feature ready for Gate 3 review.
