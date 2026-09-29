@@ -1,20 +1,15 @@
 # Current feature
 
-- slug: structured-data-rich-result-eligibility
-- stage: 04-implemented-merged
-- spec: docs/feature-specs/structured-data-rich-result-eligibility.md
-- audit_spec: docs/audit-specs/structured-data-rich-result-eligibility.md
-- contract: docs/feature-contracts/structured-data-rich-result-eligibility.md
-- task_sequence: docs/task-sequences/structured-data-rich-result-eligibility.md
-- base_commit: 14fb4b0
-- merged_head: 62d659c
-- qa: docs/qa/structured-data-rich-result-eligibility.md
-- security_review: recorded in .ai-agents/state/security-findings.md, 2026-09-29, no findings
-- ci_integration: recorded in .ai-agents/state/ci-backlog.md, 2026-09-29, no gap found
-- changelog: recorded in .ai-agents/state/changelog-draft.md, under Unreleased
+- slug: structured-data-type-conflicts
+- stage: 03-sequenced
+- spec: docs/feature-specs/structured-data-type-conflicts.md
+- audit_spec: docs/audit-specs/structured-data-type-conflicts.md
+- contract: docs/feature-contracts/structured-data-type-conflicts.md
+- task_sequence: docs/task-sequences/structured-data-type-conflicts.md
 
-Feature complete — all 9 stages run, QA verified live via real lhci collect/assert (including a
-design-time assertion-hazard claim that live verification found to be wrong and corrected).
+<!-- structured-data-rich-result-eligibility closed 2026-09-29: complete, all 9 stages run, merged
+62d659c, QA'd live, see docs/qa/structured-data-rich-result-eligibility.md. Shipped the per-type
+eligibility inventory, which unblocked this feature. -->
 
 <!-- structured-data-remaining-types closed 2026-09-28: complete, all 9 stages run, merged 00e6f71,
 QA'd live, see docs/qa/structured-data-remaining-types.md. Shipped all 10 remaining tracked types as

@@ -1,8 +1,12 @@
-# Current plan — structured-data-rich-result-eligibility
+# Current plan — structured-data-type-conflicts
 
-- [x] task-01: New audit — structured-data-rich-result-eligibility — complete
-- [x] task-02: Wire into custom Lighthouse config + regression test — complete
-- [x] task-03: Fixture tests for the new audit — complete
-- [x] task-04: Package README update, including the assertion-hazard warning — complete
-
-All tasks done. Feature ready for Gate 3 review.
+- [ ] task-01: type-conflicts typedefs (additive) — pending
+- [ ] task-02: type-conflicts ruleset JSON Schema — pending
+- [ ] task-03: Registry — add resolveTypeConflictsRuleset() (touches shared file) — pending
+- [ ] task-04: type-conflicts-engine.js — findDuplicates and findConflicts — pending
+- [ ] task-05: Ruleset data — type-conflicts namespace — pending
+- [ ] task-06: Engine and registry unit tests — pending
+- [ ] task-07: New audit — structured-data-type-conflicts — pending
+- [ ] task-08: Fixture tests for the new audit — pending
+- [ ] task-09: Wire into custom Lighthouse config + regression test — pending
+- [ ] task-10: Package README update — pending
