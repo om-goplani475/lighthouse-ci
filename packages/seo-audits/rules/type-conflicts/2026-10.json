@@ -1,0 +1,14 @@
+{
+  "version": "2026-10",
+  "singularTypes": ["Organization", "WebSite", "BreadcrumbList"],
+  "identityFields": {
+    "Product": ["sku", "gtin", "gtin13", "gtin8", "mpn"],
+    "Organization": ["url"],
+    "LocalBusiness": ["url"],
+    "Event": ["url"],
+    "VideoObject": ["contentUrl", "embedUrl", "url"],
+    "Recipe": ["url"],
+    "Article": ["url"],
+    "JobPosting": ["url"]
+  }
+}
