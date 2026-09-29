@@ -6,6 +6,7 @@
 - audit_spec: docs/audit-specs/structured-data-type-conflicts.md
 - contract: docs/feature-contracts/structured-data-type-conflicts.md
 - task_sequence: docs/task-sequences/structured-data-type-conflicts.md
+- base_commit: 71e55b5
 
 <!-- structured-data-rich-result-eligibility closed 2026-09-29: complete, all 9 stages run, merged
 62d659c, QA'd live, see docs/qa/structured-data-rich-result-eligibility.md. Shipped the per-type
