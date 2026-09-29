@@ -16,6 +16,10 @@ const execAsync = promisify(exec);
 
 const REGISTRY_PATH = path.join(__dirname, '../../src/rule-engine/registry.js');
 const SCHEMA_ORG_SCHEMA = path.join(__dirname, '../../rules/schema/schema-org-ruleset.schema.json');
+const SERP_PIXEL_BUDGETS_SCHEMA = path.join(
+  __dirname,
+  '../../rules/schema/serp-pixel-budgets-ruleset.schema.json'
+);
 const FIXTURES_ROOT = path.join(__dirname, '../fixtures/rules');
 
 /**
@@ -47,15 +51,18 @@ async function runScriptExpectingThrow(script) {
 describe('rule registry — real production rulesets', () => {
   it('resolves the current schema-org, google-requirements, and eligibility rulesets', async () => {
     const script = `
-      import {resolveSchemaOrgRuleset, resolveGoogleRequirementsRuleset, resolveEligibilityRuleset, resolveTypeConflictsRuleset} from '${REGISTRY_PATH}';
+      import {resolveSchemaOrgRuleset, resolveGoogleRequirementsRuleset, resolveEligibilityRuleset, resolveTypeConflictsRuleset, resolveSerpPixelBudgetsRuleset} from '${REGISTRY_PATH}';
       console.log(JSON.stringify({
         schemaOrg: resolveSchemaOrgRuleset(),
         google: resolveGoogleRequirementsRuleset(),
         eligibility: resolveEligibilityRuleset(),
         typeConflicts: resolveTypeConflictsRuleset(),
+        serpPixelBudgets: resolveSerpPixelBudgetsRuleset(),
       }));
     `;
-    const {schemaOrg, google, eligibility, typeConflicts} = JSON.parse(await runScript(script));
+    const {schemaOrg, google, eligibility, typeConflicts, serpPixelBudgets} = JSON.parse(
+      await runScript(script)
+    );
 
     expect(schemaOrg.version).toBe('2026-09');
     expect(schemaOrg.universal.required).toEqual(['@context', '@type']);
@@ -106,6 +113,16 @@ describe('rule registry — real production rulesets', () => {
     // checked for duplicate count, never for entity conflicts. Confirms the two lists are kept
     // genuinely separate, not accidentally conflated.
     expect(typeConflicts.identityFields.BreadcrumbList).toBeUndefined();
+
+    expect(serpPixelBudgets.version).toBe('2026-10');
+    expect(serpPixelBudgets.title).toEqual({
+      font: '400 20px Arial, sans-serif',
+      maxWidthPx: {desktop: 600, mobile: 580},
+    });
+    expect(serpPixelBudgets.description).toEqual({
+      font: '400 14px Arial, sans-serif',
+      maxWidthPx: {desktop: 920, mobile: 680},
+    });
   }, 30000);
 
   it('every checked-in ruleset file under rules/ validates against its own schema', () => {
@@ -129,6 +146,10 @@ describe('rule registry — real production rulesets', () => {
       {
         dir: path.join(__dirname, '../../rules/type-conflicts'),
         schema: path.join(__dirname, '../../rules/schema/type-conflicts-ruleset.schema.json'),
+      },
+      {
+        dir: path.join(__dirname, '../../rules/serp-pixel-budgets'),
+        schema: SERP_PIXEL_BUDGETS_SCHEMA,
       },
     ];
 
@@ -205,6 +226,32 @@ describe('rule registry — error handling', () => {
         FIXTURES_ROOT,
         'schema-invalid'
       )}', '${SCHEMA_ORG_SCHEMA}', '2026-09');
+    `;
+    const stderr = await runScriptExpectingThrow(script);
+    expect(stderr).toMatch(/failed schema validation/);
+  }, 30000);
+});
+
+describe('rule registry — serp-pixel-budgets namespace', () => {
+  it('throws a clear error when a requested version does not exist', async () => {
+    const script = `
+      import {resolveSerpPixelBudgetsRuleset} from '${REGISTRY_PATH}';
+      resolveSerpPixelBudgetsRuleset('9999-99');
+    `;
+    const stderr = await runScriptExpectingThrow(script);
+    expect(stderr).toMatch(/could not read/);
+  }, 30000);
+
+  it('throws a clear error when a serp-pixel-budgets ruleset fails schema validation', async () => {
+    // A fixture with title.maxWidthPx missing the required "mobile" key — syntactically valid
+    // JSON, but schema-invalid, same discipline as the generic resolveRuleset error-handling
+    // cases above, applied to this namespace specifically.
+    const script = `
+      import {resolveRuleset} from '${REGISTRY_PATH}';
+      resolveRuleset('${path.join(
+        FIXTURES_ROOT,
+        'serp-pixel-budgets-invalid'
+      )}', '${SERP_PIXEL_BUDGETS_SCHEMA}', '2026-10');
     `;
     const stderr = await runScriptExpectingThrow(script);
     expect(stderr).toMatch(/failed schema validation/);
