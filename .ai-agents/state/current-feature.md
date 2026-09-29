@@ -1,8 +1,10 @@
 # Current feature
 
 - slug: pixel-width-truncation
-- stage: 00-intake-complete
+- stage: 01-audit-design-complete
 - spec: docs/feature-specs/pixel-width-truncation.md
+- audit_spec: docs/audit-specs/pixel-width-truncation.md
+- contract: docs/feature-contracts/pixel-width-truncation.md
 - phase: 1 (page-metadata) — see .ai-agents/state/current-phase.md; this feature's branch will be
   feat/pixel-width-truncation off phase-1-page-metadata, not off main
 
