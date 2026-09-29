@@ -6,6 +6,7 @@
 - audit_spec: docs/audit-specs/structured-data-rich-result-eligibility.md
 - contract: docs/feature-contracts/structured-data-rich-result-eligibility.md
 - task_sequence: docs/task-sequences/structured-data-rich-result-eligibility.md
+- base_commit: 14fb4b0
 
 <!-- structured-data-remaining-types closed 2026-09-28: complete, all 9 stages run, merged 00e6f71,
 QA'd live, see docs/qa/structured-data-remaining-types.md. Shipped all 10 remaining tracked types as
