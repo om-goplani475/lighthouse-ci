@@ -217,5 +217,23 @@ pushes a `LighthouseRunWarnings` entry when discovery is unavailable. Closes fin
 sitemap security review. No `.lighthouserc.js` key: it is an environment variable on purpose, since a
 config-file setting could be committed to a repo that also audits untrusted pages.
 
+### sitemap-url-status (2026-09-30, Phase 4 item 5)
+
+**User-facing**: New opt-in audit **`sitemap-url-status`**: requests a sample of the URLs your sitemap
+lists and fails if any does not return `2xx` (a redirect, 404, 5xx or unreachable URL all fail; a
+redirect is shown with its target). It is a spot check, not a crawl: 10 URLs by default, evenly spread
+across the sitemap (first and last included) and identical on every run so CI results are stable; set
+`LHCI_SEO_SITEMAP_SAMPLE_SIZE` (1-25) on a job that should check more. Only URLs on the same host as
+their sitemap are requested. Whether a page is `noindex` is not checked. Suggested severity `warn`
+(it is a sample, and a network blip can fail a URL); see the README. On its first real run it found a
+genuine bug in nodejs.org's own sitemap (URLs with the dots stripped, which 404).
+
+**Internal/dev**: lightweight mode on the existing `SitemapDocuments` artifact, so no new gatherer.
+Pure logic in `src/lib/sitemap-url-sample.js` (deterministic even sampling, same-origin filter,
+worker pool with per-request race timeout, one network-error retry, total budget) with the status
+fetcher injected; the audit is thin. `safeFetchStatus` additively returns `redirectLocation` for a
+3xx. Decisions confirmed with the developer before coding (sample selection, redirects fail, size
+and how to set it). No `.lighthouserc.js` key: the sample size is an environment variable on purpose.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->
