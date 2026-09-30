@@ -23,9 +23,10 @@
  */
 
 import BaseGatherer from 'lighthouse/core/gather/base-gatherer.js';
-import {safeFetchBytes} from '../lib/safe-fetch.js';
+import {safeFetchBytes, safeFetchPrefix} from '../lib/safe-fetch.js';
 import {parseRobotsTxt} from '../lib/robots-txt.js';
 import {LIMITS, emptyDocument, parseSitemapBytes} from '../lib/sitemap-parse.js';
+import {collectUrlSample} from '../lib/sitemap-url-sample.js';
 
 /** @typedef {import('../lib/sitemap-parse.js').SitemapDocument} SitemapDocument */
 /** @typedef {import('../lib/sitemap-parse.js').SitemapDocumentsArtifact} SitemapDocumentsArtifact */
@@ -154,12 +155,12 @@ async function followIndexes(fetchBytes, artifact) {
 }
 
 /**
+ * Discovery and the sitemap documents themselves; the page sample is added by the caller.
  * @param {{finalDisplayedUrl: string}} url
- * @param {{fetchBytes?: FetchBytes}} [deps] `fetchBytes` is injectable so tests never touch the
- *   network; production always uses the SSRF-protected default.
+ * @param {FetchBytes} fetchBytes
  * @return {Promise<SitemapDocumentsArtifact>}
  */
-async function collectSitemapDocuments(url, {fetchBytes = safeFetchBytes} = {}) {
+async function collectDocuments(url, fetchBytes) {
   const origin = new URL(url.finalDisplayedUrl).origin;
 
   /** @type {SitemapDocumentsArtifact} */
@@ -169,6 +170,7 @@ async function collectSitemapDocuments(url, {fetchBytes = safeFetchBytes} = {}) 
     ignoredSitemapLines: [],
     documentsTruncated: false,
     documents: [],
+    urlSample: null,
   };
 
   const robots = await fetchRobots(fetchBytes, `${origin}/robots.txt`);
@@ -216,6 +218,33 @@ async function collectSitemapDocuments(url, {fetchBytes = safeFetchBytes} = {}) 
     artifact.discovery = 'default-location';
     artifact.documents.push(probe);
     await followIndexes(fetchBytes, artifact);
+  }
+  return artifact;
+}
+
+/**
+ * Discovers and fetches the site's sitemap(s), then requests a bounded sample of the URLs they list
+ * (`urlSample`, see `../lib/sitemap-url-sample.js`): one request per sampled URL, whose status,
+ * headers and head signals feed both `sitemap-url-status` and `sitemap-indexability`. The sample is
+ * only taken when a sitemap was actually found (`robots-txt` or `default-location`), and is `null`
+ * otherwise or when it lists no URL on its own origin.
+ * @param {{finalDisplayedUrl: string}} url
+ * @param {{
+ *   fetchBytes?: FetchBytes,
+ *   fetchPage?: typeof safeFetchPrefix,
+ *   env?: NodeJS.ProcessEnv,
+ *   now?: () => number,
+ * }} [deps] Injectable so tests never touch the network; production always uses the
+ *   SSRF-protected defaults.
+ * @return {Promise<SitemapDocumentsArtifact>}
+ */
+async function collectSitemapDocuments(
+  url,
+  {fetchBytes = safeFetchBytes, fetchPage = safeFetchPrefix, env, now} = {}
+) {
+  const artifact = await collectDocuments(url, fetchBytes);
+  if (artifact.discovery === 'robots-txt' || artifact.discovery === 'default-location') {
+    artifact.urlSample = await collectUrlSample(artifact.documents, {fetchPage, env, now});
   }
   return artifact;
 }

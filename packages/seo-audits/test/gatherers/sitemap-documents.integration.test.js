@@ -17,7 +17,7 @@
 
 const http = require('http');
 const zlib = require('zlib');
-const {fetchBytesWithLookup} = require('../../src/lib/safe-fetch.js');
+const {fetchBytesWithLookup, fetchPrefixWithLookup} = require('../../src/lib/safe-fetch.js');
 const {collectSitemapDocuments} = require('../../src/gatherers/sitemap-documents.js');
 const {SITEMAP_NAMESPACE} = require('../../src/lib/sitemap-parse.js');
 
@@ -62,6 +62,8 @@ describe('collectSitemapDocuments — against a real local server', () => {
       {
         fetchBytes: (url, opts) =>
           fetchBytesWithLookup(url, permissiveLookup, {...opts, ...overrides}),
+        // The real page fetcher with the test-only lookup, so the page sample is exercised too.
+        fetchPage: url => fetchPrefixWithLookup(url, permissiveLookup, {timeoutMs: 2000}),
       }
     );
 
@@ -268,5 +270,103 @@ describe('collectSitemapDocuments — default fetcher, private-network opt-in, r
     expect(artifact.documents[0].outcome).toBe('network-error');
     expect(artifact.documents[0].errorMessage).toMatch(/private\/reserved/);
     expect(artifact.documents[0].errorMessage).not.toContain('LHCI_SEO_ALLOW_PRIVATE_NETWORK');
+  });
+});
+
+describe('collectSitemapDocuments — sampled pages, real local server', () => {
+  const original = process.env.LHCI_SEO_ALLOW_PRIVATE_NETWORK;
+  /** @type {http.Server} */
+  let server;
+  let base = '';
+
+  beforeEach(async () => {
+    server = http.createServer((req, res) => {
+      const path = req.url;
+      if (path === '/robots.txt') {
+        res.writeHead(200);
+        res.end(`Sitemap: ${base}/sitemap.xml`);
+      } else if (path === '/sitemap.xml') {
+        const locs = ['/noindex', '/canonical', '/pdf', '/gone', '/gzip', '/two-headers'].map(
+          x => `${base}${x}`
+        );
+        res.writeHead(200);
+        res.end(urlset(...locs));
+      } else if (path === '/noindex') {
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        res.end(
+          '<html><head><meta name="googlebot" content="noindex"></head><body>x</body></html>'
+        );
+      } else if (path === '/canonical') {
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        res.end(
+          `<html><head><link rel="canonical" href="${base}/elsewhere?a=1&amp;b=2"></head><body>x</body></html>`
+        );
+      } else if (path === '/pdf') {
+        res.writeHead(200, {'Content-Type': 'application/pdf', 'X-Robots-Tag': 'noindex'});
+        res.end('%PDF');
+      } else if (path === '/gzip') {
+        res.writeHead(200, {'Content-Type': 'text/html', 'Content-Encoding': 'gzip'});
+        res.end(zlib.gzipSync('<html><head><meta name="robots" content="noindex"></head></html>'));
+      } else if (path === '/two-headers') {
+        res.setHeader('Content-Type', 'text/html');
+        res.setHeader('X-Robots-Tag', ['noindex', 'googlebot: nofollow']);
+        res.writeHead(200);
+        res.end('<html><head></head><body></body></html>');
+      } else {
+        res.writeHead(404);
+        res.end();
+      }
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    base = `http://127.0.0.1:${server.address().port}`;
+  });
+
+  afterEach(async () => {
+    if (original === undefined) delete process.env.LHCI_SEO_ALLOW_PRIVATE_NETWORK;
+    else process.env.LHCI_SEO_ALLOW_PRIVATE_NETWORK = original;
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  });
+
+  const byPath = artifact =>
+    Object.fromEntries(artifact.urlSample.pages.map(p => [new URL(p.url).pathname, p]));
+
+  it('extracts the real signals from real responses (default fetchers, opt-in on)', async () => {
+    process.env.LHCI_SEO_ALLOW_PRIVATE_NETWORK = '1';
+    const artifact = await collectSitemapDocuments({finalDisplayedUrl: `${base}/page`});
+    expect(artifact.discovery).toBe('robots-txt');
+    const pages = byPath(artifact);
+
+    expect(pages['/noindex']).toMatchObject({
+      status: 200,
+      bodyRead: 'html',
+      metas: [{name: 'googlebot', content: 'noindex'}],
+      headComplete: true,
+    });
+    // The `&amp;` in the href is decoded by the real HTML parser.
+    expect(pages['/canonical'].canonicals).toEqual([`${base}/elsewhere?a=1&b=2`]);
+    // A PDF is not read, but its X-Robots-Tag header is seen.
+    expect(pages['/pdf']).toMatchObject({
+      bodyRead: 'skipped-not-html',
+      xRobotsTag: ['noindex'],
+      metas: [],
+    });
+    // A 404 is recorded from its status with no signals.
+    expect(pages['/gone']).toMatchObject({status: 404, bodyRead: 'skipped-status', metas: []});
+    // A gzip body is not read (no decompression of a prefix), but is not mistaken for HTML either.
+    expect(pages['/gzip']).toMatchObject({
+      bodyRead: 'skipped-compressed',
+      metas: [],
+      headComplete: false,
+    });
+    // Repeated headers stay separate occurrences.
+    expect(pages['/two-headers'].xRobotsTag).toEqual(['noindex', 'googlebot: nofollow']);
+  });
+
+  it('with the opt-in off, discovery is unavailable and no page is requested at all', async () => {
+    delete process.env.LHCI_SEO_ALLOW_PRIVATE_NETWORK;
+    const artifact = await collectSitemapDocuments({finalDisplayedUrl: `${base}/page`});
+    expect(artifact.discovery).toBe('unavailable');
+    expect(artifact.urlSample).toBeNull();
   });
 });

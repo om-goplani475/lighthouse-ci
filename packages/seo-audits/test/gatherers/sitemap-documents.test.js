@@ -41,9 +41,28 @@ function fakeFetch(routes) {
   return {fetchBytes, calls};
 }
 
+/**
+ * A page fetcher for tests that are not about the page sample: answers every sampled URL with a
+ * skipped, empty result, so nothing can reach the network. (The gatherer now samples the URLs a
+ * sitemap lists; without this, a test listing https://example.com/... would request it for real.)
+ */
+const harmlessFetchPage = async () => ({
+  status: 200,
+  redirectLocation: null,
+  headers: {'x-robots-tag': [], 'content-type': [], 'content-encoding': [], location: []},
+  body: Buffer.alloc(0),
+  bodyRead: 'skipped-not-html',
+  truncated: false,
+});
+
 const run = routes => {
   const {fetchBytes, calls} = fakeFetch(routes);
-  return collectSitemapDocuments(PAGE, {fetchBytes}).then(artifact => ({artifact, calls}));
+  return collectSitemapDocuments(PAGE, {fetchBytes, fetchPage: harmlessFetchPage}).then(
+    artifact => ({
+      artifact,
+      calls,
+    })
+  );
 };
 
 describe('collectSitemapDocuments — discovery and root documents', () => {
@@ -201,6 +220,7 @@ describe('collectSitemapDocuments — discovery and root documents', () => {
   it('passes the documented timeout and byte caps to the fetcher', async () => {
     const seen = [];
     await collectSitemapDocuments(PAGE, {
+      fetchPage: harmlessFetchPage,
       fetchBytes: async (url, options) => {
         seen.push([url, options]);
         return {
@@ -440,5 +460,150 @@ describe('SitemapDocuments gatherer class', () => {
     // Not calling the network: assert the helper contract used by getArtifact instead.
     expect(skippedWarning({discovery: 'none', unavailableReason: null, documents: []})).toBeNull();
     expect(passContext.baseArtifacts.LighthouseRunWarnings).toEqual([]);
+  });
+});
+
+describe('collectSitemapDocuments — the sampled page section (urlSample)', () => {
+  const index = (...locs) =>
+    `<sitemapindex xmlns="${NS}">${locs
+      .map(l => `<sitemap><loc>${l}</loc></sitemap>`)
+      .join('')}</sitemapindex>`;
+  const ROBOTS = {'https://example.com/robots.txt': {body: 'Sitemap: https://example.com/s.xml'}};
+  const htmlPage = (head, extra = {}) => ({
+    status: 200,
+    redirectLocation: null,
+    headers: {
+      'x-robots-tag': [],
+      'content-type': ['text/html'],
+      'content-encoding': [],
+      location: [],
+    },
+    body: Buffer.from(`<html><head>${head}</head><body>x</body></html>`),
+    bodyRead: 'html',
+    truncated: false,
+    ...extra,
+  });
+
+  /** @param {(url: string) => Promise<any>} fetchPage */
+  const runWith = (routes, fetchPage, deps = {}) => {
+    const {fetchBytes} = fakeFetch(routes);
+    return collectSitemapDocuments(PAGE, {fetchBytes, fetchPage, env: {}, ...deps});
+  };
+
+  it('samples the listed URLs after the documents, requesting each once, and stores signals not HTML', async () => {
+    const requested = [];
+    const artifact = await runWith(
+      {
+        ...ROBOTS,
+        'https://example.com/s.xml': {
+          body: urlset('https://example.com/a', 'https://example.com/b'),
+        },
+      },
+      async url => {
+        requested.push(url);
+        return htmlPage('<meta name="robots" content="noindex"><link rel="canonical" href="/c">');
+      }
+    );
+    expect(requested).toEqual(['https://example.com/a', 'https://example.com/b']);
+    expect(artifact.urlSample).toMatchObject({
+      sampleSize: 10,
+      eligibleCount: 2,
+      skippedCrossOrigin: 0,
+    });
+    expect(artifact.urlSample.pages[0]).toMatchObject({
+      url: 'https://example.com/a',
+      status: 200,
+      bodyRead: 'html',
+      metas: [{name: 'robots', content: 'noindex'}],
+      canonicals: ['/c'],
+      headComplete: true,
+    });
+    expect(JSON.stringify(artifact)).not.toContain('<body>');
+  });
+
+  it('also samples after the /sitemap.xml fallback', async () => {
+    const artifact = await runWith(
+      {
+        'https://example.com/robots.txt': {body: ''},
+        'https://example.com/sitemap.xml': {body: urlset('https://example.com/a')},
+      },
+      async () => htmlPage('')
+    );
+    expect(artifact.discovery).toBe('default-location');
+    expect(artifact.urlSample.pages).toHaveLength(1);
+  });
+
+  it.each([
+    ['no sitemap (404 on the fallback)', {'https://example.com/robots.txt': {body: ''}}],
+    ['robots.txt unavailable', {'https://example.com/robots.txt': {status: 503}}],
+  ])('takes no sample for %s, and never calls the page fetcher', async (_label, routes) => {
+    let called = false;
+    const artifact = await runWith(routes, async () => {
+      called = true;
+      return htmlPage('');
+    });
+    expect(artifact.urlSample).toBeNull();
+    expect(called).toBe(false);
+  });
+
+  it('takes no sample when the only sitemap failed to fetch or lists nothing on its own origin', async () => {
+    const failed = await runWith(ROBOTS, async () => htmlPage(''));
+    expect(failed.urlSample).toBeNull();
+    const foreign = await runWith(
+      {...ROBOTS, 'https://example.com/s.xml': {body: urlset('https://other.test/a')}},
+      async () => htmlPage('')
+    );
+    expect(foreign.urlSample).toBeNull();
+  });
+
+  it("samples the URLs of an index's child sitemaps, not the child sitemap URLs themselves", async () => {
+    const requested = [];
+    const artifact = await runWith(
+      {
+        ...ROBOTS,
+        'https://example.com/s.xml': {
+          body: index('https://example.com/c1.xml', 'https://example.com/gone.xml'),
+        },
+        'https://example.com/c1.xml': {body: urlset('https://example.com/a')},
+      },
+      async url => {
+        requested.push(url);
+        return htmlPage('');
+      }
+    );
+    expect(requested).toEqual(['https://example.com/a']);
+    expect(artifact.documents.map(d => d.outcome)).toEqual(['ok', 'ok', 'http-error']);
+  });
+
+  it('honors the sample-size variable and records it', async () => {
+    const locs = Array.from({length: 50}, (_, i) => `https://example.com/p${i}`);
+    const artifact = await runWith(
+      {...ROBOTS, 'https://example.com/s.xml': {body: urlset(...locs)}},
+      async () => htmlPage(''),
+      {env: {LHCI_SEO_SITEMAP_SAMPLE_SIZE: '3'}}
+    );
+    expect(artifact.urlSample.sampleSize).toBe(3);
+    expect(artifact.urlSample.pages.map(p => p.url)).toEqual([
+      'https://example.com/p0',
+      'https://example.com/p25',
+      'https://example.com/p49',
+    ]);
+  });
+
+  it('records a page that failed, without failing the run or losing the documents', async () => {
+    const artifact = await runWith(
+      {
+        ...ROBOTS,
+        'https://example.com/s.xml': {
+          body: urlset('https://example.com/a', 'https://example.com/b'),
+        },
+      },
+      async url => {
+        if (url.endsWith('a')) throw new Error('ECONNREFUSED');
+        return htmlPage('');
+      }
+    );
+    expect(artifact.documents[0].outcome).toBe('ok');
+    expect(artifact.urlSample.pages.map(p => p.error)).toEqual(['ECONNREFUSED', null]);
   });
 });
