@@ -15,9 +15,18 @@ rationale and the agent pipeline this package was built through.
   Google documents rich-result guidance for (`Product`, `Article`, `BreadcrumbList`, `Recipe`,
   `Review`, `Event`, `JobPosting`, `VideoObject`, `Organization`, `LocalBusiness`, `FAQPage`, `HowTo`),
   checks that Google's required/recommended properties are present, including specific nested
-  sub-object properties (e.g. `Product.offers.price`, `Event.location.address`). Rule content lives as
-  versioned data under `rules/`, not hardcoded in the audit — see
-  `docs/architecture/structured-data-rule-engine.md` for why, `docs/feature-specs/structured-data-rule-engine.md`
+  sub-object properties (e.g. `Product.offers.price`, `Event.location.address`), **and, for a
+  handful of properties where it's unambiguous, that a *present* property's value is well-formed**
+  (Phase 2 item 4) — e.g. `Product.offers.price` parses as a number, `Product.offers.priceCurrency`
+  is a 3-letter code shape, `Article.datePublished`/`Event.startDate`/`JobPosting.datePosted`/
+  `VideoObject.uploadDate`/`Review.reviewRating.ratingValue` are ISO-8601-shaped. This is
+  deliberately narrow, not a general-purpose schema-datatype validator: only properties with a
+  `datatypes` entry in their `rules/google/structured-data/*.json` type rule are checked this way,
+  and only when present at all — a missing property is still `required`'s concern, this only
+  catches "present but obviously wrong" (e.g. `price: "free"`), findings are tagged with the same
+  `google-requirements` namespace and drive the same score as a missing-property finding, no new
+  namespace needed. Rule content lives as versioned data under `rules/`, not hardcoded in the audit
+  — see `docs/architecture/structured-data-rule-engine.md` for why, `docs/feature-specs/structured-data-rule-engine.md`
   for the original two-type audit, and `docs/audit-specs/structured-data-remaining-types.md` for the
   per-type property lists behind the other 10. Tracking a new type is a `rules/` data change, not new
   audit code.

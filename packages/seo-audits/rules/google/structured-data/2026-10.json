@@ -6,7 +6,8 @@
       "nested": {
         "offers": {
           "type": "Offer",
-          "required": ["price", "priceCurrency", "availability"]
+          "required": ["price", "priceCurrency", "availability"],
+          "datatypes": {"price": "number", "priceCurrency": "currency"}
         }
       },
       "conditional": []
@@ -14,6 +15,7 @@
     "Article": {
       "required": ["headline", "image", "datePublished"],
       "nested": {},
+      "datatypes": {"datePublished": "date"},
       "conditional": []
     },
     "BreadcrumbList": {
@@ -59,7 +61,8 @@
         },
         "reviewRating": {
           "type": "Rating",
-          "required": ["ratingValue"]
+          "required": ["ratingValue"],
+          "datatypes": {"ratingValue": "number"}
         }
       },
       "conditional": []
@@ -72,6 +75,7 @@
           "required": ["name", "address"]
         }
       },
+      "datatypes": {"startDate": "date"},
       "conditional": []
     },
     "JobPosting": {
@@ -86,11 +90,13 @@
           "required": ["address"]
         }
       },
+      "datatypes": {"datePosted": "date"},
       "conditional": []
     },
     "VideoObject": {
       "required": ["name", "description", "thumbnailUrl", "uploadDate"],
       "nested": {},
+      "datatypes": {"uploadDate": "date"},
       "conditional": []
     },
     "HowTo": {

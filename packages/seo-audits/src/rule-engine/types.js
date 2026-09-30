@@ -25,12 +25,28 @@
  * @typedef {{version: string, universal: SchemaOrgRuleSetUniversal, types: object}} SchemaOrgRuleSet
  */
 
-/** @typedef {{type: string, required: string[]}} GoogleRuleSetNestedRule */
+/**
+ * A property's expected value shape, checked only when the property is present (missing is
+ * `required`'s concern, not this one's). `'number'` accepts a JS number or a numeric string
+ * (schema.org allows either for e.g. `price`); `'date'` requires an ISO-8601-shaped date/datetime
+ * string; `'currency'` requires a 3-uppercase-letter ISO 4217-shaped code (format only, not
+ * validated against the real currency-code list — see the feature spec for why).
+ * @typedef {'number' | 'date' | 'currency'} GoogleRuleSetDatatype
+ */
+
+/**
+ * @typedef {{
+ *   type: string,
+ *   required: string[],
+ *   datatypes?: Record<string, GoogleRuleSetDatatype>,
+ * }} GoogleRuleSetNestedRule
+ */
 /**
  * @typedef {{
  *   required: string[],
  *   nested: Record<string, GoogleRuleSetNestedRule>,
  *   conditional: Array<{if: object, then: object}>,
+ *   datatypes?: Record<string, GoogleRuleSetDatatype>,
  * }} GoogleRuleSetTypeRule
  */
 /**
