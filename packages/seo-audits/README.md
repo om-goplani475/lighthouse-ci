@@ -239,6 +239,24 @@ itself (container vs. single-entity) lives in `src/rule-engine/schema-org-engine
   paywalled/degraded since the platform's ownership change and couldn't be directly verified the
   way schema.org's pages were for `structured-data-deprecated-properties` — what's checked here is
   corroborated across multiple secondary sources, not a single fetched authoritative page.
+- **`social-preview-content`** (Phase 3 item 5, "social preview renderer" — scoped down after a
+  design conversation) — purely informational (`scoreDisplayMode: informative`, `score` always
+  `null`). Reports the exact title/description/image URL each platform would actually use for its
+  share-preview card, resolved through each platform's real fallback rules — **not** a rendered
+  image. An actual visual render turned out not to be buildable inside a standard Lighthouse
+  report at all: `details.type: 'screenshot'` is hardcoded internal-only for the `final-screenshot`
+  audit's own special-cased UI (confirmed by reading
+  `node_modules/lighthouse/report/renderer/details-renderer.js`'s `render()`, which explicitly
+  returns `null` for it — "Internal-only details, not for rendering"), and no other `details` type
+  can show a single composed image either. Building a real render would need editing
+  `packages/viewer`, which is exactly the boundary this fork's own rules say audit/gatherer work
+  shouldn't cross — so this reports the *content* that determines what a preview would say, not a
+  picture of it. Shares `og:*`/`twitter:*` fallback-resolution logic with
+  `twitter-card-completeness` via a new `src/lib/social-meta.js` (extracted so the two audits can't
+  quietly disagree on what a platform would actually show). Not-applicable when there's no
+  `og:*`/`twitter:*` content on the page at all; otherwise always reports both platform rows,
+  regardless of whether `open-graph-completeness`/`twitter-card-completeness` pass — this is a
+  report of what *would* show, not a pass/fail judgment.
 
 ### A note on the SSRF-protected fetch (`manifest-icons`, `open-graph-image-reachable`, `src/lib/safe-fetch.js`)
 
@@ -314,22 +332,23 @@ module.exports = {
 };
 ```
 
-This adds all twenty audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all twenty-one audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
 `h1-title-relevance`, `robots-directives-report`, `robots-directives-conflict`, `canonical-https`,
 `favicon-presence`, `favicon-quality`, `manifest-icons`, `open-graph-completeness`,
-`open-graph-canonical-match`, `open-graph-image-reachable`, `twitter-card-completeness`) on top of
-Lighthouse's default audits (via `extends: 'lighthouse:default'` — see `src/lighthouse-config.js`),
-in a new `seo-extended` category, without replacing or altering any of Lighthouse's own defaults.
+`open-graph-canonical-match`, `open-graph-image-reachable`, `twitter-card-completeness`,
+`social-preview-content`) on top of Lighthouse's default audits (via `extends: 'lighthouse:default'`
+— see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
+any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the twenty audits are part of this fork's shared `all`/`recommended` presets
+None of the twenty-one audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all twenty here are opt-in via `configPath`, so they can't be part of that guarantee.
-Set severity yourself in your own `.lighthouserc.js`:
+default, and all twenty-one here are opt-in via `configPath`, so they can't be part of that
+guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
 module.exports = {
@@ -366,6 +385,8 @@ module.exports = {
         'open-graph-canonical-match': ['error', {}], // or 'warn'
         'open-graph-image-reachable': ['error', {}], // or 'warn'
         'twitter-card-completeness': ['error', {}], // or 'warn'
+        // Same informational-only caveat as structured-data-rich-result-eligibility — see below.
+        'social-preview-content': ['warn', {}],
       },
     },
   },
@@ -374,12 +395,12 @@ module.exports = {
 
 **A note on asserting `structured-data-rich-result-eligibility`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`, `h1-title-relevance`,
-`robots-directives-report`, and `favicon-quality`**: all six audits are
+`robots-directives-report`, `favicon-quality`, and `social-preview-content`**: all seven audits are
 `scoreDisplayMode: informative` (none ever has a pass/fail score, by design — see
 above). Verified live (`lhci collect`/`lhci assert` against a real page): Lighthouse itself
 normalizes an `informative` audit's LHR `score` to `1` before `lhci assert` ever reads it
 (`node_modules/lighthouse/core/audits/audit.js`'s `_normalizeAuditScore`) — so a `minScore`
-assertion on any of the six **always passes**, at any threshold, regardless of what the report
+assertion on any of the seven **always passes**, at any threshold, regardless of what the report
 actually shows. This means there's genuinely nothing to gate CI on with `minScore` for any of them;
 the common case is to simply not add them to `assertions` at all, since an `['error', {}]` entry
 will never actually fail — it isn't dangerous, just a no-op as a CI gate. (An earlier draft of this

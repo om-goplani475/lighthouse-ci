@@ -19,6 +19,7 @@
  */
 
 import {Audit} from 'lighthouse/core/audits/audit.js';
+import {twitterContent, twitterResolved} from '../lib/social-meta.js';
 
 const UIStrings = {
   title: 'Twitter/X Card metadata is complete',
@@ -30,24 +31,6 @@ const UIStrings = {
     'and `twitter:image:alt` (when an image is present) are recommended and reported ' +
     'informationally, never failing the audit on their own.',
 };
-
-/**
- * @param {Array<{name?: string, content?: string, property?: string}>} metaElements
- * @param {string} name
- * @return {string | undefined}
- */
-function twitterContent(metaElements, name) {
-  return metaElements.find(meta => meta.name === name && meta.content)?.content;
-}
-
-/**
- * @param {Array<{name?: string, content?: string, property?: string}>} metaElements
- * @param {string} property
- * @return {string | undefined}
- */
-function ogContent(metaElements, property) {
-  return metaElements.find(meta => meta.property === property && meta.content)?.content;
-}
 
 class TwitterCardCompleteness extends Audit {
   /**
@@ -86,22 +69,15 @@ class TwitterCardCompleteness extends Audit {
     /** @type {Array<{property: string, severity: 'error' | 'info', message: string}>} */
     const rows = [];
 
-    /** @type {Array<['title' | 'description' | 'image', string]>} */
-    const fallbackFields = [
-      ['title', 'og:title'],
-      ['description', 'og:description'],
-      ['image', 'og:image'],
-    ];
-    for (const [field, ogProperty] of fallbackFields) {
-      const twitterProperty = `twitter:${field}`;
-      const resolved =
-        twitterContent(MetaElements, twitterProperty) ?? ogContent(MetaElements, ogProperty);
-      if (!resolved) {
+    /** @type {Array<'title' | 'description' | 'image'>} */
+    const fallbackFields = ['title', 'description', 'image'];
+    for (const field of fallbackFields) {
+      if (!twitterResolved(MetaElements, field)) {
         rows.push({
-          property: twitterProperty,
+          property: `twitter:${field}`,
           severity: 'error',
           message:
-            `Missing "${twitterProperty}", and no "${ogProperty}" fallback is present ` + 'either.',
+            `Missing "twitter:${field}", and no "og:${field}" fallback is present ` + 'either.',
         });
       }
     }
@@ -116,8 +92,7 @@ class TwitterCardCompleteness extends Audit {
       }
     }
 
-    const hasImage =
-      twitterContent(MetaElements, 'twitter:image') ?? ogContent(MetaElements, 'og:image');
+    const hasImage = twitterResolved(MetaElements, 'image');
     if (hasImage && !twitterContent(MetaElements, 'twitter:image:alt')) {
       rows.push({
         property: 'twitter:image:alt',
