@@ -258,7 +258,28 @@ itself (container vs. single-entity) lives in `src/rule-engine/schema-org-engine
   regardless of whether `open-graph-completeness`/`twitter-card-completeness` pass — this is a
   report of what *would* show, not a pass/fail judgment.
 
-### A note on the SSRF-protected fetch (`manifest-icons`, `open-graph-image-reachable`, `src/lib/safe-fetch.js`)
+- **`robots-txt-sitemap-declared`** (Phase 4) — scored. Passes when robots.txt has at least one
+  `Sitemap:` line with an absolute http(s) URL (the one discovery route every crawler reads; a
+  search-console submission also works, so treat it as a recommendation). Fails when robots.txt has
+  no such line or does not exist. Not-applicable when robots.txt could not be retrieved (5xx or a
+  network failure). Reads Lighthouse core's own `RobotsTxt` artifact; no new gatherer.
+- **`robots-txt-crawler-access`** — scored on Googlebot and Bingbot only. Simulates robots.txt for
+  those crawlers against the audited page *and* the same-origin CSS/JS the page actually loaded
+  (blocking those stops a search engine rendering the page as a visitor sees it). The table also
+  lists Googlebot-Image and the AI crawlers (GPTBot, ClaudeBot, CCBot, PerplexityBot) for
+  reference; they are **never scored**, since blocking an AI crawler is a legitimate licensing
+  choice. `Googlebot-Image` follows the `googlebot` group when robots.txt has no
+  `googlebot-image` group, as Google documents. Cross-origin CSS/JS is skipped: robots.txt only
+  governs its own origin. Uses `robots-parser` (already a Lighthouse dependency).
+- **`robots-txt-rule-conflicts`** — scored. Flags the same path being both `Allow` and `Disallow`
+  for one user-agent, with the line numbers; groups naming the same user-agent are merged first,
+  since crawlers combine them. Google resolves a tie in favor of `Allow`, so the `Disallow`
+  silently does nothing. Only identical path strings are compared: wildcard overlaps (`/a*` vs
+  `/ab`) are not detected (see `docs/phases/phase-4-robots-sitemap.md`).
+- **`sitemap-valid`**, **`sitemap-duplicate-urls`**, **`sitemap-limits`** (Phase 4) — three scored
+  audits reading one shared artifact; see "Sitemap audits" below.
+
+### A note on the SSRF-protected fetch (`manifest-icons`, `open-graph-image-reachable`, the sitemap audits, `src/lib/safe-fetch.js`)
 
 Fetching a URL *discovered on the page* (as opposed to the page itself, which Lighthouse's own
 runner already handles) is real SSRF attack surface — an attacker-controlled page could point its
@@ -287,6 +308,60 @@ first (existing tests only exercised loopback/literal-IP targets and a permissiv
 server, never a real external hostname through the real request path). Fixed by having `safeLookup`
 honor `options.all` and reply in the shape actually requested, same as real `dns.lookup` does —
 confirmed live against a real external URL both before (crash) and after (correct status) the fix.
+
+### Sitemap audits (`sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`)
+
+All three read the `SitemapDocuments` artifact, produced once per run by
+`src/gatherers/sitemap-documents.js`, so a sitemap is fetched and parsed a single time however many
+audits use it. **How it works:**
+
+- **Discovery**: the `Sitemap:` lines in robots.txt (absolute http(s) URLs only, at most 5). If
+  robots.txt declares none (or does not exist), it probes `/sitemap.xml` on the page's origin. A 404
+  or 410 there means "no sitemap": all three audits are not-applicable (a missing declaration is
+  `robots-txt-sitemap-declared`'s concern). Any other failure, or robots.txt itself being
+  unavailable (5xx, network error, redirect), also makes them not-applicable, since nothing can be
+  concluded.
+- **What is fetched**: each discovered sitemap, and, for a sitemap *index*, its child sitemaps one
+  level deep, at most **10 documents per run**. Reaching the cap is reported as truncation, never as
+  a pass for the unchecked files. Plain XML and gzip (`.xml.gz`, detected by the file's gzip magic
+  bytes, not the URL) are both supported.
+- **Cross-origin sitemaps are fetched.** The protocol lets robots.txt point at another host (a CDN,
+  say), so those are checked too, through the same SSRF-protected path as everything else. The
+  cost: a page's robots.txt can make the CLI issue a few bounded GET requests to public URLs of its
+  choosing.
+- **Redirects are reported, not followed.** A declared sitemap URL that redirects (http to https,
+  non-www to www) fails `sitemap-valid` with the `Location` and the advice to declare the final
+  URL. Google does follow redirects, so this is stricter than Google; the message says what to
+  change. Following redirects would need a new, separately reviewed mode in `safe-fetch.js`.
+- **Bounds**: each request has a 10 s **total** deadline (not only an idle timeout, so a server
+  trickling bytes cannot hold it open) and a 50 MiB + 1 byte cap on the wire; gzip is inflated with
+  a hard cap of 50 MiB + 1 on the *output* (a small "gzip bomb" cannot expand past it); parsing
+  stops after 50,001 entries. One byte over each protocol limit is what lets `sitemap-limits` prove
+  a file is over it without reading an unbounded amount. These are constants, deliberately not
+  configurable: a knob that loosens a resource bound is a security decision.
+
+**The audits**
+
+- **`sitemap-valid`** — passes when every discovered sitemap is reachable, well-formed XML (strict
+  parsing, with line and column for the first error), has a `<urlset>` or `<sitemapindex>` root in
+  the `http://www.sitemaps.org/schemas/sitemap/0.9` namespace, and lists only absolute http(s)
+  `<loc>` values of at most 2,048 characters. Image, video, news and `xhtml:link` extension
+  elements are tolerated but not validated. robots.txt `Sitemap:` lines that were ignored for not
+  being absolute URLs are shown but do not fail the audit.
+- **`sitemap-duplicate-urls`** — fails when one sitemap file lists the same `<loc>` more than once.
+  URLs are compared as **exact strings**: `/a` vs `/a/`, or differing letter case, are different
+  URLs and are not flagged, since they are not equivalent in general. The same URL in two
+  *different* sitemap files is not flagged.
+- **`sitemap-limits`** — fails when a file has more than 50,000 URLs (or, for an index, 50,000 child
+  sitemaps) or is more than 50 MiB uncompressed, the sitemaps.org limits Google enforces. The table
+  lists every checked file with entry count, compressed and uncompressed size, and gzip or not.
+
+**You cannot test these against a local page.** The fetch path refuses loopback and private
+addresses by design, so `lhci collect` against `http://localhost:...` cannot reach a sitemap served
+from the same machine; the audits will report not-applicable or a fetch error. Use a real public
+site, or the integration test in `test/gatherers/sitemap-documents.integration.test.js`, which
+drives the same code against a local server using a test-only lookup that production code cannot
+use.
 
 ### Finding namespaces
 
@@ -332,22 +407,24 @@ module.exports = {
 };
 ```
 
-This adds all twenty-one audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all twenty-seven audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
 `h1-title-relevance`, `robots-directives-report`, `robots-directives-conflict`, `canonical-https`,
 `favicon-presence`, `favicon-quality`, `manifest-icons`, `open-graph-completeness`,
 `open-graph-canonical-match`, `open-graph-image-reachable`, `twitter-card-completeness`,
-`social-preview-content`) on top of Lighthouse's default audits (via `extends: 'lighthouse:default'`
+`social-preview-content`, `robots-txt-sitemap-declared`, `robots-txt-crawler-access`,
+`robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`) on top of
+Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the twenty-one audits are part of this fork's shared `all`/`recommended` presets
+None of the twenty-seven audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all twenty-one here are opt-in via `configPath`, so they can't be part of that
+default, and all twenty-seven here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
@@ -387,6 +464,18 @@ module.exports = {
         'twitter-card-completeness': ['error', {}], // or 'warn'
         // Same informational-only caveat as structured-data-rich-result-eligibility — see below.
         'social-preview-content': ['warn', {}],
+        // Scored; a recommendation, since a search-console submission also works.
+        'robots-txt-sitemap-declared': ['warn', {minScore: 1}],
+        // Scored on Googlebot/Bingbot only; AI crawlers appear in the table but never fail it.
+        'robots-txt-crawler-access': ['error', {minScore: 1}],
+        'robots-txt-rule-conflicts': ['warn', {minScore: 1}],
+        // A malformed, unreachable or redirecting sitemap is a definite defect. If your sitemap
+        // URL legitimately redirects (Google follows that), prefer 'warn'.
+        'sitemap-valid': ['error', {minScore: 1}],
+        // Google documents these as hard limits it enforces; content over them is ignored.
+        'sitemap-limits': ['error', {minScore: 1}],
+        // Search engines tolerate duplicates, and matching is deliberately exact-string.
+        'sitemap-duplicate-urls': ['warn', {minScore: 1}],
       },
     },
   },
