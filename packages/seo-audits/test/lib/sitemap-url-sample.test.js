@@ -239,6 +239,74 @@ describe('checkUrls', () => {
   });
 });
 
+describe('checkUrls — fetcher fields pass through as `response`', () => {
+  it('keeps everything the fetcher resolved, untouched, alongside the existing fields', async () => {
+    const extra = {
+      status: 200,
+      redirectLocation: null,
+      headers: {'x-robots-tag': ['noindex']},
+      body: Buffer.from('hi'),
+      bodyRead: 'html',
+    };
+    const [result] = await checkUrls(['https://e.com/a'], {fetchStatus: async () => extra});
+    expect(result).toMatchObject({
+      url: 'https://e.com/a',
+      status: 200,
+      redirectLocation: null,
+      error: null,
+      notChecked: false,
+    });
+    expect(result.response).toBe(extra);
+  });
+
+  it('gives a plain {status} fetcher a plain {status} response', async () => {
+    const [result] = await checkUrls(['https://e.com/a'], {
+      fetchStatus: async () => ({status: 404}),
+    });
+    expect(result.response).toEqual({status: 404});
+  });
+
+  it('has no response for an errored or not-checked URL', async () => {
+    const [errored] = await checkUrls(['https://e.com/a'], {
+      fetchStatus: async () => {
+        throw new Error('boom');
+      },
+    });
+    expect(errored.response).toBeUndefined();
+    const [skipped] = await checkUrls(['https://e.com/a'], {
+      fetchStatus: async () => ({status: 200}),
+      budgetMs: 0,
+    });
+    expect(skipped).toMatchObject({notChecked: true});
+    expect(skipped.response).toBeUndefined();
+  });
+
+  it("keeps only the successful attempt's response when a retry succeeds after an error", async () => {
+    let attempts = 0;
+    const [result] = await checkUrls(['https://e.com/a'], {
+      fetchStatus: async () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error('ECONNRESET');
+        return {status: 200, marker: 'second'};
+      },
+    });
+    expect(result.error).toBeNull();
+    expect(result.response).toEqual({status: 200, marker: 'second'});
+  });
+
+  it('does not leave a stale response when the retry fails after a response-less first error', async () => {
+    let attempts = 0;
+    const [result] = await checkUrls(['https://e.com/a'], {
+      fetchStatus: async () => {
+        attempts += 1;
+        throw new Error(`fail ${attempts}`);
+      },
+    });
+    expect(result.error).toBe('fail 2');
+    expect(result.response).toBeUndefined();
+  });
+});
+
 describe('describeCheck', () => {
   const base = {url: 'u', status: 200, redirectLocation: null, error: null, notChecked: false};
   it.each([

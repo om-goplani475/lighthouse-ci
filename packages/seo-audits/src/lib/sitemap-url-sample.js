@@ -11,15 +11,24 @@
 
 /** @typedef {import('./sitemap-parse.js').SitemapDocument} SitemapDocument */
 /**
+ * `response` is whatever the injected fetcher resolved, untouched (a plain `{status}` fetcher gives
+ * `{status}`; the page fetcher's headers and body prefix ride along), so callers that need more than
+ * the status can use it without `checkUrls` knowing what it is. Absent when the URL errored or was not
+ * checked.
  * @typedef {{
  *   url: string,
  *   status: number | null,
  *   redirectLocation: string | null,
  *   error: string | null,
  *   notChecked: boolean,
+ *   response?: {status: number, redirectLocation?: string | null},
  * }} UrlCheck
  */
-/** @typedef {(url: string) => Promise<{status: number, redirectLocation?: string}>} FetchStatus */
+/**
+ * A fetcher may resolve more than these fields (the page fetcher adds headers and a body prefix);
+ * they are kept on `UrlCheck.response`.
+ * @typedef {(url: string) => Promise<{status: number, redirectLocation?: string | null}>} FetchStatus
+ */
 
 const SAMPLE_SIZE_ENV = 'LHCI_SEO_SITEMAP_SAMPLE_SIZE';
 const DEFAULT_SAMPLE_SIZE = 10;
@@ -118,7 +127,7 @@ async function checkOne(fetchStatus, url, timeoutMs) {
     /** @type {any} */
     let timer;
     try {
-      /** @type {{status: number, redirectLocation?: string}} */
+      /** @type {{status: number, redirectLocation?: string | null}} */
       const response = await Promise.race([
         fetchStatus(url),
         /** @type {Promise<never>} */ (
@@ -132,10 +141,12 @@ async function checkOne(fetchStatus, url, timeoutMs) {
       ]);
       result.status = response.status;
       result.redirectLocation = response.redirectLocation || null;
+      result.response = response;
       result.error = null;
       return result;
     } catch (err) {
       result.error = err instanceof Error ? err.message : String(err);
+      delete result.response;
     } finally {
       clearTimeout(timer);
     }
