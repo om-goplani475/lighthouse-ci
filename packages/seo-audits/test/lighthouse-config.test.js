@@ -58,7 +58,7 @@ describe('seo-audits lighthouse-config', () => {
     expect(artifactIds).toContain('SitemapDocuments');
     expect(artifactIds).toContain('LlmsTxt');
 
-    // And all thirty of this fork's audits are actually added, not just defaults preserved.
+    // And all thirty-one of this fork's audits are actually added, not just defaults preserved.
     expect(auditIds).toContain('structured-data-json-ld');
     expect(auditIds).toContain('structured-data-schema-properties');
     expect(auditIds).toContain('structured-data-rich-result-eligibility');
@@ -88,10 +88,11 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('sitemap-limits');
     expect(auditIds).toContain('sitemap-url-status');
     expect(auditIds).toContain('sitemap-robots-crossref');
+    expect(auditIds).toContain('sitemap-indexability');
     expect(auditIds).toContain('llms-txt-structure');
   }, 30000);
 
-  it('adds the seo-extended category with all thirty audits, without touching the core seo category', async () => {
+  it('adds the seo-extended category with all thirty-one audits, without touching the core seo category', async () => {
     const {categories} = await resolveConfig();
 
     expect(categories['seo-extended']).toBeDefined();
@@ -115,6 +116,7 @@ describe('seo-audits lighthouse-config', () => {
       'robots-txt-rule-conflicts',
       'robots-txt-sitemap-declared',
       'sitemap-duplicate-urls',
+      'sitemap-indexability',
       'sitemap-limits',
       'sitemap-robots-crossref',
       'sitemap-url-status',
