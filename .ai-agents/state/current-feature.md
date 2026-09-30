@@ -1,7 +1,9 @@
 # Current feature
 
 - slug: sitemap-fetch-and-parse
-- stage: 03-sequenced
+- stage: 04-implemented (Gate 3 review pending; no PR: not pushing, per developer's push-it-yourself rule)
+- base_branch: phase-4-robots-sitemap
+- base_commit: 299b2ab
 - spec: docs/feature-specs/sitemap-fetch-and-parse.md
 - audit_spec: docs/audit-specs/sitemap-fetch-and-parse.md
 - contract: docs/feature-contracts/sitemap-fetch-and-parse.md

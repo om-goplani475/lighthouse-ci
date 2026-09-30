@@ -55,7 +55,7 @@ The package is plain ESM JS with JSDoc types (see `lighthouse-conventions.md`), 
 const LIMITS = {
   MAX_DECLARED: 5,
   MAX_DOCUMENTS: 10,
-  MAX_COMPRESSED_BYTES: 15 * 1024 * 1024,
+  MAX_COMPRESSED_BYTES: 52_428_801,   // wire cap == decompressed cap; see "Implementation deviations"
   MAX_UNCOMPRESSED_BYTES: 52_428_801, // 50 MiB + 1, so "over the limit" is detectable
   MAX_ENTRIES_STORED: 50_001,         // 50,000 protocol limit + 1
   MAX_LOC_LENGTH: 2048,
@@ -175,3 +175,19 @@ Cross-checked against `docs/audit-specs/sitemap-fetch-and-parse.md` (completed, 
   `rule-engine/registry.js`, so all of them (lib, gatherer, audits) load directly under Jest with no
   shell-out workaround. The gatherer extends `BaseGatherer` (`lighthouse/core/gather/base-gatherer.js`),
   which `favicon-links.js` already does under Jest.
+
+## Implementation deviations (recorded at /implement, 2026-09-30)
+
+Two deliberate differences from the text above, both found while implementing:
+
+1. **`MAX_COMPRESSED_BYTES` is 50 MiB + 1, not 15 MiB.** A plain (non-gzip) sitemap is legitimately
+   up to 50 MiB on the wire, so a 15 MiB wire cap would report a valid 20-50 MiB sitemap as a fetch
+   failure, exactly the size range `sitemap-limits` must judge. Memory and time stay bounded by
+   this cap, the 50 MiB + 1 decompressed cap, and the fetcher's 10 s total deadline.
+2. **`entryCount` counts every `<loc>` seen, valid or not**, so `locs.length + invalidLocCount ===
+   entryCount` (`locs` holds only valid values), rather than `entryCount === locs.length`. This keeps
+   the 50,000-entry limit honest for a file full of invalid locs.
+
+Also: `safeFetchBytes`' `timeoutMs` is a *total* wall-clock deadline (a trickling server would
+never trip a socket idle timeout), and `parseSitemapBytes` takes an optional second argument
+`{maxUncompressedBytes}` used only by tests to avoid allocating 50 MiB.
