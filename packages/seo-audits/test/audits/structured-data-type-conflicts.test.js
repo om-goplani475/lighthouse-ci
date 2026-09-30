@@ -170,4 +170,16 @@ describe('structured-data-type-conflicts audit', () => {
     const namespaces = result.details.items.map(i => i.namespace).sort();
     expect(namespaces).toEqual(['conflicting-entity', 'duplicate-count']);
   }, 30000);
+
+  it('detects a duplicate singular type declared twice within one @graph block (Phase 2 item 5)', async () => {
+    const graphBlock = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@graph': [JSON.parse(ORG_A), JSON.parse(ORG_B)],
+    });
+    const result = await runAudit([{content: graphBlock}]);
+    expect(result.score).toBe(0);
+    expect(result.details.items).toEqual([
+      expect.objectContaining({namespace: 'duplicate-count', type: 'Organization'}),
+    ]);
+  }, 30000);
 });

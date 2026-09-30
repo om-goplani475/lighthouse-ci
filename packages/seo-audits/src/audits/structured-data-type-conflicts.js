@@ -7,6 +7,7 @@
 import {Audit} from 'lighthouse/core/audits/audit.js';
 import {findDuplicates, findConflicts} from '../rule-engine/type-conflicts-engine.js';
 import {resolveTypeConflictsRuleset} from '../rule-engine/registry.js';
+import {extractTypedEntities} from '../lib/json-ld-graph.js';
 
 const ruleset = resolveTypeConflictsRuleset();
 const relevantTypes = new Set([...ruleset.singularTypes, ...Object.keys(ruleset.identityFields)]);
@@ -23,26 +24,6 @@ const UIStrings = {
     "won't flag legitimately different entities of the same schema type, like a product " +
     'listing page with multiple distinct products).',
 };
-
-/**
- * @param {unknown} value
- * @return {value is Record<string, unknown>}
- */
-function isObject(value) {
-  return typeof value === 'object' && value !== null;
-}
-
-/**
- * @param {string} content
- * @return {unknown}
- */
-function tryParse(content) {
-  try {
-    return JSON.parse(content);
-  } catch {
-    return undefined;
-  }
-}
 
 // @ts-expect-error - StructuredDataJsonLd isn't part of Lighthouse's own closed Artifacts
 // type from an out-of-tree package — same boundary already documented in the sibling audits.
@@ -78,12 +59,12 @@ class StructuredDataTypeConflicts extends Audit {
     const blocksByType = Object.create(null);
 
     artifacts.StructuredDataJsonLd.forEach(block => {
-      const parsed = tryParse(block.content);
-      if (!isObject(parsed) || typeof parsed['@type'] !== 'string') return;
-
-      const schemaType = parsed['@type'];
-      typeCounts[schemaType] = (typeCounts[schemaType] || 0) + 1;
-      (blocksByType[schemaType] = blocksByType[schemaType] || []).push(parsed);
+      // extractTypedEntities also unwraps @graph containers — duplicate/conflicting entities
+      // declared together inside one @graph are now counted, not silently invisible.
+      for (const {type: schemaType, data} of extractTypedEntities(block.content)) {
+        typeCounts[schemaType] = (typeCounts[schemaType] || 0) + 1;
+        (blocksByType[schemaType] = blocksByType[schemaType] || []).push(data);
+      }
     });
 
     const hasRelevantBlock = Object.keys(typeCounts).some(type => relevantTypes.has(type));

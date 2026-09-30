@@ -109,4 +109,32 @@ describe('structured-data-json-ld audit', () => {
     ]);
     expect(result.details.rulesetVersions).toEqual({schemaOrg: '2026-09'});
   }, 30000);
+
+  it('passes a valid @graph container — the false positive this used to produce is fixed (Phase 2 item 5)', async () => {
+    const result = await runAudit([
+      {
+        content: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@graph': [
+            {'@type': 'Product', name: 'Widget'},
+            {'@type': 'Organization', name: 'Acme'},
+          ],
+        }),
+      },
+    ]);
+    expect(result.score).toBe(1);
+  }, 30000);
+
+  it('fails a @graph container with an entry missing its own @type', async () => {
+    const result = await runAudit([
+      {
+        content: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@graph': [{'@type': 'Product', name: 'Widget'}, {name: 'No type here'}],
+        }),
+      },
+    ]);
+    expect(result.score).toBe(0);
+    expect(result.details.items[0].reason).toBe('Missing @context or @type');
+  }, 30000);
 });

@@ -11,6 +11,7 @@ import {
   resolveGoogleRequirementsRuleset,
   resolveEligibilityRuleset,
 } from '../rule-engine/registry.js';
+import {extractTypedEntities} from '../lib/json-ld-graph.js';
 
 const googleRuleset = resolveGoogleRequirementsRuleset();
 const eligibilityRuleset = resolveEligibilityRuleset();
@@ -26,26 +27,6 @@ const UIStrings = {
     'one Google currently documents support for at all — valid markup never guarantees a rich ' +
     'result will actually display.',
 };
-
-/**
- * @param {unknown} value
- * @return {value is Record<string, unknown>}
- */
-function isObject(value) {
-  return typeof value === 'object' && value !== null;
-}
-
-/**
- * @param {string} content
- * @return {unknown}
- */
-function tryParse(content) {
-  try {
-    return JSON.parse(content);
-  } catch {
-    return undefined;
-  }
-}
 
 // @ts-expect-error - StructuredDataJsonLd isn't part of Lighthouse's own closed Artifacts
 // type from an out-of-tree package — same boundary already documented in
@@ -76,34 +57,35 @@ class StructuredDataSchemaProperties extends Audit {
     let anyRequirementFailure = false;
 
     artifacts.StructuredDataJsonLd.forEach((block, blockIndex) => {
-      const parsed = tryParse(block.content);
-      if (!isObject(parsed) || typeof parsed['@type'] !== 'string') return;
+      // extractTypedEntities also unwraps @graph containers — one raw <script> block can
+      // produce multiple entities here, each still tagged with the same blockIndex so a report
+      // reader can trace findings back to the <script> tag they came from.
+      for (const {type: schemaType, data} of extractTypedEntities(block.content)) {
+        if (!googleRuleset.types[schemaType]) continue;
 
-      const schemaType = parsed['@type'];
-      if (!googleRuleset.types[schemaType]) return;
+        anyTrackedType = true;
 
-      anyTrackedType = true;
+        const requirementFindings = validateGoogleRequirements(schemaType, data, googleRuleset);
+        if (requirementFindings.length > 0) anyRequirementFailure = true;
+        for (const finding of requirementFindings) {
+          rows.push({
+            blockIndex,
+            type: schemaType,
+            namespace: finding.namespace,
+            property: finding.property,
+            message: finding.message,
+          });
+        }
 
-      const requirementFindings = validateGoogleRequirements(schemaType, parsed, googleRuleset);
-      if (requirementFindings.length > 0) anyRequirementFailure = true;
-      for (const finding of requirementFindings) {
-        rows.push({
-          blockIndex,
-          type: schemaType,
-          namespace: finding.namespace,
-          property: finding.property,
-          message: finding.message,
-        });
-      }
-
-      for (const finding of evaluateEligibility(schemaType, eligibilityRuleset)) {
-        rows.push({
-          blockIndex,
-          type: schemaType,
-          namespace: finding.namespace,
-          property: finding.property,
-          message: finding.message,
-        });
+        for (const finding of evaluateEligibility(schemaType, eligibilityRuleset)) {
+          rows.push({
+            blockIndex,
+            type: schemaType,
+            namespace: finding.namespace,
+            property: finding.property,
+            message: finding.message,
+          });
+        }
       }
     });
 

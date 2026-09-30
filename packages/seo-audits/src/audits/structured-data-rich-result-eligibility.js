@@ -7,6 +7,7 @@
 import {Audit} from 'lighthouse/core/audits/audit.js';
 import {evaluate as evaluateEligibility} from '../rule-engine/eligibility-engine.js';
 import {resolveEligibilityRuleset} from '../rule-engine/registry.js';
+import {extractTypedEntities} from '../lib/json-ld-graph.js';
 
 const eligibilityRuleset = resolveEligibilityRuleset();
 
@@ -22,26 +23,6 @@ const UIStrings = {
 
 const UNTRACKED_MESSAGE_SUFFIX =
   ' is not a rich-result type Google currently documents guidance for.';
-
-/**
- * @param {unknown} value
- * @return {value is Record<string, unknown>}
- */
-function isObject(value) {
-  return typeof value === 'object' && value !== null;
-}
-
-/**
- * @param {string} content
- * @return {unknown}
- */
-function tryParse(content) {
-  try {
-    return JSON.parse(content);
-  } catch {
-    return undefined;
-  }
-}
 
 // @ts-expect-error - StructuredDataJsonLd isn't part of Lighthouse's own closed Artifacts
 // type from an out-of-tree package — same boundary already documented in
@@ -70,34 +51,35 @@ class StructuredDataRichResultEligibility extends Audit {
     const rowsByType = new Map();
 
     artifacts.StructuredDataJsonLd.forEach(block => {
-      const parsed = tryParse(block.content);
-      if (!isObject(parsed) || typeof parsed['@type'] !== 'string') return;
+      // extractTypedEntities also unwraps @graph containers — a page's Organization/WebSite/
+      // Article trio commonly declared together in one @graph now each get counted here, not
+      // silently invisible.
+      for (const {type: schemaType} of extractTypedEntities(block.content)) {
+        const existing = rowsByType.get(schemaType);
+        if (existing) {
+          existing.count++;
+          continue;
+        }
 
-      const schemaType = parsed['@type'];
-      const existing = rowsByType.get(schemaType);
-      if (existing) {
-        existing.count++;
-        return;
-      }
-
-      const typeRule = eligibilityRuleset.types[schemaType];
-      if (typeRule) {
-        const [finding] = evaluateEligibility(schemaType, eligibilityRuleset);
-        rowsByType.set(schemaType, {
-          type: schemaType,
-          count: 1,
-          tracked: 'Yes',
-          richResultFeature: typeRule.richResultFeature,
-          message: finding.message,
-        });
-      } else {
-        rowsByType.set(schemaType, {
-          type: schemaType,
-          count: 1,
-          tracked: 'No',
-          richResultFeature: '',
-          message: schemaType + UNTRACKED_MESSAGE_SUFFIX,
-        });
+        const typeRule = eligibilityRuleset.types[schemaType];
+        if (typeRule) {
+          const [finding] = evaluateEligibility(schemaType, eligibilityRuleset);
+          rowsByType.set(schemaType, {
+            type: schemaType,
+            count: 1,
+            tracked: 'Yes',
+            richResultFeature: typeRule.richResultFeature,
+            message: finding.message,
+          });
+        } else {
+          rowsByType.set(schemaType, {
+            type: schemaType,
+            count: 1,
+            tracked: 'No',
+            richResultFeature: '',
+            message: schemaType + UNTRACKED_MESSAGE_SUFFIX,
+          });
+        }
       }
     });
 

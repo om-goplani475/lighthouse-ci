@@ -284,4 +284,43 @@ describe('structured-data-schema-properties audit', () => {
     expect(eligibilityRow).toBeDefined();
     expect(eligibilityRow.message).toContain('not currently documented as supported');
   }, 30000);
+
+  it('unwraps @graph and checks each entity independently (Phase 2 item 5)', async () => {
+    const graphBlock = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@graph': [JSON.parse(VALID_PRODUCT), JSON.parse(ARTICLE_MISSING_DATE)],
+    });
+    const result = await runAudit([{content: graphBlock}]);
+    expect(result.score).toBe(0); // The Article inside the graph is missing datePublished.
+    const failure = result.details.items.find(
+      /** @param {any} item */ item => item.namespace === 'google-requirements'
+    );
+    expect(failure).toEqual(expect.objectContaining({type: 'Article', property: 'datePublished'}));
+  }, 30000);
+
+  it('resolves an @id reference to a sibling @graph entity before checking nested properties', async () => {
+    const graphBlock = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@id': '#offer1',
+          '@type': 'Offer',
+          price: '9.99',
+          priceCurrency: 'USD',
+          availability: 'https://schema.org/InStock',
+        },
+        {
+          '@type': 'Product',
+          name: 'Widget',
+          image: 'https://example.com/widget.jpg',
+          offers: {'@id': '#offer1'},
+        },
+      ],
+    });
+    const result = await runAudit([{content: graphBlock}]);
+    // Without reference resolution, `offers` would be the bare {"@id": "#offer1"} stub — none
+    // of price/priceCurrency/availability present, so all three nested-required checks would
+    // fail. With resolution, the referenced Offer's real data is used, so this passes.
+    expect(result.score).toBe(1);
+  }, 30000);
 });

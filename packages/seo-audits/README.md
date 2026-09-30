@@ -7,7 +7,9 @@ rationale and the agent pipeline this package was built through.
 ## What's in here
 
 - **`structured-data-json-ld`** — validates every `<script type="application/ld+json">` block on a
-  page: it must be parseable JSON and include `@context`/`@type`. Lighthouse's own built-in
+  page: it must be parseable JSON and include `@context`/`@type`, **or be a valid `@graph`
+  container** (`@context` plus a non-empty `@graph` array whose entries each have their own
+  `@type`) — see "`@graph` and `@id` reference support" below. Lighthouse's own built-in
   `structured-data` audit is a manual placeholder (it just tells you to run an external tool); this
   one actually checks it. See `docs/feature-specs/structured-data-validation.md` in the repo root for
   the full spec and rationale.
@@ -40,6 +42,34 @@ rationale and the agent pipeline this package was built through.
     rich-result types to a narrow set of authoritative sites; the eligibility ruleset's schema only
     models a boolean `supported` flag, which can't express "restricted" — `false` is the closer
     approximation of the two, not a data-entry mistake.
+
+### `@graph` and `@id` reference support (Phase 2 item 5)
+
+All four structured-data audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+`structured-data-rich-result-eligibility`, `structured-data-type-conflicts`) understand
+`{"@context": ..., "@graph": [...]}` containers — a standard JSON-LD pattern common real-world
+emitters (Yoast SEO and others) use to declare several entities in one `<script>` block. Before
+this, a `@graph` block was **wrongly flagged as invalid** by `structured-data-json-ld` (it has no
+top-level `@type` by design — that used to trigger a false "Missing @type"), and every entity
+inside one was **silently invisible** to the other three audits (each independently checked for a
+top-level `@type` string and skipped anything without one). Both are fixed: `@graph` containers are
+recognized as valid (checking `@context` at the container level and `@type` on each entry), and
+every typed entity inside a `@graph` is unwrapped and checked exactly as if it were its own
+top-level block.
+
+Property values given as a bare `{"@id": "..."}` reference (rather than inlined) are also resolved
+against sibling entities in the same `@graph` before nested-property/datatype checks run — e.g. a
+`Product.offers` given as `{"@id": "#offer1"}` pointing at a separate `Offer` entity elsewhere in
+the graph is resolved to that entity's real data, not read as a bare, property-less stub that would
+otherwise fail every nested-required check. Resolution is **one level deep only** — a resolved
+node's own `@id` references are not themselves chased, matching this codebase's existing "no deep
+recursion" scope limit (see the nested-property-check limitation above). An unresolvable reference
+(no matching `@id` anywhere in the graph) is left as-is, which naturally fails nested-required
+checks the same way a genuinely missing property would — not a special-cased error path.
+
+Shared logic lives in `src/lib/json-ld-graph.js` (`extractTypedEntities`), used by the three
+type-consuming audits in place of each one's previous ad-hoc `@type` check; the validity check
+itself (container vs. single-entity) lives in `src/rule-engine/schema-org-engine.js`.
 - **`structured-data-rich-result-eligibility`** — a standalone, purely informational report: for
   every distinct schema type found in JSON-LD on the page, one row showing whether Google currently
   documents rich-result guidance for it and which feature if so, reusing the same `eligibility`

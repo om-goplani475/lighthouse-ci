@@ -139,4 +139,16 @@ describe('structured-data-rich-result-eligibility audit', () => {
     const result = await runAudit([{content: PRODUCT_BLOCK}]);
     expect(result.details.rulesetVersions).toEqual({eligibility: '2026-10'});
   }, 30000);
+
+  it('unwraps @graph and reports each entity inside it, not just the container (Phase 2 item 5)', async () => {
+    const graphBlock = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@graph': [JSON.parse(PRODUCT_BLOCK), JSON.parse(RECIPE_BLOCK)],
+    });
+    const result = await runAudit([{content: graphBlock}]);
+    expect(result.details.items).toEqual([
+      expect.objectContaining({type: 'Product', tracked: 'Yes'}),
+      expect.objectContaining({type: 'Recipe', tracked: 'Yes'}),
+    ]);
+  }, 30000);
 });
