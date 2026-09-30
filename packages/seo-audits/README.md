@@ -277,7 +277,8 @@ itself (container vs. single-entity) lives in `src/rule-engine/schema-org-engine
   silently does nothing. Only identical path strings are compared: wildcard overlaps (`/a*` vs
   `/ab`) are not detected (see `docs/phases/phase-4-robots-sitemap.md`).
 - **`sitemap-valid`**, **`sitemap-duplicate-urls`**, **`sitemap-limits`**, **`sitemap-url-status`**
-  (Phase 4) — four scored audits reading one shared artifact; see "Sitemap audits" below.
+  (Phase 4) — four scored audits reading one shared artifact; see "Sitemap audits" below. A fifth,
+  **`sitemap-robots-crossref`**, compares that artifact with robots.txt.
 
 ### A note on the SSRF-protected fetch (`manifest-icons`, `open-graph-image-reachable`, the sitemap audits, `src/lib/safe-fetch.js`)
 
@@ -374,6 +375,22 @@ audits use it. **How it works:**
     page is `noindex` is not checked here; that belongs to the later sitemap-vs-indexability check.
   - Not-applicable when no sitemap URL list could be checked.
 
+- **`sitemap-robots-crossref`** (Phase 4 item 8) — scored. A sitemap asks search engines to index
+  its URLs and robots.txt tells them not to crawl some paths; a URL that is both listed and
+  disallowed contradicts itself. Every same-origin URL the sitemap lists (all of them, not a sample:
+  it is pure matching, no requests) is checked against robots.txt for **Googlebot and Bingbot**,
+  and the failing rows say which. A more specific crawler group replaces `*` for that crawler, and
+  an `Allow` that beats a broader `Disallow` is honored. Reads the sitemap artifact plus core's
+  `RobotsTxt`; fetches nothing. URLs on other hosts are counted and skipped (robots.txt only governs
+  its own origin), and AI-crawler-only blocks are not a conflict.
+  - **The sitemap file's own path being disallowed** is also flagged, but as something to verify, not
+    proof it is ignored: Google's own sitemap documentation does not say whether robots.txt rules
+    apply to sitemap files (checked 2026-09-30), and search engines differ.
+  - **Whether the audited page is listed in the sitemap** is shown for information only and never
+    affects the score: many pages are legitimately left out (logins, filtered views).
+  - Not-applicable when no sitemap URL list or robots.txt could be read; a missing robots.txt
+    (404) means nothing is disallowed, so it passes.
+
 ### Auditing a site on localhost or a private network (`LHCI_SEO_ALLOW_PRIVATE_NETWORK`)
 
 The fetch path (`src/lib/safe-fetch.js`) refuses loopback and private addresses by default, because
@@ -447,7 +464,7 @@ module.exports = {
 };
 ```
 
-This adds all twenty-eight audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all twenty-nine audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
@@ -456,16 +473,16 @@ This adds all twenty-eight audits (`structured-data-json-ld`, `structured-data-s
 `open-graph-canonical-match`, `open-graph-image-reachable`, `twitter-card-completeness`,
 `social-preview-content`, `robots-txt-sitemap-declared`, `robots-txt-crawler-access`,
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
-`sitemap-url-status`) on top of
+`sitemap-url-status`, `sitemap-robots-crossref`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the twenty-eight audits are part of this fork's shared `all`/`recommended` presets
+None of the twenty-nine audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all twenty-eight here are opt-in via `configPath`, so they can't be part of that
+default, and all twenty-nine here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
@@ -520,6 +537,8 @@ module.exports = {
         // A listed URL that 404s or redirects is a definite defect, but this is a sample and a
         // network blip can fail a URL; 'warn' by default, 'error' once you trust your sitemap.
         'sitemap-url-status': ['warn', {minScore: 1}],
+        // Listing a URL the same site disallows is a definite contradiction, not a judgment call.
+        'sitemap-robots-crossref': ['error', {minScore: 1}],
       },
     },
   },

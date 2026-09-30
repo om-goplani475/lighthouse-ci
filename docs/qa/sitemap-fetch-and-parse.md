@@ -136,3 +136,31 @@ developer: evenly spread deterministic sample, only 2xx passes (redirects fail),
 
 Observation: `safeFetchStatus` now also returns `redirectLocation` for a 3xx response (additive: a
 plain `{status}` is returned for everything else, so existing callers and tests are unchanged).
+
+## Follow-up: `sitemap-robots-crossref` (Phase 4 item 8), 2026-09-30
+
+Lightweight mode, no new gatherer or requests: compares `SitemapDocuments` with core's `RobotsTxt`.
+Decisions confirmed with the developer: scored on URLs disallowed for Googlebot/Bingbot, a declared
+sitemap's own disallowed path is also scored, "audited page missing from the sitemap" is informational.
+
+- [x] **Localhost (opt-in on)** — robots.txt disallows `/private/` and `/sitemap.xml` for `*` and
+      `/bing-only/` for Bingbot; the sitemap lists `/`, `/ok`, `/private/a`, `/private/b`,
+      `/bing-only/x`. `score: 0`: "3 of 5 sitemap URL(s) are disallowed by robots.txt; 1 sitemap file
+      path(s) are disallowed"; rows name Googlebot for `/private/a`, `/private/b` and the sitemap
+      path, and **Bingbot only** for `/bing-only/x`. Bingbot is correctly *not* flagged for
+      `/private/`: its own group replaces `*` for it. The page is reported as listed.
+- [x] **Real sites, pass** — `https://nodejs.org/en`: 1,732 sitemap URLs checked, 8 on another host
+      skipped, page reported as not listed (informational, score 1); `https://developer.mozilla.org/en-US/`:
+      52,383 URLs checked (all of them, quickly: no requests), page listed, score 1
+- [x] In the `seo-extended` category; config test asserts all 29 audit ids
+- [x] Unit tests (19): pass; blocked for both crawlers vs one; Allow overriding a broader Disallow;
+      AI-crawler-only block ignored; 500 blocked URLs list 20 rows but report the true total; other
+      host/scheme/port not checked; declared sitemap path flagged, index-child path not; robots.txt
+      404 passes; robots.txt 5xx/unavailable and discovery none/unavailable not-applicable; index and
+      failed documents ignored; page-listed tolerates a trailing slash and a fragment
+- [x] seo-audits suite: 598 tests pass; typecheck and lint clean
+- [ ] **Unverified claim, stated in the audit's own description:** whether search engines apply
+      robots.txt to sitemap files. Google's sitemap documentation (developers.google.com,
+      `build-sitemap`) does not address it (checked 2026-09-30), so that check is worded as "verify",
+      and can be dropped if it proves wrong
+- [ ] Not exercised live: robots.txt unavailable (5xx) branch; unit-tested only
