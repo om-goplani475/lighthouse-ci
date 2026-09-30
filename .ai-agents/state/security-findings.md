@@ -400,3 +400,20 @@ URLs listed in a sitemap (an attacker-influenced list), not just files discovere
   the report lists sampled URLs, statuses and error text only, never response bodies or headers other
   than a redirect's `Location`.
 - status: n/a
+
+## 2026-09-30 — llms-txt-structure (Phase 4 item 10)
+
+Reviewed as built: a new gatherer with one outbound request.
+
+- severity: none found (no finding to log); recorded for completeness
+- checked: (1) the URL is built from the audited page's own origin plus the fixed path `/llms.txt`;
+  nothing on the page can change it, and the file's links are never fetched; (2) the request is
+  `safeFetchBytes`: scheme allowlist, private-address blocking (including the IPv6 fix and the
+  private-network opt-in rules, no separate path), no redirects followed (a redirect is reported with
+  its target, not requested), 1 MiB body cap, 5 s total deadline; (3) every outcome is data: a refused,
+  slow, oversized or failing fetch cannot throw or hang the run, and adds a run warning; (4) parsing
+  is line-by-line with simple anchored patterns (no nested quantifiers, none of the backtracking
+  behavior a regular-expression denial of service needs) over at most 1 MiB, and an odd-input test
+  confirms it does not throw; (5) data exposure: the report shows line numbers, format problems and
+  link counts, never the file's contents beyond short problem descriptions.
+- status: n/a

@@ -164,3 +164,40 @@ sitemap's own disallowed path is also scored, "audited page missing from the sit
       `build-sitemap`) does not address it (checked 2026-09-30), so that check is worded as "verify",
       and can be dropped if it proves wrong
 - [ ] Not exercised live: robots.txt unavailable (5xx) branch; unit-tested only
+
+## Follow-up: `llms-txt-structure` (Phase 4 item 10), 2026-09-30
+
+Lightweight mode; a small `LlmsTxt` gatherer (one bounded fetch through `safe-fetch.js`) and a thin
+audit. Format source: llmstxt.org, fetched 2026-09-30 (only the H1 is required; blockquote, other
+markdown and H2 link-list sections are optional; a proposal, not a ratified standard). Decision
+confirmed with the developer: scored on structure when present, not-applicable when absent.
+
+- [x] **Real files, pass** — `https://llmstxt.org/` (3 links), `https://nodejs.org/en` (70 links),
+      `https://stripe.com/` (305 links in 31 sections), `https://docs.stripe.com/` (453 links in 26
+      sections), `https://platform.claude.com/docs/en/intro` (Anthropic docs, 642 links)
+- [x] **Absent** — `https://developer.mozilla.org/en-US/` (404): `notApplicable`
+- [x] **Local (opt-in on), planted defects** — valid file: score 1 ("2 link(s) in 1 section(s)");
+      an SPA answering `/llms.txt` with its HTML page: score 0, one Problem ("the file is an HTML
+      page, not markdown"); a file with an empty link URL: score 0, Problem at line 7, plus a note
+- [x] **Opt-in off** — `notApplicable`, and the report carries the run warning "llms.txt was not
+      checked: ... refusing to connect to "localhost" ... set LHCI_SEO_ALLOW_PRIVATE_NETWORK=1"
+- [x] In the `seo-extended` category; config test asserts the `LlmsTxt` artifact and all 30 audits
+- [x] Tests (36): parser 16 (H1-only passes, no H1 / empty / H2-as-H1 fail, broken link-like items,
+      empty or non-http URL, plain items only noted, sub-bullets ignored, code fences ignored, BOM and
+      CRLF, HTML page, odd input never throws); gatherer 10 (root-origin URL and bounds, present /
+      absent 404 410 403 / 5xx / redirect not followed / fetch error, run warning only when
+      unavailable, real default fetcher refuses a private host with the hint); audit 10 (incl. the
+      description stating it is a proposal and makes no claim about use; problem rows capped at 30
+      with the true count kept)
+- [x] seo-audits suite: 634 tests pass; typecheck and lint clean
+
+**A real-world correction found during this QA, worth remembering:** the first version failed
+Anthropic's docs (12 problems, over 120 notes) and Stripe (1 and 5 problems). Anthropic's file has H2
+sections holding plain lists (languages) and Stripe's uses indented sub-bullets as notes and prose
+bullets with links mid-sentence. None of that is broken in practice, so the audit was made lenient:
+only unambiguous violations fail; the rest are collapsed notes. Both now pass; the planted defects
+above still fail.
+
+- [ ] Not exercised live: a real site returning HTTP 5xx for `/llms.txt`, or a file over 1 MiB
+      (unit tests only)
+- [ ] Link reachability, `llms-full.txt` and subpath files: deferred, see the phase tracker

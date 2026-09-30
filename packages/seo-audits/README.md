@@ -391,6 +391,30 @@ audits use it. **How it works:**
   - Not-applicable when no sitemap URL list or robots.txt could be read; a missing robots.txt
     (404) means nothing is disallowed, so it passes.
 
+- **`llms-txt-structure`** (Phase 4 item 10) — scored on structure **only when the file exists**.
+  Fetches `/llms.txt` at the audited page's origin (through the SSRF-protected fetch: one request,
+  1 MiB cap, 5 s, no redirects followed) and checks it against the format at llmstxt.org.
+  **`llms.txt` is a community proposal (Jeremy Howard, September 2024), not a ratified standard, and
+  this audit does not claim any search engine or AI system uses it**; it only checks that a file you
+  chose to publish is well-formed. Not-applicable when the site has none (a 404 is not a failure:
+  nothing requires one) or the file could not be fetched.
+  - **Fails on**: no H1 title (the only part the format requires); an item that starts like a link
+    but is not one (`- [name]` with no URL); an empty or non-http(s) link URL; and a file that is
+    really an **HTML page** (a single-page app answering every path with its index page, the most
+    common way `/llms.txt` "exists" without being one).
+  - **Notes, never failures**: a missing blockquote summary or sections (optional), an H1 that is not
+    first, several H1s, plain-text items or mid-sentence links inside a link section, a section with
+    no links, links followed by text that does not start with a colon. Indented sub-bullets are
+    ignored. This is deliberately lenient: it was tuned against real files from Stripe (docs and
+    marketing sites), Anthropic's docs and nodejs.org, several of which use exactly these shapes, and
+    failing them would make the audit noise. It is a judgment call about usefulness, not something
+    llmstxt.org states.
+  - **Not checked (deferred)**: that the listed links resolve, `llms-full.txt`, and an `llms.txt` at a
+    subpath.
+  - When the file cannot be checked (server error, an address refused by the SSRF policy, too large)
+    the report carries a run warning saying why, including the `LHCI_SEO_ALLOW_PRIVATE_NETWORK`
+    setting when that is the cause.
+
 ### Auditing a site on localhost or a private network (`LHCI_SEO_ALLOW_PRIVATE_NETWORK`)
 
 The fetch path (`src/lib/safe-fetch.js`) refuses loopback and private addresses by default, because
@@ -464,7 +488,7 @@ module.exports = {
 };
 ```
 
-This adds all twenty-nine audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all thirty audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
@@ -473,16 +497,16 @@ This adds all twenty-nine audits (`structured-data-json-ld`, `structured-data-sc
 `open-graph-canonical-match`, `open-graph-image-reachable`, `twitter-card-completeness`,
 `social-preview-content`, `robots-txt-sitemap-declared`, `robots-txt-crawler-access`,
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
-`sitemap-url-status`, `sitemap-robots-crossref`) on top of
+`sitemap-url-status`, `sitemap-robots-crossref`, `llms-txt-structure`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the twenty-nine audits are part of this fork's shared `all`/`recommended` presets
+None of the thirty audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all twenty-nine here are opt-in via `configPath`, so they can't be part of that
+default, and all thirty here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
@@ -539,6 +563,8 @@ module.exports = {
         'sitemap-url-status': ['warn', {minScore: 1}],
         // Listing a URL the same site disallows is a definite contradiction, not a judgment call.
         'sitemap-robots-crossref': ['error', {minScore: 1}],
+        // llms.txt is an unratified proposal and optional, so 'warn' unless you want to gate on it.
+        'llms-txt-structure': ['warn', {minScore: 1}],
       },
     },
   },
