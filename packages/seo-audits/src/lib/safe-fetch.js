@@ -556,6 +556,184 @@ function fetchBytesWithLookup(
   });
 }
 
+const PREFIX_HEADER_ALLOWLIST = ['x-robots-tag', 'content-type', 'content-encoding', 'location'];
+const PREFIX_MAX_HEADER_VALUES = 10;
+const PREFIX_MAX_HEADER_LENGTH = 1000;
+
+/**
+ * @typedef {{
+ *   'x-robots-tag': string[],
+ *   'content-type': string[],
+ *   'content-encoding': string[],
+ *   location: string[],
+ * }} PrefixHeaders
+ * @typedef {{
+ *   status: number,
+ *   redirectLocation: string | null,
+ *   headers: PrefixHeaders,
+ *   body: Buffer,
+ *   bodyRead: 'html' | 'skipped-status' | 'skipped-not-html' | 'skipped-compressed',
+ *   truncated: boolean,
+ * }} PrefixResult
+ */
+
+/**
+ * The allowlisted response headers, every occurrence of each. Taken from `rawHeaders`, not
+ * `res.headers`: Node merges repeated headers into one comma-joined string there, and for
+ * `X-Robots-Tag` the boundary between two occurrences matters (`noindex` and `googlebot: nofollow`
+ * are two headers, not one list).
+ * @param {string[]} rawHeaders
+ * @return {PrefixHeaders}
+ */
+function collectPrefixHeaders(rawHeaders) {
+  /** @type {PrefixHeaders} */
+  const headers = {'x-robots-tag': [], 'content-type': [], 'content-encoding': [], location: []};
+  for (let i = 0; i + 1 < rawHeaders.length; i += 2) {
+    const name = rawHeaders[i].toLowerCase();
+    if (!PREFIX_HEADER_ALLOWLIST.includes(name)) continue;
+    const list = headers[/** @type {keyof PrefixHeaders} */ (name)];
+    if (list.length < PREFIX_MAX_HEADER_VALUES) {
+      list.push(rawHeaders[i + 1].slice(0, PREFIX_MAX_HEADER_LENGTH));
+    }
+  }
+  return headers;
+}
+
+/**
+ * Fetches a URL's headers and, only for a 2xx HTML response, the first `maxBytes` of its body. Built
+ * for reading a page's `<head>`: it never downloads a whole page, and never reads a body it cannot
+ * use (a PDF, an error page, or a compressed response, since Node does not decompress and the prefix
+ * of a gzip stream is not HTML; `Accept-Encoding: identity` is sent to avoid that). Skipped bodies
+ * still return their headers, so an `X-Robots-Tag` on a PDF is seen.
+ *
+ * Reaching `maxBytes` (or a body that stalls after its headers until the deadline) *resolves* with
+ * `truncated: true`, because a prefix is what was asked for; a failure before any headers arrive
+ * rejects. `timeoutMs` is a total wall-clock deadline, as in `fetchBytesWithLookup`. Same
+ * URL/scheme checks and `lookup` wiring as its siblings; not exported as public API for the same
+ * reason.
+ * @param {string} urlString
+ * @param {typeof safeLookup} lookup
+ * @param {{timeoutMs?: number, maxBytes?: number}} [options]
+ * @return {Promise<PrefixResult>}
+ */
+function fetchPrefixWithLookup(urlString, lookup, {timeoutMs = 5_000, maxBytes = 64 * 1024} = {}) {
+  return new Promise((resolve, reject) => {
+    /** @type {URL} */
+    let url;
+    try {
+      url = new URL(urlString);
+    } catch {
+      reject(new Error(`"${urlString}" is not a valid URL`));
+      return;
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      reject(new Error(`refusing to fetch "${urlString}": scheme must be http or https`));
+      return;
+    }
+
+    let settled = false;
+    /** Set once headers arrive: resolves with whatever body has been read so far, as truncated. */
+    /** @type {(() => void) | null} */
+    let finishPartial = null;
+
+    /** @param {Error} err */
+    const fail = err => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      req.destroy();
+      reject(err);
+    };
+    /** @param {PrefixResult} result */
+    const succeed = result => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      // Stop the download: nothing past the prefix is wanted.
+      req.destroy();
+      resolve(result);
+    };
+
+    const client = url.protocol === 'https:' ? https : http;
+    const req = client.request(
+      url,
+      {
+        method: 'GET',
+        // @ts-expect-error - see fetchJsonWithLookup's identical comment on `lookup`.
+        lookup,
+        headers: {
+          Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5',
+          'Accept-Encoding': 'identity',
+        },
+      },
+      res => {
+        const status = res.statusCode ?? 0;
+        const headers = collectPrefixHeaders(res.rawHeaders);
+        const redirectLocation = headers.location[0] ?? null;
+
+        /** @param {PrefixResult['bodyRead']} bodyRead */
+        const skipped = bodyRead =>
+          succeed({
+            status,
+            redirectLocation,
+            headers,
+            body: Buffer.alloc(0),
+            bodyRead,
+            truncated: false,
+          });
+
+        if (status < 200 || status >= 300) return skipped('skipped-status');
+        const contentType = (headers['content-type'][0] || '').toLowerCase();
+        // An absent Content-Type is read: browsers sniff, and so do most pages' consumers.
+        if (contentType && !/^(text\/html|application\/xhtml\+xml)\b/.test(contentType)) {
+          return skipped('skipped-not-html');
+        }
+        const encodings = headers['content-encoding'].map(v => v.trim().toLowerCase());
+        if (encodings.some(v => v !== '' && v !== 'identity')) return skipped('skipped-compressed');
+
+        let total = 0;
+        /** @type {Buffer[]} */
+        const chunks = [];
+        /** @param {boolean} truncated */
+        const finish = truncated =>
+          succeed({
+            status,
+            redirectLocation,
+            headers,
+            body: Buffer.concat(chunks),
+            bodyRead: 'html',
+            truncated,
+          });
+        finishPartial = () => finish(true);
+
+        res.on('data', chunk => {
+          if (settled) return;
+          if (total + chunk.length > maxBytes) {
+            chunks.push(chunk.subarray(0, maxBytes - total));
+            total = maxBytes;
+            finish(true);
+            return;
+          }
+          total += chunk.length;
+          chunks.push(chunk);
+        });
+        // A reset or abort after the headers leaves a partial prefix: report it as truncated.
+        res.on('error', () => finish(true));
+        res.on('close', () => finish(!(/** @type {{complete?: boolean}} */ (res).complete)));
+        res.on('end', () => finish(false));
+      }
+    );
+
+    const deadline = setTimeout(() => {
+      if (finishPartial) finishPartial();
+      else fail(new Error(`fetch of "${urlString}" timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    req.on('error', fail);
+    req.end();
+  });
+}
+
 /**
  * Fetches a URL and resolves with just its HTTP status code, with the same SSRF/DoS protections
  * as `safeFetchJson` — the response body is never read or downloaded.
@@ -649,11 +827,44 @@ function safeFetchBytes(urlString, options) {
   return fetchBytesWithLookup(urlString, safeLookup, options);
 }
 
+/**
+ * Fetches a URL's headers and the first bytes of a 2xx HTML body (see `fetchPrefixWithLookup`), with
+ * the same SSRF/DoS protections as `safeFetchBytes`: scheme allowlist, private-address blocking for
+ * literal and resolved addresses (one decision point, `isBlockedAddress`, including the private-network
+ * opt-in), no redirects followed, a total deadline, and a hard cap on the bytes read.
+ * @param {string} urlString
+ * @param {{timeoutMs?: number, maxBytes?: number}} [options]
+ * @return {Promise<PrefixResult>}
+ */
+function safeFetchPrefix(urlString, options) {
+  // Same literal-IP bypass as the other exports: Node skips `lookup` for a literal-IP hostname, so
+  // it must be checked explicitly before the request is made.
+  let url;
+  try {
+    url = new URL(urlString);
+  } catch {
+    return Promise.reject(new Error(`"${urlString}" is not a valid URL`));
+  }
+  const literalIp = literalIpOf(url);
+  if (literalIp && isBlockedAddress(literalIp)) {
+    return Promise.reject(
+      new Error(
+        `refusing to fetch "${urlString}": a private/reserved IP address (${literalIp}).${optInHint(
+          literalIp
+        )}`
+      )
+    );
+  }
+
+  return fetchPrefixWithLookup(urlString, safeLookup, options);
+}
+
 export {
   ALLOW_PRIVATE_NETWORK_ENV,
   isBlockedAddress,
   isPermittedPrivateAddress,
   safeFetchBytes,
+  safeFetchPrefix,
   safeFetchJson,
   safeFetchStatus,
   isPrivateOrReservedIp,
@@ -661,4 +872,5 @@ export {
   fetchJsonWithLookup,
   statusWithLookup,
   fetchBytesWithLookup,
+  fetchPrefixWithLookup,
 };

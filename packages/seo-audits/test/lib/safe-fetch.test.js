@@ -16,6 +16,8 @@ const {
   fetchJsonWithLookup,
   statusWithLookup,
   fetchBytesWithLookup,
+  safeFetchPrefix,
+  fetchPrefixWithLookup,
   ALLOW_PRIVATE_NETWORK_ENV,
   isBlockedAddress,
   isPermittedPrivateAddress,
@@ -644,5 +646,281 @@ describe('statusWithLookup — redirect target, against a real local server', ()
   it('returns a plain {status} when there is no Location, so existing callers are unchanged', async () => {
     const result = await statusWithLookup(`http://127.0.0.1:${port}/fine`, permissive);
     expect(result).toEqual({status: 200});
+  });
+});
+
+describe('fetchPrefixWithLookup — request mechanics, against a real local server', () => {
+  /** @type {http.Server} */
+  let server;
+  let port = 0;
+  /** @type {Record<string, string | undefined>} */
+  let lastRequestHeaders = {};
+  const HTML = '<!doctype html><html><head><title>T</title></head><body>hello</body></html>';
+
+  beforeEach(async () => {
+    server = http.createServer((req, res) => {
+      lastRequestHeaders = /** @type {any} */ (req.headers);
+      const path = req.url;
+      if (path === '/page') {
+        res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
+        res.end(HTML);
+      } else if (path === '/xhtml') {
+        res.writeHead(200, {'Content-Type': 'application/xhtml+xml'});
+        res.end(HTML);
+      } else if (path === '/no-content-type') {
+        res.writeHead(200);
+        res.end(HTML);
+      } else if (path === '/identity') {
+        res.writeHead(200, {'Content-Type': 'text/html', 'Content-Encoding': 'identity'});
+        res.end(HTML);
+      } else if (path === '/big') {
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        res.end('a'.repeat(200_000));
+      } else if (path === '/exact') {
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        res.end('b'.repeat(1000));
+      } else if (path === '/forever') {
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        const timer = setInterval(() => res.write('c'.repeat(4096)), 1);
+        res.on('close', () => clearInterval(timer));
+      } else if (path === '/stall') {
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        res.write('<html><head><meta name="robots" content="noindex">');
+        // never ends
+      } else if (path === '/slow-headers') {
+        // never responds at all
+      } else if (path === '/pdf') {
+        res.writeHead(200, {'Content-Type': 'application/pdf', 'X-Robots-Tag': 'noindex'});
+        res.end('%PDF-1.4 ' + 'x'.repeat(5000));
+      } else if (path === '/gzip') {
+        res.writeHead(200, {
+          'Content-Type': 'text/html',
+          'Content-Encoding': 'gzip',
+          'X-Robots-Tag': 'googlebot: noindex',
+        });
+        res.end(Buffer.from([0x1f, 0x8b, 0x08, 0x00, 1, 2, 3]));
+      } else if (path === '/missing') {
+        res.writeHead(404, {'Content-Type': 'text/html', 'X-Robots-Tag': 'noindex'});
+        res.end('<html>not found</html>');
+      } else if (path === '/moved') {
+        res.writeHead(301, {Location: 'http://169.254.169.254/latest/meta-data/'});
+        res.end();
+      } else if (path === '/two-headers') {
+        res.setHeader('Content-Type', 'text/html');
+        res.setHeader('X-Robots-Tag', ['noindex', 'googlebot: nofollow']);
+        res.writeHead(200);
+        res.end(HTML);
+      } else if (path === '/many-headers') {
+        res.setHeader('Content-Type', 'text/html');
+        res.setHeader(
+          'X-Robots-Tag',
+          Array.from({length: 30}, (_, i) => `v${i}`)
+        );
+        res.setHeader('Set-Cookie', 'secret=1');
+        res.setHeader('X-Other', 'ignored');
+        res.writeHead(200);
+        res.end(HTML);
+      } else if (path === '/reset') {
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        res.write('<html><head><title>partial');
+        setTimeout(() => res.destroy(), 20);
+      } else {
+        res.writeHead(404);
+        res.end();
+      }
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    port = server.address().port;
+  });
+
+  afterEach(async () => {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  });
+
+  const permissive = (hostname, options, callback) => callback(null, '127.0.0.1', 4);
+  const get = (path, options) =>
+    fetchPrefixWithLookup(`http://127.0.0.1:${port}${path}`, permissive, options);
+
+  it('reads a whole small HTML page, not truncated', async () => {
+    const result = await get('/page');
+    expect(result).toMatchObject({
+      status: 200,
+      bodyRead: 'html',
+      truncated: false,
+      redirectLocation: null,
+    });
+    expect(result.body.toString()).toBe(HTML);
+    expect(result.headers['content-type']).toEqual(['text/html; charset=utf-8']);
+  });
+
+  it.each([['/xhtml'], ['/no-content-type'], ['/identity']])('also reads %s', async path => {
+    const result = await get(path);
+    expect(result.bodyRead).toBe('html');
+    expect(result.body.toString()).toBe(HTML);
+  });
+
+  it('asks for an uncompressed body and for HTML', async () => {
+    await get('/page');
+    expect(lastRequestHeaders['accept-encoding']).toBe('identity');
+    expect(lastRequestHeaders.accept).toContain('text/html');
+  });
+
+  it('stops at the byte cap and RESOLVES with a truncated prefix, not an error', async () => {
+    const result = await get('/big', {maxBytes: 1000});
+    expect(result.bodyRead).toBe('html');
+    expect(result.truncated).toBe(true);
+    expect(result.body.length).toBe(1000);
+  });
+
+  it('does not call a body of exactly maxBytes truncated', async () => {
+    const result = await get('/exact', {maxBytes: 1000});
+    expect(result.body.length).toBe(1000);
+    expect(result.truncated).toBe(false);
+  });
+
+  it('defaults to a 64 KiB prefix', async () => {
+    const result = await get('/big');
+    expect(result.body.length).toBe(64 * 1024);
+    expect(result.truncated).toBe(true);
+  });
+
+  it('caps a never-ending text/html body quickly, without downloading it all', async () => {
+    const started = Date.now();
+    const result = await get('/forever', {maxBytes: 8192, timeoutMs: 4000});
+    expect(result.truncated).toBe(true);
+    expect(result.body.length).toBe(8192);
+    expect(Date.now() - started).toBeLessThan(3000);
+  });
+
+  it('resolves with the partial body as truncated when the body stalls after its headers', async () => {
+    const result = await get('/stall', {timeoutMs: 300});
+    expect(result.bodyRead).toBe('html');
+    expect(result.truncated).toBe(true);
+    expect(result.body.toString()).toContain('noindex');
+  }, 10000);
+
+  it('resolves with the partial body as truncated when the connection is reset mid-body', async () => {
+    const result = await get('/reset', {timeoutMs: 3000});
+    expect(result.truncated).toBe(true);
+    expect(result.body.toString()).toContain('partial');
+  });
+
+  it('rejects when nothing arrives before the deadline (slow headers)', async () => {
+    await expect(get('/slow-headers', {timeoutMs: 200})).rejects.toThrow(/timed out after 200ms/);
+  }, 10000);
+
+  it('skips the body of a non-HTML response but still returns its headers', async () => {
+    const result = await get('/pdf');
+    expect(result).toMatchObject({status: 200, bodyRead: 'skipped-not-html', truncated: false});
+    expect(result.body.length).toBe(0);
+    expect(result.headers['x-robots-tag']).toEqual(['noindex']);
+  });
+
+  it('skips a compressed body (Node does not decompress) but keeps the headers', async () => {
+    const result = await get('/gzip');
+    expect(result.bodyRead).toBe('skipped-compressed');
+    expect(result.body.length).toBe(0);
+    expect(result.headers['content-encoding']).toEqual(['gzip']);
+    expect(result.headers['x-robots-tag']).toEqual(['googlebot: noindex']);
+  });
+
+  it('skips the body of a non-2xx response, keeping its headers', async () => {
+    const result = await get('/missing');
+    expect(result).toMatchObject({status: 404, bodyRead: 'skipped-status'});
+    expect(result.body.length).toBe(0);
+    expect(result.headers['x-robots-tag']).toEqual(['noindex']);
+  });
+
+  it('returns a redirect with its Location and never follows it', async () => {
+    const result = await get('/moved');
+    expect(result).toMatchObject({status: 301, bodyRead: 'skipped-status'});
+    expect(result.redirectLocation).toBe('http://169.254.169.254/latest/meta-data/');
+  });
+
+  it('returns every X-Robots-Tag occurrence separately, not merged into one string', async () => {
+    const result = await get('/two-headers');
+    expect(result.headers['x-robots-tag']).toEqual(['noindex', 'googlebot: nofollow']);
+  });
+
+  it('returns only allowlisted headers, capped in number', async () => {
+    const result = await get('/many-headers');
+    expect(Object.keys(result.headers).sort()).toEqual([
+      'content-encoding',
+      'content-type',
+      'location',
+      'x-robots-tag',
+    ]);
+    expect(result.headers['x-robots-tag']).toHaveLength(10);
+    expect(JSON.stringify(result.headers)).not.toContain('secret');
+  });
+
+  it('rejects a non-http scheme and an invalid URL', async () => {
+    await expect(fetchPrefixWithLookup('ftp://example.com/a', permissive)).rejects.toThrow(
+      /scheme must be http/
+    );
+    await expect(fetchPrefixWithLookup('not a url', permissive)).rejects.toThrow(/not a valid URL/);
+  });
+});
+
+describe('safeFetchPrefix — address policy through the real default path', () => {
+  const original = process.env[ALLOW_PRIVATE_NETWORK_ENV];
+  const setOptIn = value => {
+    if (value === undefined) delete process.env[ALLOW_PRIVATE_NETWORK_ENV];
+    else process.env[ALLOW_PRIVATE_NETWORK_ENV] = value;
+  };
+  afterEach(() => setOptIn(original));
+
+  /** @type {http.Server} */
+  let server;
+  let port = 0;
+  beforeEach(async () => {
+    server = http.createServer((req, res) => {
+      res.writeHead(200, {'Content-Type': 'text/html'});
+      res.end('<html><head><meta name="robots" content="noindex"></head></html>');
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    port = server.address().port;
+  });
+  afterEach(async () => {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  });
+
+  it('refuses a loopback URL by default, naming the setting', async () => {
+    setOptIn(undefined);
+    await expect(safeFetchPrefix(`http://127.0.0.1:${port}/`)).rejects.toThrow(
+      /private\/reserved.*LHCI_SEO_ALLOW_PRIVATE_NETWORK=1/
+    );
+    await expect(safeFetchPrefix(`http://localhost:${port}/`)).rejects.toThrow(/private\/reserved/);
+  });
+
+  it('fetches a loopback page when opted in', async () => {
+    setOptIn('1');
+    const result = await safeFetchPrefix(`http://127.0.0.1:${port}/`);
+    expect(result.bodyRead).toBe('html');
+    expect(result.body.toString()).toContain('noindex');
+    const viaName = await safeFetchPrefix(`http://localhost:${port}/`);
+    expect(viaName.status).toBe(200);
+  });
+
+  it('still refuses the metadata address, IPv6 literals and 0.0.0.0 when opted in, with no hint', async () => {
+    setOptIn('1');
+    for (const url of [
+      'http://169.254.169.254/latest/meta-data/',
+      'http://[::ffff:169.254.169.254]/latest/',
+      'http://[::ffff:a9fe:a9fe]/',
+      'http://0.0.0.0/',
+      'http://[fe80::1]/',
+    ]) {
+      const error = await safeFetchPrefix(url, {timeoutMs: 2000}).catch(e => e);
+      expect(error.message).toMatch(/private\/reserved/);
+      expect(error.message).not.toContain('LHCI_SEO_ALLOW_PRIVATE_NETWORK');
+    }
+  });
+
+  it('refuses a non-http scheme and an invalid URL', async () => {
+    await expect(safeFetchPrefix('file:///etc/passwd')).rejects.toThrow(/scheme must be http/);
+    await expect(safeFetchPrefix('not a url')).rejects.toThrow(/not a valid URL/);
   });
 });
