@@ -149,5 +149,73 @@ full write-up.
 
 No `.lighthouserc.js` migration note needed — same reasoning as the prior features.
 
+### sitemap-fetch-and-parse (2026-09-30, Phase 4)
+
+**User-facing**: Three new opt-in audits check your XML sitemap, all in the `seo-extended`
+category: **`sitemap-valid`** (reachable, well-formed XML, correct root and namespace, only absolute
+http(s) URLs; a redirecting sitemap URL is reported, with the advice to declare the final URL),
+**`sitemap-duplicate-urls`** (the same URL listed twice in one sitemap file; exact-string matching,
+so `/a` and `/a/` are not flagged), and **`sitemap-limits`** (more than 50,000 URLs or 50 MiB
+uncompressed, the limits Google enforces; the table lists every file with entry count and size,
+gzip or not). Sitemaps are found through the `Sitemap:` lines in `robots.txt`, falling back to
+`/sitemap.xml`; gzip (`.xml.gz`) and sitemap indexes (one level deep) are supported. Each run checks
+at most 10 sitemap files and says so when it stops there. Not-applicable when no sitemap exists.
+Same `configPath` setup as the other audits, and suggested severities are in
+`packages/seo-audits/README.md`: `error` for `sitemap-valid` and `sitemap-limits`, `warn` for
+`sitemap-duplicate-urls`. These audits fetch over the network from Node, which refuses loopback and
+private addresses, so they cannot be tried against a `localhost` page (they report not-applicable);
+use a public site.
+
+**Security fix, affects other audits too**: the shared SSRF-protected fetch used by
+`manifest-icons` and `open-graph-image-reachable` did not check IPv6 addresses written in brackets
+(`http://[::ffff:127.0.0.1]/`, `http://[::1]/`), so a page could point a manifest or `og:image` link
+at an internal service, or the cloud metadata address in its IPv4-mapped form, and have the CLI
+request it. Those are now refused, along with IPv4-mapped, NAT64 and 6to4 forms wrapping a private
+address. If you run this fork against untrusted pages from cloud infrastructure, take this update.
+
+**Internal/dev**: Full 9-stage pipeline for the gatherer (first with outbound requests in this
+package): `SitemapDocuments` fetches and parses every discovered sitemap once, so the three audits
+(and the upcoming URL-status sample and cross-checks) share one artifact. Core's `RobotsTxt` cannot
+be a gatherer dependency (only gatherers with a `meta.symbol` can), so robots.txt is fetched again
+through the SSRF path. New `safeFetchBytes` in `src/lib/safe-fetch.js` (non-2xx returned not thrown,
+total wall-clock deadline rather than an idle timeout); pure parse core `src/lib/sitemap-parse.js`
+using `saxes` (strict, with line and column) with gzip decompression capped on output. Decisions made
+with the developer: cross-origin `Sitemap:` URLs are fetched; redirects are reported, not followed.
+Deviation from the contract, recorded in it: wire cap is 50 MiB + 1, not 15 MiB. Task order and
+per-task tests: `docs/task-sequences/sitemap-fetch-and-parse.md` (12 commits).
+
+`/security-review` found two `high` issues by running attacks rather than reading code, both fixed
+before the next feature: the bracketed-IPv6 SSRF bypass above (pre-existing since Phase 1, first
+reachable from page-controlled input there), and a quadratic-time parser DoS, where 96 KB of nested
+tags took 17 s and parsing is synchronous so no timeout applies (now capped at 32 levels, 1 ms). Two
+`low` items are in the backlog (no overall gatherer time budget; private-address pages give no
+"refused by policy" reason). See `.ai-agents/state/security-findings.md` and
+`docs/qa/sitemap-fetch-and-parse.md`. QA against real sites found a genuine duplicate on MDN's live
+sitemap. Open: the 12 failing suites in the full `npm run test` (Storybook/Puppeteer, `packages/server`)
+were not confirmed against the base branch (`.ai-agents/state/ci-backlog.md`).
+
+No `.lighthouserc.js` migration note needed: no new config keys (the caps are constants on purpose).
+
+### private-network opt-in (2026-09-30, follow-up to sitemap-fetch-and-parse)
+
+**User-facing**: New environment variable **`LHCI_SEO_ALLOW_PRIVATE_NETWORK=1`** for CI jobs that audit
+a site served on `localhost` or a staging host on a private network. By default the SSRF-protected
+fetch (used by the sitemap audits, `manifest-icons` and `open-graph-image-reachable`) refuses
+loopback and private addresses, so on such a site the sitemap audits showed not-applicable and the
+other two failed with "refused". With the variable set, loopback, RFC 1918 and IPv6 unique-local
+addresses are allowed; the cloud metadata address and all link-local, `0.0.0.0`, carrier-grade NAT
+and multicast addresses stay blocked. Set it only on jobs that audit hosts you control. Without it,
+a skipped sitemap check now adds a run warning to the report naming the cause and the setting,
+instead of silently reporting not-applicable. See the README section "Auditing a site on localhost or
+a private network".
+
+**Internal/dev**: one decision point, `isBlockedAddress`, used by `safeLookup` and the three
+literal-IP checks; `isPermittedPrivateAddress` is the fixed allowlist the variable may unblock;
+`optInHint` adds the setting name to a refusal only when the setting would have helped (never for a
+metadata-address refusal). `SitemapDocumentsArtifact` gains `unavailableReason`, and the gatherer
+pushes a `LighthouseRunWarnings` entry when discovery is unavailable. Closes finding 4 of the
+sitemap security review. No `.lighthouserc.js` key: it is an environment variable on purpose, since a
+config-file setting could be committed to a repo that also audits untrusted pages.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->
