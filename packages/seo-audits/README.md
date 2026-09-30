@@ -356,12 +356,34 @@ audits use it. **How it works:**
   sitemaps) or is more than 50 MiB uncompressed, the sitemaps.org limits Google enforces. The table
   lists every checked file with entry count, compressed and uncompressed size, and gzip or not.
 
-**You cannot test these against a local page.** The fetch path refuses loopback and private
-addresses by design, so `lhci collect` against `http://localhost:...` cannot reach a sitemap served
-from the same machine; the audits will report not-applicable or a fetch error. Use a real public
-site, or the integration test in `test/gatherers/sitemap-documents.integration.test.js`, which
-drives the same code against a local server using a test-only lookup that production code cannot
-use.
+### Auditing a site on localhost or a private network (`LHCI_SEO_ALLOW_PRIVATE_NETWORK`)
+
+The fetch path (`src/lib/safe-fetch.js`) refuses loopback and private addresses by default, because
+the URLs it fetches (sitemaps, `og:image`, manifests) come from the audited page, and a page must
+not be able to aim the CLI at your internal network or the cloud metadata service. That is the
+right default for public pages, and the wrong one for CI that serves the built site on `localhost`
+or audits a staging host on a private network: the sitemap audits would report not-applicable and
+`manifest-icons` / `open-graph-image-reachable` would fail with "refused".
+
+For those runs, set **`LHCI_SEO_ALLOW_PRIVATE_NETWORK=1`** (or `true`) in the job's environment:
+
+```yaml
+      - run: lhci autorun
+        env:
+          LHCI_SEO_ALLOW_PRIVATE_NETWORK: '1'
+```
+
+- It is read from the process environment on every request. Nothing on an audited page can set it.
+- It unblocks **only** loopback (`127.0.0.0/8`, `::1`), RFC 1918 (`10/8`, `172.16/12`,
+  `192.168/16`) and IPv6 unique-local (`fc00::/7`), including IPv4-mapped spellings. The cloud
+  metadata address and all link-local addresses (`169.254.0.0/16`, `fe80::/10`), `0.0.0.0`,
+  carrier-grade NAT and multicast stay blocked even with it on, so it does not make a
+  compromised page able to reach the metadata service.
+- Set it only on jobs that audit hosts you control. On a job that audits pages you do not control,
+  from a runner with access to internal services, leave it off.
+- Without it, a skipped sitemap check adds a run warning to the report ("Sitemap audits were
+  skipped: ... set LHCI_SEO_ALLOW_PRIVATE_NETWORK=1"), and a refused fetch in the other audits says
+  the same, instead of silently showing not-applicable.
 
 ### Finding namespaces
 

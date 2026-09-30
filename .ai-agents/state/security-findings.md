@@ -359,3 +359,23 @@ code that predates this feature; both were made reachable from page-controlled i
 
 No `critical` findings. Findings 1 and 2 (`high`) are fixed on a branch awaiting merge; per the
 agent's rule they should land before the next feature starts.
+
+## 2026-09-30 — private-network opt-in (follow-up to sitemap-fetch-and-parse, finding 4)
+
+Adds `LHCI_SEO_ALLOW_PRIVATE_NETWORK` to `safe-fetch.js`, at the developer's request: their CI audits
+public URLs and also localhost/private staging, where the SSRF policy blocked legitimate fetches.
+This is a deliberate, narrow weakening of the SSRF protection, reviewed as such.
+
+- severity: low (residual risk from a new capability, not a defect)
+- finding: with the variable set, requests to loopback, RFC 1918 and IPv6 unique-local addresses are
+  allowed. Risk: a job that sets it while auditing pages it does not control, from a runner that can
+  reach internal services, lets a hostile page (via `og:image`, manifest or `Sitemap:` URLs) make the
+  CLI issue GETs to those services. Bounded by design: (1) off by default; (2) set only by the process
+  environment, never by page content; (3) read per request, no caching; (4) it unblocks a fixed
+  allowlist (`isPermittedPrivateAddress`), so the metadata address, all link-local, `0.0.0.0`, CGNAT,
+  multicast and the embedded-IPv4 forms (mapped, NAT64, 6to4) of those stay blocked; (5) only exactly
+  `1`/`true` count; (6) every request path (`safeLookup`, and the three literal-IP checks) goes through
+  the single `isBlockedAddress` decision, so there is no path that bypasses it.
+- status: accepted. README says to set it only on jobs that audit hosts you control. Finding 4 of the
+  sitemap review (silent not-applicable with no reason) is resolved by the same change: the artifact
+  records `unavailableReason` and the gatherer adds a run warning.

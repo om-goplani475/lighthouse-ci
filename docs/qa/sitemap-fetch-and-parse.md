@@ -79,3 +79,29 @@ Real `lhci collect --settings.configPath=<seo-audits config>` runs, 2026-09-30:
   document, at most 10 documents. MDN (10 documents, all small) added no noticeable delay.
 - MDN's index has more child sitemaps than the 10-document cap, so a large multi-locale site is
   only sampled; the audit says so instead of passing the rest silently.
+
+## Follow-up: private-network opt-in (`LHCI_SEO_ALLOW_PRIVATE_NETWORK`), 2026-09-30
+
+Added after the developer confirmed the tool runs in CI against both public URLs and localhost or
+private staging (where the SSRF policy refused the page's own robots.txt and sitemap, and the audits
+silently showed not-applicable).
+
+- [x] Real `lhci collect` against a site on `http://localhost:8841/` (robots.txt with a `Sitemap:`
+      line, a sitemap with one duplicated URL):
+      - opt-in **off**: all three audits `notApplicable`, and the report carries the run warning
+        "Sitemap audits were skipped: http://localhost:8841/robots.txt could not be fetched: refusing
+        to connect to "localhost": resolves to a private/reserved address (127.0.0.1). To audit your
+        own private or staging host, set LHCI_SEO_ALLOW_PRIVATE_NETWORK=1."
+      - opt-in **on** (`=1`): no warning; `sitemap-valid` 1, `sitemap-limits` 1,
+        `sitemap-duplicate-urls` 0 ("1 URL(s) are listed more than once")
+- [x] What the opt-in can and cannot unblock: 44 tests. Permitted only: loopback, RFC 1918, IPv6 ULA
+      and their IPv4-mapped forms. Still blocked with it on: `169.254.169.254`, `169.254.0.0/16`,
+      `fe80::/10`, `0.0.0.0`, `100.64.0.0/10`, multicast, `[::ffff:a9fe:a9fe]`, NAT64 and 6to4 wrapping
+      the metadata address; the refusal for those does not mention the setting
+- [x] Only exactly `1` or `true` opts in (`0`, `false`, `yes`, `on`, empty and ` 1` do not); read on
+      every request, so toggling between two calls takes effect immediately
+- [x] Real default fetch path (not the test-only lookup) against a local server: literal-IP and
+      `localhost` hostname both fetched when opted in, both refused when not
+- [x] seo-audits suite: 530 tests pass; typecheck and lint clean
+- [ ] Not exercised: an actual GitHub Actions run with the variable set (verified with the same
+      variable in a local shell)
