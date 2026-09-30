@@ -14,7 +14,7 @@
  * open-graph-completeness, open-graph-canonical-match, open-graph-image-reachable,
  * twitter-card-completeness, social-preview-content, robots-txt-sitemap-declared,
  * robots-txt-crawler-access, robots-txt-rule-conflicts, sitemap-valid, sitemap-duplicate-urls, and
- * sitemap-limits gatherers/audits on top of Lighthouse's default set.
+ * sitemap-limits, and sitemap-url-status gatherers/audits on top of Lighthouse's default set.
  *
  * Paths below are plain relative strings, not require.resolve() calls: this file is
  * ESM (no bare `require`), and Lighthouse's own module resolver
@@ -64,6 +64,7 @@ const config = {
     './audits/sitemap-valid.js',
     './audits/sitemap-duplicate-urls.js',
     './audits/sitemap-limits.js',
+    './audits/sitemap-url-status.js',
   ],
   categories: {
     'seo-extended': {
@@ -96,6 +97,7 @@ const config = {
         {id: 'sitemap-valid', weight: 1},
         {id: 'sitemap-duplicate-urls', weight: 1},
         {id: 'sitemap-limits', weight: 1},
+        {id: 'sitemap-url-status', weight: 1},
       ],
     },
   },

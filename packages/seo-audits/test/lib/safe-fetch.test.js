@@ -609,3 +609,40 @@ describe('private-network opt-in (LHCI_SEO_ALLOW_PRIVATE_NETWORK), for CI runs a
     });
   });
 });
+
+describe('statusWithLookup — redirect target, against a real local server', () => {
+  /** @type {http.Server} */
+  let server;
+  let port = 0;
+
+  beforeEach(async () => {
+    server = http.createServer((req, res) => {
+      if (req.url === '/moved') {
+        res.writeHead(301, {Location: '/elsewhere'});
+        res.end();
+      } else {
+        res.writeHead(200);
+        res.end('ok');
+      }
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    port = server.address().port;
+  });
+
+  afterEach(async () => {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  });
+
+  const permissive = (hostname, options, callback) => callback(null, '127.0.0.1', 4);
+
+  it('returns the Location of a redirect without following it', async () => {
+    const result = await statusWithLookup(`http://127.0.0.1:${port}/moved`, permissive);
+    expect(result).toEqual({status: 301, redirectLocation: '/elsewhere'});
+  });
+
+  it('returns a plain {status} when there is no Location, so existing callers are unchanged', async () => {
+    const result = await statusWithLookup(`http://127.0.0.1:${port}/fine`, permissive);
+    expect(result).toEqual({status: 200});
+  });
+});

@@ -57,7 +57,7 @@ describe('seo-audits lighthouse-config', () => {
     // The gatherer the sitemap audits depend on must resolve too, or they would all error.
     expect(artifactIds).toContain('SitemapDocuments');
 
-    // And all twenty-seven of this fork's audits are actually added, not just defaults preserved.
+    // And all twenty-eight of this fork's audits are actually added, not just defaults preserved.
     expect(auditIds).toContain('structured-data-json-ld');
     expect(auditIds).toContain('structured-data-schema-properties');
     expect(auditIds).toContain('structured-data-rich-result-eligibility');
@@ -85,9 +85,10 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('sitemap-valid');
     expect(auditIds).toContain('sitemap-duplicate-urls');
     expect(auditIds).toContain('sitemap-limits');
+    expect(auditIds).toContain('sitemap-url-status');
   }, 30000);
 
-  it('adds the seo-extended category with all twenty-seven audits, without touching the core seo category', async () => {
+  it('adds the seo-extended category with all twenty-eight audits, without touching the core seo category', async () => {
     const {categories} = await resolveConfig();
 
     expect(categories['seo-extended']).toBeDefined();
@@ -111,6 +112,7 @@ describe('seo-audits lighthouse-config', () => {
       'robots-txt-sitemap-declared',
       'sitemap-duplicate-urls',
       'sitemap-limits',
+      'sitemap-url-status',
       'sitemap-valid',
       'social-preview-content',
       'structured-data-deprecated-properties',

@@ -414,7 +414,7 @@ function fetchJsonWithLookup(urlString, lookup, {timeoutMs = 5000, maxBytes = 1_
  * @param {string} urlString
  * @param {typeof safeLookup} lookup
  * @param {{timeoutMs?: number}} [options]
- * @return {Promise<{status: number}>}
+ * @return {Promise<{status: number, redirectLocation?: string}>}
  */
 function statusWithLookup(urlString, lookup, {timeoutMs = 5000} = {}) {
   return new Promise((resolve, reject) => {
@@ -439,8 +439,11 @@ function statusWithLookup(urlString, lookup, {timeoutMs = 5000} = {}) {
       {method: 'GET', lookup, timeout: timeoutMs},
       res => {
         const status = res.statusCode ?? 0;
+        const location = res.headers.location;
         res.destroy();
-        resolve({status});
+        // `redirectLocation` only appears for a response that has one, so a plain `{status}` result
+        // (every existing caller and test) is unchanged.
+        resolve(typeof location === 'string' ? {status, redirectLocation: location} : {status});
       }
     );
 
@@ -558,7 +561,7 @@ function fetchBytesWithLookup(
  * as `safeFetchJson` — the response body is never read or downloaded.
  * @param {string} urlString
  * @param {{timeoutMs?: number}} [options]
- * @return {Promise<{status: number}>}
+ * @return {Promise<{status: number, redirectLocation?: string}>}
  */
 function safeFetchStatus(urlString, options) {
   let url;
