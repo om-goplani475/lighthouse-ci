@@ -12,14 +12,9 @@
 
 /* eslint-env jest */
 
-jest.mock('../../src/lib/safe-fetch.js', () => ({
-  safeFetchStatus: jest.fn(),
-}));
-
-const {safeFetchStatus} = require('../../src/lib/safe-fetch.js');
 const {default: SitemapUrlStatus} = require('../../src/audits/sitemap-url-status.js');
 const {emptyDocument} = require('../../src/lib/sitemap-parse.js');
-const {SAMPLE_SIZE_ENV} = require('../../src/lib/sitemap-url-sample.js');
+const {collectUrlSample} = require('../../src/lib/sitemap-url-sample.js');
 
 const doc = (url, locs, overrides = {}) => ({
   ...emptyDocument({url, source: 'declared', parentUrl: null}),
@@ -33,33 +28,33 @@ const pages = (n, base = 'https://example.com') =>
   Array.from({length: n}, (_, i) => `${base}/p${i}`);
 
 /**
- * How a scenario is fed to the audit. Before the refactor: mock the audit's own status fetcher.
+ * How a scenario is fed to the audit. Before the refactor: the audit fetched, so a mocked status
+ * fetcher was injected into it. After: the gatherer's sampling (`collectUrlSample`, with the same
+ * fetcher fed the same responses) builds the artifact section the audit now reads. Everything else
+ * (the scenarios, `fetch`, the clock and every expected value) is unchanged.
  * `fetch(url, attempt)` returns `{status, redirectLocation?}` or throws.
  */
 async function runStatusAudit({documents, discovery = 'robots-txt', sampleSize, fetch, clock}) {
-  safeFetchStatus.mockReset();
   const counts = new Map();
-  safeFetchStatus.mockImplementation(async url => {
+  const fetchPage = async url => {
     counts.set(url, (counts.get(url) || 0) + 1);
     return fetch(url, counts.get(url));
+  };
+  const env = sampleSize === undefined ? {} : {LHCI_SEO_SITEMAP_SAMPLE_SIZE: String(sampleSize)};
+  // The gatherer only samples once a sitemap was actually discovered.
+  const urlSample = ['robots-txt', 'default-location'].includes(discovery)
+    ? await collectUrlSample(documents, {fetchPage, env, now: clock ? () => clock.now : undefined})
+    : null;
+  return SitemapUrlStatus.audit({
+    SitemapDocuments: {
+      discovery,
+      unavailableReason: null,
+      ignoredSitemapLines: [],
+      documentsTruncated: false,
+      documents,
+      urlSample,
+    },
   });
-  if (sampleSize === undefined) delete process.env[SAMPLE_SIZE_ENV];
-  else process.env[SAMPLE_SIZE_ENV] = String(sampleSize);
-  const spy = clock ? jest.spyOn(Date, 'now').mockImplementation(() => clock.now) : null;
-  try {
-    return await SitemapUrlStatus.audit({
-      SitemapDocuments: {
-        discovery,
-        unavailableReason: null,
-        ignoredSitemapLines: [],
-        documentsTruncated: false,
-        documents,
-      },
-    });
-  } finally {
-    if (spy) spy.mockRestore();
-    delete process.env[SAMPLE_SIZE_ENV];
-  }
 }
 
 const ok = async () => ({status: 200});

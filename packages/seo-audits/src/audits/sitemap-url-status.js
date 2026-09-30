@@ -3,22 +3,18 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  *
- * Reads the `SitemapDocuments` artifact (see `../gatherers/sitemap-documents.js`) and requests a
- * bounded sample of the URLs it lists. This audit is the one part of the sitemap group that talks
- * to the audited site's *pages*, through `../lib/safe-fetch.js`'s `safeFetchStatus` (SSRF-protected,
- * no redirects followed, no body read). It is not a crawler: see `../lib/sitemap-url-sample.js`.
+ * Reads the `urlSample` section of the `SitemapDocuments` artifact (see
+ * `../gatherers/sitemap-documents.js`): a bounded, deterministic sample of the URLs the sitemap
+ * lists, each requested once by the gatherer. This audit makes no request of its own; sampling,
+ * bounds, retries and the same-origin rule live in `../lib/sitemap-url-sample.js`. It is not a
+ * crawler.
  */
 
 import {Audit} from 'lighthouse/core/audits/audit.js';
-import {safeFetchStatus} from '../lib/safe-fetch.js';
 import {
   SAMPLE_SIZE_ENV,
   MAX_SAMPLE_SIZE,
   DEFAULT_SAMPLE_SIZE,
-  resolveSampleSize,
-  pickEvenly,
-  collectEligibleUrls,
-  checkUrls,
   describeCheck,
 } from '../lib/sitemap-url-sample.js';
 
@@ -55,32 +51,32 @@ class SitemapUrlStatus extends Audit {
 
   /**
    * @param {{SitemapDocuments: import('../lib/sitemap-parse.js').SitemapDocumentsArtifact}} artifacts
-   * @return {Promise<import('lighthouse/types/audit.js').default.Product>}
+   * @return {import('lighthouse/types/audit.js').default.Product}
    */
-  static async audit(artifacts) {
-    const {discovery, documents} = artifacts.SitemapDocuments;
+  static audit(artifacts) {
+    const {discovery, urlSample} = artifacts.SitemapDocuments;
     if (discovery === 'none' || discovery === 'unavailable') {
       return {score: null, notApplicable: true};
     }
-
-    const {urls, skippedCrossOrigin} = collectEligibleUrls(documents);
-    if (urls.length === 0) {
+    // No sample: nothing was listed on the sitemap's own origin (or the artifact predates the
+    // sample). Either way there is nothing to judge.
+    if (!urlSample || urlSample.pages.length === 0) {
       return {score: null, notApplicable: true};
     }
 
-    const sample = pickEvenly(urls, resolveSampleSize());
-    const checks = await checkUrls(sample, {fetchStatus: safeFetchStatus});
-
+    const checks = urlSample.pages;
     const checked = checks.filter(c => !c.notChecked);
     const failures = checked.filter(
       c => c.error || c.status === null || c.status < 200 || c.status >= 300
     );
     const notChecked = checks.length - checked.length;
 
-    const notes = [`Checked ${checked.length} of ${urls.length} listed URLs (a sample).`];
+    const notes = [
+      `Checked ${checked.length} of ${urlSample.eligibleCount} listed URLs (a sample).`,
+    ];
     if (notChecked) notes.push(`${notChecked} not checked: the time budget ran out.`);
-    if (skippedCrossOrigin) {
-      notes.push(`${skippedCrossOrigin} listed on another host were not requested.`);
+    if (urlSample.skippedCrossOrigin) {
+      notes.push(`${urlSample.skippedCrossOrigin} listed on another host were not requested.`);
     }
     const note = notes.join(' ');
 
