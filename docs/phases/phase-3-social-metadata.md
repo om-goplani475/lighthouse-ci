@@ -11,9 +11,12 @@ Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
 The original five-item wishlist was split at planning time (2026-09-30) by how concretely scoped
 each item already was: four items were concrete/bounded enough to build directly (lightweight
-mode — no formal `.ai-agents/` design docs); the fifth (social preview renderer) is a genuinely
+mode — no formal `.ai-agents/` design docs); the fifth (social preview renderer) was a genuinely
 different kind of feature — not a pass/fail or informational-table check like everything else in
-this package — and needs a short design conversation before any code.
+this package — and got a short design conversation before any code, which surfaced a real
+architectural constraint (see "Not possible" below) and reshaped what item 5 actually became.
+
+**Status: all five items resolved 2026-09-30.**
 
 | # | Feature | Status | Slug / spec |
 |---|---------|--------|--------------|
@@ -21,7 +24,7 @@ this package — and needs a short design conversation before any code.
 | 2 | `og:url` matches canonical | **done** | `open-graph-canonical-match`, QA'd live see `docs/qa/social-metadata.md`. Reads `MetaElements` + core's `LinkElements`. |
 | 3 | `og:image` returns 200 | **done** | `open-graph-image-reachable`, QA'd live see `docs/qa/social-metadata.md`. Reuses `src/lib/safe-fetch.js`'s SSRF-protected request path via a new `safeFetchStatus` export (status-only, never downloads the image body). A real pre-existing bug in `safeLookup` (broke every real outbound fetch to a non-literal-IP hostname, including `manifest-icons`) was found and fixed during this item's live QA — see the QA doc. |
 | 4 | Twitter/X Card (card type, title, description, image, image accessibility) | **done** | `twitter-card-completeness`, QA'd live see `docs/qa/social-metadata.md`. Sourcing caveat: X's official docs are largely paywalled/degraded, so what's checked is corroborated across secondary sources, not a single fetched authoritative page — stated plainly in the audit's own module doc. |
-| 5 | Social preview renderer (show the actual link-card appearance) | **not yet scoped** | needs a design conversation — does this even fit a Lighthouse audit's report format (text/table), or does it need something outside that model entirely? |
+| 5 | Social preview renderer (show the actual link-card appearance) | **done** (scoped down) | `social-preview-content`, QA'd live see `docs/qa/social-metadata.md`. A true visual render is **not achievable** inside a standard Lighthouse report — confirmed by reading `node_modules/lighthouse/report/renderer/details-renderer.js`, whose `render()` hardcodes `details.type: 'screenshot'` as internal-only (the `final-screenshot` audit's own special-cased UI, not a generic per-audit image slot); no other `details` type can show a composed image either, and building one would mean editing `packages/viewer`, against this fork's own audit/gatherer boundary. Confirmed via blocking question to build a text-based preview-*content* report instead (title/description/image URL each platform would actually use, real fallback rules, not a picture) rather than file this as not-possible. Shares fallback-resolution logic with `twitter-card-completeness` via new `src/lib/social-meta.js`. |
 
 ## Sourcing note
 
@@ -51,4 +54,6 @@ single authoritative fetched page — stated plainly here, not buried, same hedg
 
 ## Not possible / permanently out of scope
 
-*(none yet)*
+| Item | Why | Reference |
+|---|---|---|
+| A true visual render of the social share preview card (item 5's original ask) | Lighthouse's own report renderer treats `details.type: 'screenshot'` as internal-only for the `final-screenshot` audit's special-cased UI, not a generic per-audit image slot — no `details` type can show a composed image. Building one would mean editing `packages/viewer`, which this fork's own rules say audit/gatherer work must not do. Real, standing architectural policy, not a scheduling choice — would need a deliberate decision to add a viewer-side rendering capability before this could be reconsidered | `docs/qa/social-metadata.md`, `src/audits/social-preview-content.js`'s module doc |

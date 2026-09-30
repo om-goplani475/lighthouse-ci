@@ -1,8 +1,8 @@
-# QA: Social/Sharing Metadata (Phase 3, items 1-4)
+# QA: Social/Sharing Metadata (Phase 3, all five items)
 
-Covers the four items built lightweight-mode: `open-graph-completeness`,
-`open-graph-canonical-match`, `open-graph-image-reachable`, `twitter-card-completeness`. Item 5
-(social preview renderer) is separately scoped, not covered here.
+Covers the four items built lightweight-mode (`open-graph-completeness`,
+`open-graph-canonical-match`, `open-graph-image-reachable`, `twitter-card-completeness`) and item 5
+(`social-preview-content`, built after a short design conversation — see its own section below).
 
 ## Sourcing
 
@@ -100,7 +100,44 @@ tags at all:
 - [x] `twitter-card-completeness`: `score: 0`, `explanation` names the missing `twitter:card` tag
       specifically (fails fast, no misleading per-field rows when the card type itself is absent).
 
+## Item 5: `social-preview-content` (social preview renderer, scoped down)
+
+The original ask ("social preview renderer... show the actual link-card appearance") implied a
+visual render. Before writing any code, I checked whether that's actually achievable inside a
+standard Lighthouse report — reading `node_modules/lighthouse/report/renderer/details-renderer.js`
+directly rather than assuming: its `render(details)` switch statement explicitly returns `null` for
+`details.type: 'screenshot'`, commented "Internal-only details, not for rendering" — that shape is
+hardcoded to the `final-screenshot` audit's own special-cased UI, not a generic per-audit image
+slot. None of the other `details` types (`table`, `list`, `checklist`, `filmstrip`,
+`criticalrequestchain`) can show a single composed image either. Building a real visual render
+would require editing `packages/viewer`, which is exactly the boundary this fork's own rules say
+audit/gatherer work shouldn't cross.
+
+Presented this finding to the developer via a blocking question: build a text-based "preview
+content" report instead (the recommended, chosen option), or file item 5 as not-possible-within-
+this-architecture. Chose the former.
+
+**What it reports**: for both Facebook/LinkedIn-style (Open Graph) and Twitter/X, the exact
+title/description/image URL that platform would actually use — not a picture of the card, but the
+real content driving it. Twitter's row uses `twitter:*` fallback-to-`og:*` resolution, the same
+logic `twitter-card-completeness` uses, now factored into a shared `src/lib/social-meta.js` so the
+two audits can't quietly disagree on what a platform would show. Purely informational
+(`scoreDisplayMode: informative`); not-applicable only when there's no `og:*`/`twitter:*` content
+at all.
+
+- [x] Unit tests (`test/audits/social-preview-content.test.js`, `test/lib/social-meta.test.js`):
+      not-applicable on zero content, correct per-platform fallback resolution, empty-string (not
+      `undefined`) for an unresolved field, always exactly two rows when there's any content at all.
+- [x] Verified live: a fixture with `og:title`/`og:description`/`og:image` set and only
+      `twitter:title` set (deliberately partial, to prove the fallback isn't just a mock) — the
+      Twitter row correctly showed its own title alongside the `og:description`/`og:image` values
+      for the two fields it didn't declare itself. A fixture with zero social tags correctly showed
+      `score: null`, `scoreDisplayMode: 'notApplicable'` in the real LHR (the raw `notApplicable:
+      true` boolean unit tests see collapses into `scoreDisplayMode` once Lighthouse's runner
+      processes it — confirmed this is standard Lighthouse behavior, not specific to this audit,
+      before treating it as expected).
+
 ## Full suite
 
-`npm run test:typecheck` and `npm run test:lint` both clean. `npx jest packages/seo-audits`: 33
-suites, 268 tests, all passing.
+`npm run test:typecheck` and `npm run test:lint` both clean. `npx jest packages/seo-audits`: 35
+suites, 283 tests, all passing.
