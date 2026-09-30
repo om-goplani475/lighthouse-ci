@@ -79,12 +79,45 @@ const CHUNK_BYTES = 64 * 1024;
  */
 /**
  * @typedef {{
+ *   url: string,
+ *   status: number | null,
+ *   redirectLocation: string | null,
+ *   error: string | null,
+ *   notChecked: boolean,
+ *   contentType: string | null,
+ *   xRobotsTag: string[],
+ *   bodyRead: 'html' | 'skipped-status' | 'skipped-not-html' | 'skipped-compressed' | null,
+ *   truncated: boolean,
+ *   metas: Array<{name: string, content: string}>,
+ *   canonicals: string[],
+ *   headComplete: boolean,
+ * }} SampledPage
+ * One sampled sitemap URL: what `sitemap-url-status` needs (`status`, `redirectLocation`, `error`,
+ * `notChecked`, exactly `UrlCheck`'s fields) plus the indexability signals read from its response
+ * (`contentType`, `xRobotsTag`, the extracted `metas` and `canonicals`, and whether the `<head>` was
+ * read in full). Never holds raw HTML.
+ */
+/**
+ * @typedef {{
+ *   sampleSize: number,
+ *   eligibleCount: number,
+ *   skippedCrossOrigin: number,
+ *   pages: SampledPage[],
+ * }} UrlSample
+ * `sampleSize` is the resolved `LHCI_SEO_SITEMAP_SAMPLE_SIZE`; `eligibleCount` is how many same-origin
+ * listed URLs the sample was drawn from.
+ */
+/**
+ * @typedef {{
  *   discovery: 'robots-txt' | 'default-location' | 'none' | 'unavailable',
  *   unavailableReason: string | null,
  *   ignoredSitemapLines: string[],
  *   documentsTruncated: boolean,
  *   documents: SitemapDocument[],
+ *   urlSample?: UrlSample | null,
  * }} SitemapDocumentsArtifact
+ * `urlSample` is `null` when no sample was taken (discovery `none`/`unavailable`, or no eligible URL)
+ * and may be absent on an older artifact; both audits that read it treat absent as `null`.
  */
 
 /**
