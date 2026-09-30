@@ -13,8 +13,9 @@
  * canonical-https, favicon-presence, favicon-quality, manifest-icons,
  * open-graph-completeness, open-graph-canonical-match, open-graph-image-reachable,
  * twitter-card-completeness, social-preview-content, robots-txt-sitemap-declared,
- * robots-txt-crawler-access, robots-txt-rule-conflicts, sitemap-valid, sitemap-duplicate-urls, and
- * sitemap-limits, and sitemap-url-status gatherers/audits on top of Lighthouse's default set.
+ * robots-txt-crawler-access, robots-txt-rule-conflicts, sitemap-valid, sitemap-duplicate-urls,
+ * sitemap-limits, sitemap-url-status, and sitemap-robots-crossref gatherers/audits on top of
+ * Lighthouse's default set.
  *
  * Paths below are plain relative strings, not require.resolve() calls: this file is
  * ESM (no bare `require`), and Lighthouse's own module resolver
@@ -65,6 +66,7 @@ const config = {
     './audits/sitemap-duplicate-urls.js',
     './audits/sitemap-limits.js',
     './audits/sitemap-url-status.js',
+    './audits/sitemap-robots-crossref.js',
   ],
   categories: {
     'seo-extended': {
@@ -98,6 +100,7 @@ const config = {
         {id: 'sitemap-duplicate-urls', weight: 1},
         {id: 'sitemap-limits', weight: 1},
         {id: 'sitemap-url-status', weight: 1},
+        {id: 'sitemap-robots-crossref', weight: 1},
       ],
     },
   },
