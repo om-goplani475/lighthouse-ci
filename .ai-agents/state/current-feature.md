@@ -1,8 +1,10 @@
 # Current feature
 
 - slug: sitemap-fetch-and-parse
-- stage: 00-intake-complete
+- stage: 02-contract-complete (Gate 1 review pending)
 - spec: docs/feature-specs/sitemap-fetch-and-parse.md
+- audit_spec: docs/audit-specs/sitemap-fetch-and-parse.md
+- contract: docs/feature-contracts/sitemap-fetch-and-parse.md
 - phase: 4 (robots-sitemap), branch phase-4-robots-sitemap — see docs/phases/phase-4-robots-sitemap.md
   (roadmap rows 4, 6 and 7; row 5's URL-status sample reuses this feature's artifact later)
 
