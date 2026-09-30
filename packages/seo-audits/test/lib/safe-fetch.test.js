@@ -16,6 +16,9 @@ const {
   fetchJsonWithLookup,
   statusWithLookup,
   fetchBytesWithLookup,
+  ALLOW_PRIVATE_NETWORK_ENV,
+  isBlockedAddress,
+  isPermittedPrivateAddress,
 } = require('../../src/lib/safe-fetch.js');
 
 describe('isPrivateOrReservedIp', () => {
@@ -426,5 +429,183 @@ describe('IPv6 literal handling (security review finding: bracketed IPv6 literal
     for (const url of ['http://2130706433/', 'http://0x7f.1/', 'http://017700000001/']) {
       await expect(safeFetchBytes(url)).rejects.toThrow(/private\/reserved/);
     }
+  });
+});
+
+describe('private-network opt-in (LHCI_SEO_ALLOW_PRIVATE_NETWORK), for CI runs against your own hosts', () => {
+  const original = process.env[ALLOW_PRIVATE_NETWORK_ENV];
+  const setOptIn = value => {
+    if (value === undefined) delete process.env[ALLOW_PRIVATE_NETWORK_ENV];
+    else process.env[ALLOW_PRIVATE_NETWORK_ENV] = value;
+  };
+  afterEach(() => setOptIn(original));
+
+  describe('isPermittedPrivateAddress: the only addresses the opt-in can unblock', () => {
+    it.each([
+      '127.0.0.1',
+      '127.5.5.5',
+      '10.1.2.3',
+      '172.16.0.1',
+      '172.31.255.255',
+      '192.168.1.1',
+      '::1',
+      'fd00::1',
+      'fc12::1',
+      '::ffff:7f00:1',
+      '::ffff:a00:1',
+      '::ffff:c0a8:101',
+    ])('permits %s', ip => {
+      expect(isPermittedPrivateAddress(ip)).toBe(true);
+    });
+
+    it.each([
+      ['169.254.169.254', 'cloud metadata'],
+      ['169.254.1.1', 'link-local'],
+      ['0.0.0.0', '"this network", reaches localhost on Linux'],
+      ['100.64.0.1', 'carrier-grade NAT'],
+      ['224.0.0.1', 'multicast'],
+      ['172.32.0.1', 'just outside RFC 1918'],
+      ['fe80::1', 'IPv6 link-local'],
+      ['::ffff:a9fe:a9fe', 'IPv4-mapped metadata address'],
+      ['64:ff9b::7f00:1', 'NAT64 wrapping loopback'],
+      ['2002:7f00:1::', '6to4 wrapping loopback'],
+      ['ff02::1', 'IPv6 multicast'],
+      ['::', 'unspecified'],
+      ['2001:db8::1', 'documentation range'],
+      ['8.8.8.8', 'public address (not private at all)'],
+    ])('does not permit %s (%s)', ip => {
+      expect(isPermittedPrivateAddress(ip)).toBe(false);
+    });
+  });
+
+  describe('isBlockedAddress', () => {
+    it('blocks private addresses when the variable is unset', () => {
+      setOptIn(undefined);
+      for (const ip of ['127.0.0.1', '10.0.0.1', '192.168.1.1', '::1', 'fd00::1']) {
+        expect(isBlockedAddress(ip)).toBe(true);
+      }
+    });
+
+    it.each([['1'], ['true']])('unblocks loopback/RFC 1918/ULA when set to %s', value => {
+      setOptIn(value);
+      for (const ip of ['127.0.0.1', '10.0.0.1', '172.20.0.1', '192.168.1.1', '::1', 'fd00::1']) {
+        expect(isBlockedAddress(ip)).toBe(false);
+      }
+    });
+
+    it.each([[''], ['0'], ['false'], ['yes'], ['on'], [' 1']])(
+      'does not treat %j as opting in (only exactly "1" or "true")',
+      value => {
+        setOptIn(value);
+        expect(isBlockedAddress('127.0.0.1')).toBe(true);
+      }
+    );
+
+    it('keeps metadata, link-local, 0.0.0.0, CGNAT and multicast blocked even when opted in', () => {
+      setOptIn('1');
+      for (const ip of [
+        '169.254.169.254',
+        '169.254.0.1',
+        '0.0.0.0',
+        '100.64.0.1',
+        '224.0.0.1',
+        'fe80::1',
+        '::ffff:a9fe:a9fe',
+        '64:ff9b::a9fe:a9fe',
+        '2002:a9fe:a9fe::',
+        'ff02::1',
+        '::',
+      ]) {
+        expect(isBlockedAddress(ip)).toBe(true);
+      }
+    });
+
+    it('never blocks an ordinary public address, opted in or not', () => {
+      setOptIn(undefined);
+      expect(isBlockedAddress('8.8.8.8')).toBe(false);
+      setOptIn('1');
+      expect(isBlockedAddress('8.8.8.8')).toBe(false);
+    });
+  });
+
+  describe('through the real default fetch path, against a real local server', () => {
+    /** @type {http.Server} */
+    let server;
+    let port = 0;
+    beforeEach(async () => {
+      server = http.createServer((req, res) => {
+        res.writeHead(200, {'Content-Type': 'text/plain'});
+        res.end('hello');
+      });
+      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+      port = server.address().port;
+    });
+    afterEach(async () => {
+      server.closeAllConnections();
+      await new Promise(resolve => server.close(resolve));
+    });
+
+    it('refuses a loopback URL by default, and the refusal names the setting', async () => {
+      setOptIn(undefined);
+      await expect(safeFetchBytes(`http://127.0.0.1:${port}/`)).rejects.toThrow(
+        /private\/reserved.*LHCI_SEO_ALLOW_PRIVATE_NETWORK=1/
+      );
+    });
+
+    it('fetches a literal-IP loopback URL when opted in', async () => {
+      setOptIn('1');
+      const result = await safeFetchBytes(`http://127.0.0.1:${port}/`);
+      expect(result.status).toBe(200);
+      expect(result.body.toString()).toBe('hello');
+    });
+
+    it('fetches a `localhost` hostname when opted in, through the real DNS lookup path', async () => {
+      setOptIn('1');
+      const result = await safeFetchBytes(`http://localhost:${port}/`);
+      expect(result.status).toBe(200);
+    });
+
+    it('refuses the `localhost` hostname by default', async () => {
+      setOptIn(undefined);
+      await expect(safeFetchBytes(`http://localhost:${port}/`)).rejects.toThrow(
+        /private\/reserved/
+      );
+    });
+
+    it('reads the variable on every request: toggling it takes effect immediately', async () => {
+      setOptIn('1');
+      await expect(safeFetchBytes(`http://127.0.0.1:${port}/`)).resolves.toMatchObject({
+        status: 200,
+      });
+      setOptIn(undefined);
+      await expect(safeFetchBytes(`http://127.0.0.1:${port}/`)).rejects.toThrow(
+        /private\/reserved/
+      );
+    });
+
+    it('still refuses the metadata address, with no hint advertising the setting, when opted in', async () => {
+      setOptIn('1');
+      for (const url of [
+        'http://169.254.169.254/latest/meta-data/',
+        'http://[::ffff:169.254.169.254]/latest/meta-data/',
+        'http://0.0.0.0/',
+        'http://[fe80::1]/',
+      ]) {
+        const error = await safeFetchBytes(url).catch(e => e);
+        expect(error).toBeInstanceOf(Error);
+        expect(error.message).toMatch(/private\/reserved/);
+        expect(error.message).not.toContain('LHCI_SEO_ALLOW_PRIVATE_NETWORK');
+      }
+    });
+
+    it('applies to safeFetchJson and safeFetchStatus too', async () => {
+      setOptIn('1');
+      await expect(safeFetchStatus(`http://127.0.0.1:${port}/`)).resolves.toEqual({status: 200});
+      await expect(safeFetchJson(`http://127.0.0.1:${port}/`)).rejects.toThrow(/not valid JSON/);
+      setOptIn(undefined);
+      await expect(safeFetchStatus(`http://127.0.0.1:${port}/`)).rejects.toThrow(
+        /private\/reserved/
+      );
+    });
   });
 });

@@ -64,6 +64,15 @@ const IPV4_BLOCKED_RANGES = [
   ['224.0.0.0', '255.255.255.255'],
 ].map(([start, end]) => [ipv4ToInt(start), ipv4ToInt(end)]);
 
+// The subset of the blocked ranges the private-network opt-in may unblock (see
+// isPermittedPrivateAddress): loopback and RFC 1918 only.
+const PERMITTED_PRIVATE_IPV4_RANGES = [
+  ['10.0.0.0', '10.255.255.255'],
+  ['127.0.0.0', '127.255.255.255'],
+  ['172.16.0.0', '172.31.255.255'],
+  ['192.168.0.0', '192.168.255.255'],
+].map(([start, end]) => [ipv4ToInt(start), ipv4ToInt(end)]);
+
 /**
  * @param {string} ip
  * @return {boolean}
@@ -158,6 +167,76 @@ function isPrivateOrReservedIp(ip) {
 }
 
 /**
+ * Opt-in for running the audits against your own private hosts (a site served on localhost inside a
+ * CI job, or a staging host on a private network). Off unless the *process environment* sets it, so
+ * nothing on an audited page can turn it on; read on every request, never cached.
+ */
+const ALLOW_PRIVATE_NETWORK_ENV = 'LHCI_SEO_ALLOW_PRIVATE_NETWORK';
+
+/**
+ * @return {boolean}
+ */
+function privateNetworkAllowed() {
+  const value = process.env[ALLOW_PRIVATE_NETWORK_ENV];
+  return value === '1' || value === 'true';
+}
+
+/**
+ * The only addresses the opt-in can unblock: loopback, RFC 1918, and IPv6 unique-local, including
+ * IPv4-mapped spellings of the IPv4 ones. Deliberately *not* link-local (169.254.0.0/16, which is
+ * the cloud metadata address), 0.0.0.0/8, carrier-grade NAT, multicast or any other reserved range:
+ * those stay blocked even with the opt-in on, because they are what a hostile page would aim at.
+ * @param {string} ip
+ * @return {boolean}
+ */
+function isPermittedPrivateAddress(ip) {
+  if (net.isIPv4(ip)) {
+    const int = ipv4ToInt(ip);
+    return PERMITTED_PRIVATE_IPV4_RANGES.some(([start, end]) => int >= start && int <= end);
+  }
+  if (net.isIPv6(ip)) {
+    const b = ipv6ToBytes(ip);
+    if (!b) return false;
+    const first80Zero = b.slice(0, 10).every(x => x === 0);
+    // ::1 (loopback)
+    if (first80Zero && b[10] === 0 && b[11] === 0) {
+      return b.slice(12, 15).every(x => x === 0) && b[15] === 1;
+    }
+    // IPv4-mapped: judge the embedded IPv4 address by the IPv4 rules.
+    if (first80Zero && b[10] === 0xff && b[11] === 0xff) {
+      return isPermittedPrivateAddress(b.slice(12).join('.'));
+    }
+    // fc00::/7 (unique local)
+    return (b[0] & 0xfe) === 0xfc;
+  }
+  return false;
+}
+
+/**
+ * Whether a connection to this address must be refused: any private/reserved address, unless the
+ * private-network opt-in is on and the address is one of the few it may unblock. This is the one
+ * decision point every request path goes through.
+ * @param {string} ip
+ * @return {boolean}
+ */
+function isBlockedAddress(ip) {
+  if (!isPrivateOrReservedIp(ip)) return false;
+  return !(privateNetworkAllowed() && isPermittedPrivateAddress(ip));
+}
+
+/**
+ * A hint appended to a refusal, only when the opt-in would actually have allowed the address, so an
+ * error for a metadata-address attempt does not advertise a setting that could not help.
+ * @param {string} ip
+ * @return {string}
+ */
+function optInHint(ip) {
+  return isPermittedPrivateAddress(ip)
+    ? ` To audit your own private or staging host, set ${ALLOW_PRIVATE_NETWORK_ENV}=1.`
+    : '';
+}
+
+/**
  * The IP address a URL's hostname literally is, or null if it is a DNS name. `new URL()` keeps the
  * brackets on an IPv6 literal (`[::1]`), and `net.isIP('[::1]')` is 0 — so without stripping them
  * every IPv6 literal was treated as a DNS name, skipped this check, and (because Node also skips
@@ -198,8 +277,14 @@ function safeLookup(hostname, options, callback) {
   // IPv4/IPv6 literal hostnames skip DNS resolution entirely in Node's dns.lookup — handle them
   // directly so a literal private IP in the URL can't bypass this check.
   if (net.isIP(hostname)) {
-    if (isPrivateOrReservedIp(hostname)) {
-      callback(new Error(`refusing to connect to "${hostname}": a private/reserved IP address`));
+    if (isBlockedAddress(hostname)) {
+      callback(
+        new Error(
+          `refusing to connect to "${hostname}": a private/reserved IP address.${optInHint(
+            hostname
+          )}`
+        )
+      );
       return;
     }
     const family = net.isIPv6(hostname) ? 6 : 4;
@@ -216,12 +301,12 @@ function safeLookup(hostname, options, callback) {
       callback(err);
       return;
     }
-    const blocked = addresses.find(a => isPrivateOrReservedIp(a.address));
+    const blocked = addresses.find(a => isBlockedAddress(a.address));
     if (blocked) {
       callback(
         new Error(
           `refusing to connect to "${hostname}": resolves to a private/reserved address ` +
-            `(${blocked.address})`
+            `(${blocked.address}).${optInHint(blocked.address)}`
         )
       );
       return;
@@ -483,9 +568,13 @@ function safeFetchStatus(urlString, options) {
     return Promise.reject(new Error(`"${urlString}" is not a valid URL`));
   }
   const literalIp = literalIpOf(url);
-  if (literalIp && isPrivateOrReservedIp(literalIp)) {
+  if (literalIp && isBlockedAddress(literalIp)) {
     return Promise.reject(
-      new Error(`refusing to fetch "${urlString}": a private/reserved IP address (${literalIp})`)
+      new Error(
+        `refusing to fetch "${urlString}": a private/reserved IP address (${literalIp}).${optInHint(
+          literalIp
+        )}`
+      )
     );
   }
 
@@ -512,9 +601,13 @@ function safeFetchJson(urlString, options) {
     return Promise.reject(new Error(`"${urlString}" is not a valid URL`));
   }
   const literalIp = literalIpOf(url);
-  if (literalIp && isPrivateOrReservedIp(literalIp)) {
+  if (literalIp && isBlockedAddress(literalIp)) {
     return Promise.reject(
-      new Error(`refusing to fetch "${urlString}": a private/reserved IP address (${literalIp})`)
+      new Error(
+        `refusing to fetch "${urlString}": a private/reserved IP address (${literalIp}).${optInHint(
+          literalIp
+        )}`
+      )
     );
   }
 
@@ -540,9 +633,13 @@ function safeFetchBytes(urlString, options) {
     return Promise.reject(new Error(`"${urlString}" is not a valid URL`));
   }
   const literalIp = literalIpOf(url);
-  if (literalIp && isPrivateOrReservedIp(literalIp)) {
+  if (literalIp && isBlockedAddress(literalIp)) {
     return Promise.reject(
-      new Error(`refusing to fetch "${urlString}": a private/reserved IP address (${literalIp})`)
+      new Error(
+        `refusing to fetch "${urlString}": a private/reserved IP address (${literalIp}).${optInHint(
+          literalIp
+        )}`
+      )
     );
   }
 
@@ -550,6 +647,9 @@ function safeFetchBytes(urlString, options) {
 }
 
 export {
+  ALLOW_PRIVATE_NETWORK_ENV,
+  isBlockedAddress,
+  isPermittedPrivateAddress,
   safeFetchBytes,
   safeFetchJson,
   safeFetchStatus,
