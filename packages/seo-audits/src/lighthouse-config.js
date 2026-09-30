@@ -13,7 +13,7 @@
  * canonical-https, favicon-presence, favicon-quality, manifest-icons,
  * open-graph-completeness, open-graph-canonical-match, open-graph-image-reachable,
  * twitter-card-completeness, social-preview-content, robots-txt-sitemap-declared,
- * and robots-txt-crawler-access gatherer/audits on top of Lighthouse's default set.
+ * robots-txt-crawler-access, and robots-txt-rule-conflicts gatherer/audits on top of Lighthouse's default set.
  *
  * Paths below are plain relative strings, not require.resolve() calls: this file is
  * ESM (no bare `require`), and Lighthouse's own module resolver
@@ -58,6 +58,7 @@ const config = {
     './audits/social-preview-content.js',
     './audits/robots-txt-sitemap-declared.js',
     './audits/robots-txt-crawler-access.js',
+    './audits/robots-txt-rule-conflicts.js',
   ],
   categories: {
     'seo-extended': {
@@ -86,6 +87,7 @@ const config = {
         {id: 'social-preview-content', weight: 1},
         {id: 'robots-txt-sitemap-declared', weight: 1},
         {id: 'robots-txt-crawler-access', weight: 1},
+        {id: 'robots-txt-rule-conflicts', weight: 1},
       ],
     },
   },

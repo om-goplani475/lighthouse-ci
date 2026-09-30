@@ -70,4 +70,42 @@ function robotsTxtState(robotsTxt) {
   return 'absent';
 }
 
-export {parseRobotsTxt, robotsTxtState};
+/**
+ * Finds the same path listed as both Allow and Disallow for one user-agent. Groups naming the same
+ * user-agent are merged first, since crawlers combine them — the contradiction can be split across
+ * two blocks. Only identical path strings count: an Allow and Disallow of *different* paths is
+ * ordinary longest-match precedence, not a conflict.
+ * @param {RobotsGroup[]} groups
+ * @return {Array<{agent: string, path: string, allowLine: number, disallowLine: number}>}
+ */
+function findRuleConflicts(groups) {
+  /** @type {Map<string, RobotsRule[]>} */
+  const rulesByAgent = new Map();
+  for (const group of groups) {
+    for (const agent of group.agents) {
+      rulesByAgent.set(agent, [...(rulesByAgent.get(agent) || []), ...group.rules]);
+    }
+  }
+
+  const conflicts = [];
+  for (const [agent, rules] of rulesByAgent) {
+    /** @type {Map<string, {allow?: number, disallow?: number}>} */
+    const byPath = new Map();
+    for (const rule of rules) {
+      // An empty Disallow means "allow everything" and has no path to contradict.
+      if (!rule.path) continue;
+      const seen = byPath.get(rule.path) || {};
+      // Keep the first line seen for each type, for a stable report.
+      if (seen[rule.type] === undefined) seen[rule.type] = rule.line;
+      byPath.set(rule.path, seen);
+    }
+    for (const [path, {allow, disallow}] of byPath) {
+      if (allow !== undefined && disallow !== undefined) {
+        conflicts.push({agent, path, allowLine: allow, disallowLine: disallow});
+      }
+    }
+  }
+  return conflicts;
+}
+
+export {parseRobotsTxt, robotsTxtState, findRuleConflicts};
