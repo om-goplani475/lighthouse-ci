@@ -1,12 +1,14 @@
-# Current plan — pixel-width-truncation
+# Current plan — sitemap-fetch-and-parse
 
-- [x] task-01: serp-pixel-budgets types + JSON Schema — complete
-- [x] task-02: serp-pixel-budgets ruleset data (v1) — complete
-- [x] task-03: resolveSerpPixelBudgetsRuleset() in the registry — complete
-- [x] task-04: Registry unit tests for serp-pixel-budgets — complete
-- [x] task-05: PixelWidth gatherer — complete
-- [x] task-06: pixel-width-truncation audit — complete
-- [x] task-07: Wire into custom Lighthouse config + regression test — complete
-- [x] task-08: Gatherer unit test — complete
-- [x] task-09: Audit fixture tests — complete
-- [x] task-10: Package README update — complete
+- [ ] task-01: Declare the saxes dependency — pending
+- [ ] task-02: safeFetchBytes in safe-fetch — pending
+- [ ] task-03: Sitemap XML parse core (uncompressed) — pending
+- [ ] task-04: Gzip handling and decompressed-size cap — pending
+- [ ] task-05: SitemapDocuments gatherer: discovery and root documents — pending
+- [ ] task-06: Sitemap index following and document cap — pending
+- [ ] task-07: Gatherer integration test against a local server — pending
+- [ ] task-08: sitemap-valid audit — pending
+- [ ] task-09: sitemap-duplicate-urls audit — pending
+- [ ] task-10: sitemap-limits audit — pending
+- [ ] task-11: Register the gatherer and audits in the Lighthouse config — pending
+- [ ] task-12: README update — pending
