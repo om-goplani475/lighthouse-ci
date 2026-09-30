@@ -30,6 +30,7 @@ async function resolveConfig() {
     initializeConfig('navigation', config, {configPath: '${CONFIG_PATH}'}).then(({resolvedConfig}) => {
       console.log(JSON.stringify({
         auditIds: (resolvedConfig.audits || []).map(a => a.implementation.meta.id),
+        artifactIds: (resolvedConfig.artifacts || []).map(a => a.id),
         categories: resolvedConfig.categories,
       }));
     });
@@ -46,14 +47,17 @@ async function resolveConfig() {
  */
 describe('seo-audits lighthouse-config', () => {
   it('preserves core default audits alongside the new one', async () => {
-    const {auditIds} = await resolveConfig();
+    const {auditIds, artifactIds} = await resolveConfig();
 
     // Core defaults must still be present — this is what would fail if a future
     // edit accidentally dropped `extends: 'lighthouse:default'`.
     expect(auditIds).toContain('meta-description');
     expect(auditIds).toContain('document-title');
 
-    // And all twenty-four of this fork's audits are actually added, not just defaults preserved.
+    // The gatherer the sitemap audits depend on must resolve too, or they would all error.
+    expect(artifactIds).toContain('SitemapDocuments');
+
+    // And all twenty-seven of this fork's audits are actually added, not just defaults preserved.
     expect(auditIds).toContain('structured-data-json-ld');
     expect(auditIds).toContain('structured-data-schema-properties');
     expect(auditIds).toContain('structured-data-rich-result-eligibility');
@@ -78,9 +82,12 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('robots-txt-sitemap-declared');
     expect(auditIds).toContain('robots-txt-crawler-access');
     expect(auditIds).toContain('robots-txt-rule-conflicts');
+    expect(auditIds).toContain('sitemap-valid');
+    expect(auditIds).toContain('sitemap-duplicate-urls');
+    expect(auditIds).toContain('sitemap-limits');
   }, 30000);
 
-  it('adds the seo-extended category with all twenty-four audits, without touching the core seo category', async () => {
+  it('adds the seo-extended category with all twenty-seven audits, without touching the core seo category', async () => {
     const {categories} = await resolveConfig();
 
     expect(categories['seo-extended']).toBeDefined();
@@ -102,6 +109,9 @@ describe('seo-audits lighthouse-config', () => {
       'robots-txt-crawler-access',
       'robots-txt-rule-conflicts',
       'robots-txt-sitemap-declared',
+      'sitemap-duplicate-urls',
+      'sitemap-limits',
+      'sitemap-valid',
       'social-preview-content',
       'structured-data-deprecated-properties',
       'structured-data-json-ld',
