@@ -1,18 +1,11 @@
 # Current feature
 
-- slug: sitemap-fetch-and-parse
-- stage: 05-merged (into phase-4-robots-sitemap; no PR, ff-only merge; /write-qa, /security-review, /ci-integration pending)
-- base_branch: phase-4-robots-sitemap
-- base_commit: 299b2ab
-- merged_head: 5b76bb7
-- spec: docs/feature-specs/sitemap-fetch-and-parse.md
-- audit_spec: docs/audit-specs/sitemap-fetch-and-parse.md
-- contract: docs/feature-contracts/sitemap-fetch-and-parse.md
-- task_sequence: docs/task-sequences/sitemap-fetch-and-parse.md
-- phase: 4 (robots-sitemap), branch phase-4-robots-sitemap — see docs/phases/phase-4-robots-sitemap.md
-  (roadmap rows 4, 6 and 7; row 5's URL-status sample reuses this feature's artifact later)
+- slug: sitemap-indexability
+- stage: 00-intake-complete
+- spec: docs/feature-specs/sitemap-indexability.md
+- phase: 4 (robots-sitemap), branch phase-4-robots-sitemap: see docs/phases/phase-4-robots-sitemap.md
+  (roadmap row 9; refactors the merged item-5 audit `sitemap-url-status` onto a shared gatherer)
 
-<!-- Previous entries (features closed before this one) are preserved in git history: see
-`git log -p .ai-agents/state/current-feature.md`. Phase 4's items 1-3 (robots-txt-sitemap-declared,
-robots-txt-crawler-access, robots-txt-rule-conflicts) were built lightweight-mode, so they have no
-per-feature spec/state entry; see docs/qa/robots-txt-sitemap.md. -->
+<!-- Previous feature sitemap-fetch-and-parse closed 2026-09-30: all 9 stages run, merged 5b76bb7
+(plus security-review fixes, the private-network opt-in, and items 5, 8 and 10 built lightweight-mode
+on top of it). See docs/qa/sitemap-fetch-and-parse.md and .ai-agents/state/security-findings.md. -->
