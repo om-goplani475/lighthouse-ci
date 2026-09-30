@@ -11,7 +11,9 @@ const {
   isPrivateOrReservedIp,
   safeLookup,
   safeFetchJson,
+  safeFetchStatus,
   fetchJsonWithLookup,
+  statusWithLookup,
 } = require('../../src/lib/safe-fetch.js');
 
 describe('isPrivateOrReservedIp', () => {
@@ -74,6 +76,40 @@ describe('safeLookup', () => {
       done();
     });
   });
+
+  /**
+   * Regression coverage for a real bug found during Phase 3 live QA: Node's own `net.connect`
+   * requests `{all: true}` whenever Happy Eyeballs is active (the default since Node 20 —
+   * `net.getDefaultAutoSelectFamily()`), which is the normal case for any real `http.request` to
+   * a hostname, not an edge case. `safeLookup` used to always reply with a single `(address,
+   * family)` tuple regardless of what was asked for, which made Node's own connect logic throw
+   * `Invalid IP address: undefined` — silently breaking every real outbound fetch to a
+   * non-literal-IP hostname (this would have broken `manifest-icons` in production against any
+   * real domain, not just the newly-added `open-graph-image-reachable`).
+   */
+  describe('options.all support (Happy Eyeballs)', () => {
+    it('replies with an array for a literal public IP when options.all is requested', done => {
+      safeLookup('8.8.8.8', {all: true}, (err, addresses) => {
+        expect(err).toBeNull();
+        expect(addresses).toEqual([{address: '8.8.8.8', family: 4}]);
+        done();
+      });
+    });
+
+    it('still rejects a literal private IP when options.all is requested', done => {
+      safeLookup('127.0.0.1', {all: true}, err => {
+        expect(err).toBeInstanceOf(Error);
+        expect(err.message).toMatch(/private\/reserved/);
+        done();
+      });
+    });
+
+    // A real (non-literal-IP) hostname's options.all path is covered live, not with a unit test
+    // against real DNS — this repo's own convention is not to give the Jest suite a live-network
+    // dependency (see CLAUDE.md's "this repo does not hit live URLs in tests"). See
+    // docs/qa/social-metadata.md for the live confirmation against a real external hostname
+    // (the exact scenario that surfaced this bug in the first place).
+  });
 });
 
 describe('safeFetchJson — integration against a real local server', () => {
@@ -85,6 +121,18 @@ describe('safeFetchJson — integration against a real local server', () => {
 
   it('refuses a non-http(s) scheme', async () => {
     await expect(safeFetchJson('file:///etc/passwd')).rejects.toThrow(/must be http or https/);
+  });
+});
+
+describe('safeFetchStatus — integration against a real local server', () => {
+  it('refuses to fetch a loopback URL — same SSRF protection as safeFetchJson', async () => {
+    await expect(safeFetchStatus('http://127.0.0.1:1/whatever')).rejects.toThrow(
+      /private\/reserved/
+    );
+  });
+
+  it('refuses a non-http(s) scheme', async () => {
+    await expect(safeFetchStatus('file:///etc/passwd')).rejects.toThrow(/must be http or https/);
   });
 });
 
@@ -165,6 +213,52 @@ describe('fetchJsonWithLookup — request mechanics, against a real local server
   it('rejects after the timeout elapses', async () => {
     await expect(
       fetchJsonWithLookup(`http://127.0.0.1:${port}/slow`, permissiveLookup, {timeoutMs: 200})
+    ).rejects.toThrow(/timed out/);
+  }, 10000);
+});
+
+describe('statusWithLookup — request mechanics, against a real local server', () => {
+  /** @type {http.Server} */
+  let server;
+  /** @type {number} */
+  let port;
+
+  beforeEach(async () => {
+    server = http.createServer((req, res) => {
+      if (req.url === '/ok') {
+        res.writeHead(200, {'Content-Type': 'image/png'});
+        res.end(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+      } else if (req.url === '/not-found') {
+        res.writeHead(404);
+        res.end('not found');
+      } else if (req.url === '/slow') {
+        // Never responds — exercises the timeout path.
+      } else {
+        res.writeHead(404);
+        res.end();
+      }
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    port = server.address().port;
+  });
+
+  afterEach(async () => {
+    await new Promise(resolve => server.close(resolve));
+  });
+
+  it('resolves with the status code without needing the response body to be valid JSON', async () => {
+    const result = await statusWithLookup(`http://127.0.0.1:${port}/ok`, permissiveLookup);
+    expect(result).toEqual({status: 200});
+  });
+
+  it('resolves with a non-2xx status rather than rejecting — the caller decides what counts as failure', async () => {
+    const result = await statusWithLookup(`http://127.0.0.1:${port}/not-found`, permissiveLookup);
+    expect(result).toEqual({status: 404});
+  });
+
+  it('rejects after the timeout elapses', async () => {
+    await expect(
+      statusWithLookup(`http://127.0.0.1:${port}/slow`, permissiveLookup, {timeoutMs: 200})
     ).rejects.toThrow(/timed out/);
   }, 10000);
 });

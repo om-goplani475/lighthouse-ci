@@ -3,12 +3,15 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  *
- * The first outbound network fetch capability this package has ever needed (used by
- * audits/manifest-icons.js, to fetch a page's web-app-manifest JSON). Every other audit/gatherer
- * only reads data the page already loaded — this deliberately fetches a *second* URL discovered
- * on the page, which is exactly the attack surface `.ai-agents/prompts/security-checklist.md`
- * exists for: SSRF via an attacker-controlled page pointing its manifest link at an internal
- * service, cloud metadata endpoint, or arbitrary scheme.
+ * The first outbound network fetch capability this package ever needed (originally built for
+ * audits/manifest-icons.js, to fetch a page's web-app-manifest JSON; audits/
+ * open-graph-image-reachable.js reuses the same SSRF-protected primitives via `safeFetchStatus`
+ * to confirm an `og:image` URL resolves, without downloading the image itself). Every other
+ * audit/gatherer only reads data the page already loaded — this deliberately fetches a *second*
+ * URL discovered on the page, which is exactly the attack surface
+ * `.ai-agents/prompts/security-checklist.md` exists for: SSRF via an attacker-controlled page
+ * pointing its manifest/image link at an internal service, cloud metadata endpoint, or arbitrary
+ * scheme.
  *
  * Protections, each directly required by the security checklist:
  * - Scheme allowlist: only http/https.
@@ -102,11 +105,25 @@ function isPrivateOrReservedIp(ip) {
  * option expects) that resolves normally but throws if every candidate address is
  * private/reserved. Passing this as the `lookup` option is what makes the validated address the
  * one actually connected to — see the module doc's DNS-rebinding note.
+ *
+ * Must honor `options.all` and reply in kind (a single `(address, family)` tuple, or an array of
+ * `{address, family}` objects), exactly like real `dns.lookup` does — not always the single-tuple
+ * shape. Node's own `net.connect` requests `{all: true}` whenever Happy Eyeballs
+ * (`net.getDefaultAutoSelectFamily()`, `true` by default since Node 20) is active, which is the
+ * normal case for any `http.request`/`https.request` to a real hostname, not just an edge case.
+ * Ignoring that and always replying single-tuple isn't a safe fail-closed default — Node's
+ * `emitLookup` throws `Invalid IP address: undefined` trying to read `addresses[0]` off what it
+ * thinks is an array, breaking every real fetch to a non-literal-IP hostname outright (confirmed:
+ * this broke `safeFetchStatus` against a real external URL during live QA for
+ * `open-graph-image-reachable`, and would equally have broken `safeFetchJson`/`manifest-icons`
+ * for any manifest on a normal domain — this was a real latent bug, not just a new one).
  * @param {string} hostname
- * @param {object} options
- * @param {(err: Error | null, address?: string, family?: number) => void} callback
+ * @param {{all?: boolean}} options
+ * @param {(err: Error | null, address?: string | Array<{address: string, family: number}>, family?: number) => void} callback
  */
 function safeLookup(hostname, options, callback) {
+  const wantsAll = Boolean(options && options.all);
+
   // IPv4/IPv6 literal hostnames skip DNS resolution entirely in Node's dns.lookup — handle them
   // directly so a literal private IP in the URL can't bypass this check.
   if (net.isIP(hostname)) {
@@ -114,7 +131,12 @@ function safeLookup(hostname, options, callback) {
       callback(new Error(`refusing to connect to "${hostname}": a private/reserved IP address`));
       return;
     }
-    callback(null, hostname, net.isIPv6(hostname) ? 6 : 4);
+    const family = net.isIPv6(hostname) ? 6 : 4;
+    if (wantsAll) {
+      callback(null, [{address: hostname, family}]);
+    } else {
+      callback(null, hostname, family);
+    }
     return;
   }
 
@@ -135,6 +157,10 @@ function safeLookup(hostname, options, callback) {
     }
     if (addresses.length === 0) {
       callback(new Error(`"${hostname}" did not resolve to any address`));
+      return;
+    }
+    if (wantsAll) {
+      callback(null, addresses);
       return;
     }
     const {address, family} = addresses[0];
@@ -223,6 +249,77 @@ function fetchJsonWithLookup(urlString, lookup, {timeoutMs = 5000, maxBytes = 1_
 }
 
 /**
+ * Same connection setup as `fetchJsonWithLookup` (URL/scheme validation, `lookup` wiring) but
+ * resolves as soon as response headers arrive and never reads the body — used when only the
+ * status code matters (e.g. confirming an `og:image` URL resolves), not the response content, so
+ * there's nothing to download or size-cap. Not exported as public API, same reasoning as
+ * `fetchJsonWithLookup` — exists so tests can exercise this against a real local server with a
+ * permissive test-only lookup.
+ * @param {string} urlString
+ * @param {typeof safeLookup} lookup
+ * @param {{timeoutMs?: number}} [options]
+ * @return {Promise<{status: number}>}
+ */
+function statusWithLookup(urlString, lookup, {timeoutMs = 5000} = {}) {
+  return new Promise((resolve, reject) => {
+    /** @type {URL} */
+    let url;
+    try {
+      url = new URL(urlString);
+    } catch {
+      reject(new Error(`"${urlString}" is not a valid URL`));
+      return;
+    }
+
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      reject(new Error(`refusing to fetch "${urlString}": scheme must be http or https`));
+      return;
+    }
+
+    const client = url.protocol === 'https:' ? https : http;
+    const req = client.request(
+      url,
+      // @ts-expect-error - see fetchJsonWithLookup's identical comment on `lookup`.
+      {method: 'GET', lookup, timeout: timeoutMs},
+      res => {
+        const status = res.statusCode ?? 0;
+        res.destroy();
+        resolve({status});
+      }
+    );
+
+    req.on('timeout', () => {
+      req.destroy(new Error(`fetch of "${urlString}" timed out after ${timeoutMs}ms`));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+/**
+ * Fetches a URL and resolves with just its HTTP status code, with the same SSRF/DoS protections
+ * as `safeFetchJson` — the response body is never read or downloaded.
+ * @param {string} urlString
+ * @param {{timeoutMs?: number}} [options]
+ * @return {Promise<{status: number}>}
+ */
+function safeFetchStatus(urlString, options) {
+  let url;
+  try {
+    url = new URL(urlString);
+  } catch {
+    return Promise.reject(new Error(`"${urlString}" is not a valid URL`));
+  }
+  if (net.isIP(url.hostname) && isPrivateOrReservedIp(url.hostname)) {
+    return Promise.reject(
+      new Error(`refusing to fetch "${urlString}": a private/reserved IP address (${url.hostname})`)
+    );
+  }
+
+  return statusWithLookup(urlString, safeLookup, options);
+}
+
+/**
  * Fetches a URL and parses the response as JSON, with the SSRF/DoS protections documented above.
  * @param {string} urlString
  * @param {{timeoutMs?: number, maxBytes?: number}} [options]
@@ -250,4 +347,11 @@ function safeFetchJson(urlString, options) {
   return fetchJsonWithLookup(urlString, safeLookup, options);
 }
 
-export {safeFetchJson, isPrivateOrReservedIp, safeLookup, fetchJsonWithLookup};
+export {
+  safeFetchJson,
+  safeFetchStatus,
+  isPrivateOrReservedIp,
+  safeLookup,
+  fetchJsonWithLookup,
+  statusWithLookup,
+};
