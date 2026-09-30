@@ -14,6 +14,7 @@ const {
   pickEvenly,
   collectEligibleUrls,
   checkUrls,
+  collectUrlSample,
   describeCheck,
 } = require('../../src/lib/sitemap-url-sample.js');
 const {emptyDocument} = require('../../src/lib/sitemap-parse.js');
@@ -304,6 +305,223 @@ describe('checkUrls — fetcher fields pass through as `response`', () => {
     });
     expect(result.error).toBe('fail 2');
     expect(result.response).toBeUndefined();
+  });
+});
+
+describe('collectUrlSample', () => {
+  const urlsetDoc = (locs, url = 'https://example.com/sitemap.xml') => ({
+    ...emptyDocument({url, source: 'declared', parentUrl: null}),
+    status: 200,
+    kind: 'urlset',
+    locs,
+    entryCount: locs.length,
+  });
+  const pages = n => Array.from({length: n}, (_, i) => `https://example.com/p${i}`);
+
+  /** A page-fetcher result shaped like safeFetchPrefix's. */
+  const page = (overrides = {}) => ({
+    status: 200,
+    redirectLocation: null,
+    headers: {
+      'x-robots-tag': [],
+      'content-type': ['text/html; charset=utf-8'],
+      'content-encoding': [],
+      location: [],
+    },
+    body: Buffer.from('<html><head><title>T</title></head><body>x</body></html>'),
+    bodyRead: 'html',
+    truncated: false,
+    ...overrides,
+  });
+
+  const collect = (documents, fetchPage, deps = {}) =>
+    collectUrlSample(documents, {fetchPage, env: {}, ...deps});
+
+  it('returns null when there is no eligible URL', async () => {
+    expect(await collect([], async () => page())).toBeNull();
+    expect(await collect([urlsetDoc(['https://other.test/a'])], async () => page())).toBeNull();
+    expect(
+      await collect([{...urlsetDoc(['https://example.com/a']), kind: 'sitemapindex'}], async () =>
+        page()
+      )
+    ).toBeNull();
+  });
+
+  it('records how the sample was drawn: size, eligible count, other-host skips', async () => {
+    const sample = await collect(
+      [urlsetDoc([...pages(30), 'https://other.test/x'])],
+      async () => page(),
+      {env: {LHCI_SEO_SITEMAP_SAMPLE_SIZE: '4'}}
+    );
+    expect(sample).toMatchObject({sampleSize: 4, eligibleCount: 30, skippedCrossOrigin: 1});
+    expect(sample.pages).toHaveLength(4);
+    expect(sample.pages[0].url).toBe('https://example.com/p0');
+    expect(sample.pages[3].url).toBe('https://example.com/p29');
+  });
+
+  it('defaults to 10 and caps at 25, from the environment', async () => {
+    expect((await collect([urlsetDoc(pages(100))], async () => page())).pages).toHaveLength(10);
+    const big = await collect([urlsetDoc(pages(100))], async () => page(), {
+      env: {LHCI_SEO_SITEMAP_SAMPLE_SIZE: '500'},
+    });
+    expect(big.sampleSize).toBe(25);
+    expect(big.pages).toHaveLength(25);
+  });
+
+  it('extracts head signals for an HTML page and carries its headers', async () => {
+    const html =
+      '<html><head><meta name="robots" content="noindex"><link rel="canonical" href="/c"></head><body>x</body></html>';
+    const sample = await collect([urlsetDoc(['https://example.com/a'])], async () =>
+      page({
+        body: Buffer.from(html),
+        headers: {
+          'x-robots-tag': ['googlebot: noindex'],
+          'content-type': ['text/html'],
+          'content-encoding': [],
+          location: [],
+        },
+      })
+    );
+    expect(sample.pages[0]).toEqual({
+      url: 'https://example.com/a',
+      status: 200,
+      redirectLocation: null,
+      error: null,
+      notChecked: false,
+      contentType: 'text/html',
+      xRobotsTag: ['googlebot: noindex'],
+      bodyRead: 'html',
+      truncated: false,
+      metas: [{name: 'robots', content: 'noindex'}],
+      canonicals: ['/c'],
+      headComplete: true,
+    });
+  });
+
+  it('passes the truncated flag to the extractor: a cut-off head is not complete', async () => {
+    const sample = await collect([urlsetDoc(['https://example.com/a'])], async () =>
+      page({body: Buffer.from('<html><head><title>T</title><script>var x=1;'), truncated: true})
+    );
+    expect(sample.pages[0]).toMatchObject({truncated: true, headComplete: false, metas: []});
+  });
+
+  it.each([
+    [
+      'a PDF',
+      {
+        bodyRead: 'skipped-not-html',
+        body: Buffer.alloc(0),
+        headers: {
+          'x-robots-tag': ['noindex'],
+          'content-type': ['application/pdf'],
+          'content-encoding': [],
+          location: [],
+        },
+      },
+    ],
+    [
+      'a compressed page',
+      {
+        bodyRead: 'skipped-compressed',
+        body: Buffer.alloc(0),
+        headers: {
+          'x-robots-tag': [],
+          'content-type': ['text/html'],
+          'content-encoding': ['gzip'],
+          location: [],
+        },
+      },
+    ],
+  ])('keeps headers but no signals for %s', async (_label, overrides) => {
+    const sample = await collect([urlsetDoc(['https://example.com/a'])], async () =>
+      page(overrides)
+    );
+    expect(sample.pages[0]).toMatchObject({
+      status: 200,
+      bodyRead: overrides.bodyRead,
+      metas: [],
+      canonicals: [],
+      headComplete: false,
+    });
+    expect(sample.pages[0].xRobotsTag).toEqual(overrides.headers['x-robots-tag']);
+  });
+
+  it('records a 404 and a redirect from their status, with no signals', async () => {
+    const sample = await collect(
+      [urlsetDoc(['https://example.com/gone', 'https://example.com/moved'])],
+      async url =>
+        url.endsWith('gone')
+          ? page({status: 404, bodyRead: 'skipped-status', body: Buffer.alloc(0)})
+          : page({
+              status: 301,
+              redirectLocation: 'https://example.com/new',
+              bodyRead: 'skipped-status',
+              body: Buffer.alloc(0),
+            })
+    );
+    expect(sample.pages.map(p => [p.status, p.redirectLocation, p.bodyRead])).toEqual([
+      [404, null, 'skipped-status'],
+      [301, 'https://example.com/new', 'skipped-status'],
+    ]);
+  });
+
+  it('records an error and a not-checked page without signals', async () => {
+    let clock = 0;
+    const sample = await collect(
+      [urlsetDoc(pages(3))],
+      async url => {
+        clock += 40_000;
+        if (url.endsWith('p0')) throw new Error('ECONNREFUSED');
+        return page();
+      },
+      {now: () => clock}
+    );
+    // p0 fails twice (retry) and takes the whole budget; the rest are not checked.
+    expect(sample.pages[0]).toMatchObject({
+      error: 'ECONNREFUSED',
+      status: null,
+      bodyRead: null,
+      metas: [],
+      headComplete: false,
+    });
+    expect(sample.pages[1]).toMatchObject({notChecked: true, status: null, bodyRead: null});
+  });
+
+  it('accepts a plain {status} fetcher, producing empty signals', async () => {
+    const sample = await collect([urlsetDoc(['https://example.com/a'])], async () => ({
+      status: 200,
+    }));
+    expect(sample.pages[0]).toMatchObject({
+      status: 200,
+      contentType: null,
+      xRobotsTag: [],
+      bodyRead: null,
+      metas: [],
+      canonicals: [],
+    });
+  });
+
+  it('never keeps a raw body: the serialized sample contains none of the page text', async () => {
+    const secret = 'SECRET-BODY-TEXT-1234567890';
+    const sample = await collect([urlsetDoc(['https://example.com/a'])], async () =>
+      page({
+        body: Buffer.from(
+          `<html><head><meta name="robots" content="noindex"></head><body>${secret}</body></html>`
+        ),
+      })
+    );
+    expect(JSON.stringify(sample)).not.toContain(secret);
+    expect(JSON.stringify(sample)).not.toContain('<body>');
+  });
+
+  it('requests each sampled URL exactly once (no request beyond the sample)', async () => {
+    const seen = [];
+    await collect([urlsetDoc(pages(50))], async url => {
+      seen.push(url);
+      return page();
+    });
+    expect(seen).toHaveLength(10);
+    expect(new Set(seen).size).toBe(10);
   });
 });
 

@@ -9,7 +9,13 @@
  * tested without a network. Not a crawler: it never follows a redirect and never reads a body.
  */
 
+import {safeFetchPrefix} from './safe-fetch.js';
+import {extractHeadSignals} from './html-head-signals.js';
+
 /** @typedef {import('./sitemap-parse.js').SitemapDocument} SitemapDocument */
+/** @typedef {import('./sitemap-parse.js').SampledPage} SampledPage */
+/** @typedef {import('./sitemap-parse.js').UrlSample} UrlSample */
+/** @typedef {import('./safe-fetch.js').PrefixResult} PrefixResult */
 /**
  * `response` is whatever the injected fetcher resolved, untouched (a plain `{status}` fetcher gives
  * `{status}`; the page fetcher's headers and body prefix ride along), so callers that need more than
@@ -202,6 +208,67 @@ async function checkUrls(urls, options) {
 }
 
 /**
+ * Reduces one check to the compact, serializable `SampledPage` kept in the artifact. Raw bodies are
+ * never kept: for an HTML response the body prefix is turned into the extracted head signals and
+ * dropped. A plain `{status}` response (or an errored / not-checked URL) yields empty signals.
+ * @param {UrlCheck} check
+ * @return {SampledPage}
+ */
+function toSampledPage(check) {
+  const response = /** @type {Partial<PrefixResult> | undefined} */ (check.response);
+  const headers = response && response.headers;
+  const bodyRead = (response && response.bodyRead) || null;
+  const truncated = Boolean(response && response.truncated);
+  const signals =
+    response && bodyRead === 'html' && response.body
+      ? extractHeadSignals(response.body, {truncated})
+      : {metas: [], canonicals: [], headComplete: false};
+  return {
+    url: check.url,
+    status: check.status,
+    redirectLocation: check.redirectLocation,
+    error: check.error,
+    notChecked: check.notChecked,
+    contentType: (headers && headers['content-type'] && headers['content-type'][0]) || null,
+    xRobotsTag: headers && headers['x-robots-tag'] ? headers['x-robots-tag'].slice() : [],
+    bodyRead,
+    truncated,
+    metas: signals.metas,
+    canonicals: signals.canonicals,
+    headComplete: signals.headComplete,
+  };
+}
+
+/**
+ * Samples the URLs a sitemap lists and requests each once, returning what the sitemap audits need:
+ * status (for `sitemap-url-status`) and the head signals read from the response (for
+ * `sitemap-indexability`). Same selection and bounds as ever: same-origin only, evenly spread and
+ * deterministic, size from `LHCI_SEO_SITEMAP_SAMPLE_SIZE`, then `checkUrls`' concurrency, timeouts,
+ * retry and total budget. Returns `null` when there is no eligible URL.
+ * @param {SitemapDocument[]} documents
+ * @param {{fetchPage?: FetchStatus, env?: NodeJS.ProcessEnv, now?: () => number}} [deps]
+ *   `fetchPage` is injectable so tests never touch the network.
+ * @return {Promise<UrlSample | null>}
+ */
+async function collectUrlSample(
+  documents,
+  {fetchPage = safeFetchPrefix, env = process.env, now = Date.now} = {}
+) {
+  const {urls, skippedCrossOrigin} = collectEligibleUrls(documents);
+  if (urls.length === 0) return null;
+
+  const sampleSize = resolveSampleSize(env);
+  const sample = pickEvenly(urls, sampleSize);
+  const checks = await checkUrls(sample, {fetchStatus: fetchPage, now});
+  return {
+    sampleSize,
+    eligibleCount: urls.length,
+    skippedCrossOrigin,
+    pages: checks.map(toSampledPage),
+  };
+}
+
+/**
  * @param {UrlCheck} check
  * @return {string}
  */
@@ -223,5 +290,6 @@ export {
   pickEvenly,
   collectEligibleUrls,
   checkUrls,
+  collectUrlSample,
   describeCheck,
 };
