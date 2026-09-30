@@ -8,6 +8,7 @@
   "dependencies": {
     "ajv": "6.12.6",
     "lighthouse": "12.6.1",
-    "robots-parser": "^3.0.1"
+    "robots-parser": "^3.0.1",
+    "saxes": "^6.0.0"
   }
 }
