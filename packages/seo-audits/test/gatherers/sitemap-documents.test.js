@@ -213,3 +213,140 @@ describe('collectSitemapDocuments — discovery and root documents', () => {
     });
   });
 });
+
+describe('collectSitemapDocuments — sitemap index following', () => {
+  const index = (...locs) =>
+    `<sitemapindex xmlns="${NS}">${locs
+      .map(l => `<sitemap><loc>${l}</loc></sitemap>`)
+      .join('')}</sitemapindex>`;
+  const ROBOTS = {
+    'https://example.com/robots.txt': {body: 'Sitemap: https://example.com/index.xml'},
+  };
+
+  it('fetches the children of an index as index-child documents with their parent', async () => {
+    const {artifact} = await run({
+      ...ROBOTS,
+      'https://example.com/index.xml': {
+        body: index('https://example.com/s1.xml', 'https://example.com/s2.xml'),
+      },
+      'https://example.com/s1.xml': {body: urlset('https://example.com/a')},
+      'https://example.com/s2.xml': {body: urlset('https://example.com/b')},
+    });
+    expect(artifact.documents.map(d => [d.url, d.source, d.parentUrl])).toEqual([
+      ['https://example.com/index.xml', 'declared', null],
+      ['https://example.com/s1.xml', 'index-child', 'https://example.com/index.xml'],
+      ['https://example.com/s2.xml', 'index-child', 'https://example.com/index.xml'],
+    ]);
+    expect(artifact.documentsTruncated).toBe(false);
+  });
+
+  it('follows the index found through the /sitemap.xml fallback too', async () => {
+    const {artifact} = await run({
+      'https://example.com/sitemap.xml': {body: index('https://example.com/s1.xml')},
+      'https://example.com/s1.xml': {body: urlset('https://example.com/a')},
+    });
+    expect(artifact.discovery).toBe('default-location');
+    expect(artifact.documents.map(d => d.source)).toEqual(['default-location', 'index-child']);
+  });
+
+  it('records a failing child (404) without aborting the others', async () => {
+    const {artifact} = await run({
+      ...ROBOTS,
+      'https://example.com/index.xml': {
+        body: index('https://example.com/gone.xml', 'https://example.com/s2.xml'),
+      },
+      'https://example.com/s2.xml': {body: urlset('https://example.com/b')},
+    });
+    expect(artifact.documents.map(d => d.outcome)).toEqual(['ok', 'http-error', 'ok']);
+  });
+
+  it('records a nested index but does not fetch its children (one level only)', async () => {
+    const {artifact, calls} = await run({
+      ...ROBOTS,
+      'https://example.com/index.xml': {body: index('https://example.com/nested.xml')},
+      'https://example.com/nested.xml': {body: index('https://example.com/deep.xml')},
+      'https://example.com/deep.xml': {body: urlset('https://example.com/a')},
+    });
+    expect(artifact.documents.map(d => d.kind)).toEqual(['sitemapindex', 'sitemapindex']);
+    expect(calls).not.toContain('https://example.com/deep.xml');
+    expect(artifact.documentsTruncated).toBe(false);
+  });
+
+  it('stops at MAX_DOCUMENTS total and flags truncation', async () => {
+    const children = Array.from({length: 25}, (_, i) => `https://example.com/c${i}.xml`);
+    const routes = {...ROBOTS, 'https://example.com/index.xml': {body: index(...children)}};
+    for (const c of children) routes[c] = {body: urlset('https://example.com/a')};
+    const {artifact, calls} = await run(routes);
+    expect(artifact.documents).toHaveLength(LIMITS.MAX_DOCUMENTS);
+    expect(artifact.documentsTruncated).toBe(true);
+    // robots.txt + the index itself + 9 children.
+    expect(calls).toHaveLength(1 + LIMITS.MAX_DOCUMENTS);
+  });
+
+  it('does not flag truncation when the children exactly fill the budget', async () => {
+    const children = Array.from(
+      {length: LIMITS.MAX_DOCUMENTS - 1},
+      (_, i) => `https://example.com/c${i}.xml`
+    );
+    const {artifact} = await run({
+      ...ROBOTS,
+      'https://example.com/index.xml': {body: index(...children)},
+    });
+    expect(artifact.documents).toHaveLength(LIMITS.MAX_DOCUMENTS);
+    expect(artifact.documentsTruncated).toBe(false);
+  });
+
+  it('counts declared roots against the same budget as children', async () => {
+    const roots = Array.from({length: 3}, (_, i) => `https://example.com/i${i}.xml`);
+    const routes = {
+      'https://example.com/robots.txt': {body: roots.map(r => `Sitemap: ${r}`).join('\n')},
+    };
+    for (const [n, r] of roots.entries()) {
+      const kids = Array.from({length: 5}, (_, k) => `https://example.com/i${n}-c${k}.xml`);
+      routes[r] = {body: index(...kids)};
+    }
+    const {artifact} = await run(routes);
+    expect(artifact.documents).toHaveLength(LIMITS.MAX_DOCUMENTS);
+    expect(artifact.documentsTruncated).toBe(true);
+    // Breadth-first over roots in order: the first index gets its children before the last.
+    expect(
+      artifact.documents.filter(d => d.parentUrl === 'https://example.com/i0.xml')
+    ).toHaveLength(5);
+    expect(
+      artifact.documents.filter(d => d.parentUrl === 'https://example.com/i2.xml')
+    ).toHaveLength(0);
+  });
+
+  it('never requests a child whose loc failed validation, nor one already fetched', async () => {
+    const {calls} = await run({
+      ...ROBOTS,
+      'https://example.com/index.xml': {
+        body: index(
+          '/relative.xml',
+          'ftp://example.com/x.xml',
+          'https://example.com/s1.xml',
+          'https://example.com/s1.xml',
+          'https://example.com/index.xml'
+        ),
+      },
+      'https://example.com/s1.xml': {body: urlset('https://example.com/a')},
+    });
+    expect(calls).toEqual([
+      'https://example.com/robots.txt',
+      'https://example.com/index.xml',
+      'https://example.com/s1.xml',
+    ]);
+  });
+
+  it('does not follow anything from a urlset, a broken document, or a failed root', async () => {
+    const {calls} = await run({
+      'https://example.com/robots.txt': {
+        body: 'Sitemap: https://example.com/a.xml\nSitemap: https://example.com/b.xml\nSitemap: https://example.com/c.xml',
+      },
+      'https://example.com/a.xml': {body: urlset('https://example.com/x')},
+      'https://example.com/b.xml': {body: '<sitemapindex'},
+      'https://example.com/c.xml': {status: 500},
+    });
+    expect(calls).toHaveLength(4);
+  });
+});

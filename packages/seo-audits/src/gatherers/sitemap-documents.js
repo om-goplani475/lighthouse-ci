@@ -109,6 +109,36 @@ function isAbsoluteHttpUrl(value) {
 }
 
 /**
+ * Follows each root sitemap *index* exactly one level: its child sitemaps are fetched
+ * breadth-first (roots in order, each root's children in order) until `LIMITS.MAX_DOCUMENTS`
+ * documents exist in total. A child that is itself an index is recorded but its own children are
+ * not fetched. Only children whose `<loc>` passed validation are ever requested, and a URL already
+ * fetched is not requested twice. Running out of budget sets `documentsTruncated`, so a partial
+ * check is never presented as a complete one.
+ * @param {FetchBytes} fetchBytes
+ * @param {SitemapDocumentsArtifact} artifact Mutated: children are appended to `documents`.
+ * @return {Promise<void>}
+ */
+async function followIndexes(fetchBytes, artifact) {
+  const roots = artifact.documents.filter(
+    doc => doc.outcome === 'ok' && doc.kind === 'sitemapindex'
+  );
+  const seen = new Set(artifact.documents.map(doc => doc.url));
+
+  for (const root of roots) {
+    for (const childUrl of root.locs) {
+      if (seen.has(childUrl)) continue;
+      if (artifact.documents.length >= LIMITS.MAX_DOCUMENTS) {
+        artifact.documentsTruncated = true;
+        return;
+      }
+      seen.add(childUrl);
+      artifact.documents.push(await fetchDocument(fetchBytes, childUrl, 'index-child', root.url));
+    }
+  }
+}
+
+/**
  * @param {{finalDisplayedUrl: string}} url
  * @param {{fetchBytes?: FetchBytes}} [deps] `fetchBytes` is injectable so tests never touch the
  *   network; production always uses the SSRF-protected default.
@@ -144,6 +174,7 @@ async function collectSitemapDocuments(url, {fetchBytes = safeFetchBytes} = {}) 
     for (const sitemapUrl of declared) {
       artifact.documents.push(await fetchDocument(fetchBytes, sitemapUrl, 'declared', null));
     }
+    await followIndexes(fetchBytes, artifact);
     return artifact;
   }
 
@@ -161,6 +192,7 @@ async function collectSitemapDocuments(url, {fetchBytes = safeFetchBytes} = {}) 
   } else {
     artifact.discovery = 'default-location';
     artifact.documents.push(probe);
+    await followIndexes(fetchBytes, artifact);
   }
   return artifact;
 }
