@@ -1,46 +1,12 @@
 # Current feature
 
-- slug: none — pixel-width-truncation closed out below
-- phase: 1 (page-metadata), still in progress — see docs/phases/phase-1-page-metadata.md for the
-  next item to intake (1b: meta description identical/near-identical to page title)
+- slug: sitemap-fetch-and-parse
+- stage: 00-intake-complete
+- spec: docs/feature-specs/sitemap-fetch-and-parse.md
+- phase: 4 (robots-sitemap), branch phase-4-robots-sitemap — see docs/phases/phase-4-robots-sitemap.md
+  (roadmap rows 4, 6 and 7; row 5's URL-status sample reuses this feature's artifact later)
 
-<!-- pixel-width-truncation closed 2026-09-29: complete, all 9 stages run, merged 5fea5d1 locally
-onto phase-1-page-metadata (no PR/CI gate — explicit developer instruction to merge locally and
-push directly), QA'd live via real lhci collect/assert runs (see docs/qa/pixel-width-truncation.md,
-including live resolution of the audit spec's flagged fallback-font risk), security-reviewed with
-no findings (see .ai-agents/state/security-findings.md) — note the security review's "post as a
-comment on the closed PR" step didn't apply, since there was no PR; findings were appended directly
-to security-findings.md and reported to the developer instead. First gatherer in this package to
-depend on the rule engine (documented architectural exception, not a pattern to copy reflexively).
-spec: docs/feature-specs/pixel-width-truncation.md, audit spec:
-docs/audit-specs/pixel-width-truncation.md, contract: docs/feature-contracts/pixel-width-truncation.md,
-task sequence: docs/task-sequences/pixel-width-truncation.md. -->
-
-<!-- structured-data-type-conflicts closed 2026-09-29: complete, all 9 stages run, merged 19cbbc2
-(includes a post-merge prototype-safety security fix), QA'd live, see
-docs/qa/structured-data-type-conflicts.md. Last feature of Phase 2 (structured data) before Phase 1
-was picked up. Corrected here: this file's `stage` field was left stale at `04-implemented-merged`
-after that feature actually completed all 9 stages — the prose said so but the field didn't; fixed
-by writing this fresh file rather than perpetuating the mismatch. -->
-
-<!-- structured-data-rich-result-eligibility closed 2026-09-29: complete, all 9 stages run, merged
-62d659c, QA'd live, see docs/qa/structured-data-rich-result-eligibility.md. -->
-
-<!-- structured-data-remaining-types closed 2026-09-28: complete, all 9 stages run, merged 00e6f71,
-QA'd live, see docs/qa/structured-data-remaining-types.md. -->
-
-<!-- structured-data-rule-engine closed 2026-09-28: complete, all 9 stages run, merged bce25fb,
-QA'd live, see docs/qa/structured-data-rule-engine.md. -->
-
-<!-- structured-data-schema-properties (original feature #2, all 12 types) paused 2026-09-28:
-superseded by structured-data-rule-engine, then further split into structured-data-remaining-types
-(now closed). The original spec (docs/feature-specs/structured-data-schema-properties.md) remains
-as reference. See docs/architecture/structured-data-rule-engine.md for the full decision record. -->
-
-<!-- Previous feature structured-data-validation closed 2026-09-27: complete, all 9 stages run, see
-docs/qa/structured-data-validation.md. Previous-previous feature missing-meta-description closed
-2026-09-27: already satisfied by upstream, no implementation done. -->
-
-<!-- See docs/phases/phase-2-structured-data.md for the full structured-data feature breakdown
-(Phase 2, closed out 2026-09-29). See docs/phases/phase-1-page-metadata.md for Phase 1, the phase
-this current feature is part of. -->
+<!-- Previous entries (features closed before this one) are preserved in git history: see
+`git log -p .ai-agents/state/current-feature.md`. Phase 4's items 1-3 (robots-txt-sitemap-declared,
+robots-txt-crawler-access, robots-txt-rule-conflicts) were built lightweight-mode, so they have no
+per-feature spec/state entry; see docs/qa/robots-txt-sitemap.md. -->
