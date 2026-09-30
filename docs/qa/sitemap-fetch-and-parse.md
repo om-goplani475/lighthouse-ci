@@ -105,3 +105,34 @@ silently showed not-applicable).
 - [x] seo-audits suite: 530 tests pass; typecheck and lint clean
 - [ ] Not exercised: an actual GitHub Actions run with the variable set (verified with the same
       variable in a local shell)
+
+## Follow-up: `sitemap-url-status` (Phase 4 item 5), 2026-09-30
+
+Built lightweight-mode on the same `SitemapDocuments` artifact; decisions confirmed with the
+developer: evenly spread deterministic sample, only 2xx passes (redirects fail), default 10 with
+`LHCI_SEO_SITEMAP_SAMPLE_SIZE` (clamped 1-25).
+
+- [x] **Real find, public site** — `https://nodejs.org/en`: 10 of 1,731 listed URLs sampled (8
+      other-host URLs skipped, not requested); `score: 0`, 5 of 10 returned 404 (for example
+      `/en/blog/release/v010.22`). Confirmed independently with curl (also with a browser User-Agent):
+      that URL 404s while `/en/blog/release/v0.10.22` returns 200, so nodejs.org's own sitemap lists
+      URLs with the dots stripped. A genuine sitemap bug, not a false positive from this tool.
+- [x] **Localhost, opt-in on** — seven listed URLs on `localhost:8851` (two 404/301 entries planted,
+      plus one on `elsewhere.example`): 7 of 7 checked; 404 shown as `HTTP 404`, the redirect shown
+      as `HTTP 301, redirects to http://localhost:8851/ok1`, the other-host URL counted and never
+      requested; `score: 0`
+- [x] **Localhost, opt-in off** — `notApplicable` (the sitemap itself is not fetchable; the run
+      warning from the private-network opt-in explains why)
+- [x] Audit in the `seo-extended` category; config test asserts all 28 audit ids
+- [x] Unit tests (47): sample-size parsing and clamping (invalid values fall back to 10); even
+      deterministic selection incl. first/last and no repeats; same-origin filtering (other host,
+      scheme, port, `www` all skipped); concurrency never above 5; one retry for a network error,
+      none for an HTTP status; hard per-request timeout even when the fetcher never settles; total
+      time budget marks the rest "not checked"; redirect target recorded and not followed
+- [x] seo-audits suite: 577 tests pass; typecheck and lint clean
+- [ ] Not exercised live: the total-time-budget path (needs 30 s of slow responses); unit-tested with
+      an injected clock only
+- [ ] Sample-size variable checked in unit tests only, not in a real CI job
+
+Observation: `safeFetchStatus` now also returns `redirectLocation` for a 3xx response (additive: a
+plain `{status}` is returned for everything else, so existing callers and tests are unchanged).

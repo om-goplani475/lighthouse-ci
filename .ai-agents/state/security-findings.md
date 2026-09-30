@@ -379,3 +379,24 @@ This is a deliberate, narrow weakening of the SSRF protection, reviewed as such.
 - status: accepted. README says to set it only on jobs that audit hosts you control. Finding 4 of the
   sitemap review (silent not-applicable with no reason) is resolved by the same change: the artifact
   records `unavailableReason` and the gatherer adds a run warning.
+
+## 2026-09-30 — sitemap-url-status (Phase 4 item 5)
+
+Reviewed as it was built, since it is the first audit that requests the audited site's *pages* from
+URLs listed in a sitemap (an attacker-influenced list), not just files discovered through robots.txt.
+
+- severity: none found (no finding to log); recorded for completeness
+- checked: (1) **only same-origin URLs are requested**, compared by full origin (scheme, host and port,
+  so `www`, another port or `http` vs `https` all count as other-host) against the sitemap that listed
+  them, so a sitemap cannot make the CLI request a different host (including internal ones) beyond the
+  sitemap's own; (2) every request goes through `safeFetchStatus`: scheme allowlist, private-address
+  blocking (with the IPv6 fix and the private-network opt-in rules, no separate path), no redirects
+  followed, no body read; (3) bounded: sample size at most 25 (`LHCI_SEO_SITEMAP_SAMPLE_SIZE` is
+  clamped, environment only, invalid values fall back to 10), 5 in flight, 5 s hard per-request timeout
+  enforced with a race (the fetcher's own timeout is only an idle timeout), one retry for a network
+  error only, and a 30 s budget after which the rest are reported as not checked; worst case is about
+  30 s plus one in-flight request each; (4) the sample is deterministic, so it cannot be steered
+  per run, and it takes at most 25 requests to a host the operator already audits; (5) data exposure:
+  the report lists sampled URLs, statuses and error text only, never response bodies or headers other
+  than a redirect's `Location`.
+- status: n/a

@@ -276,8 +276,8 @@ itself (container vs. single-entity) lives in `src/rule-engine/schema-org-engine
   since crawlers combine them. Google resolves a tie in favor of `Allow`, so the `Disallow`
   silently does nothing. Only identical path strings are compared: wildcard overlaps (`/a*` vs
   `/ab`) are not detected (see `docs/phases/phase-4-robots-sitemap.md`).
-- **`sitemap-valid`**, **`sitemap-duplicate-urls`**, **`sitemap-limits`** (Phase 4) — three scored
-  audits reading one shared artifact; see "Sitemap audits" below.
+- **`sitemap-valid`**, **`sitemap-duplicate-urls`**, **`sitemap-limits`**, **`sitemap-url-status`**
+  (Phase 4) — four scored audits reading one shared artifact; see "Sitemap audits" below.
 
 ### A note on the SSRF-protected fetch (`manifest-icons`, `open-graph-image-reachable`, the sitemap audits, `src/lib/safe-fetch.js`)
 
@@ -309,9 +309,9 @@ server, never a real external hostname through the real request path). Fixed by 
 honor `options.all` and reply in the shape actually requested, same as real `dns.lookup` does —
 confirmed live against a real external URL both before (crash) and after (correct status) the fix.
 
-### Sitemap audits (`sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`)
+### Sitemap audits (`sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`, `sitemap-url-status`)
 
-All three read the `SitemapDocuments` artifact, produced once per run by
+All four read the `SitemapDocuments` artifact, produced once per run by
 `src/gatherers/sitemap-documents.js`, so a sitemap is fetched and parsed a single time however many
 audits use it. **How it works:**
 
@@ -355,6 +355,24 @@ audits use it. **How it works:**
 - **`sitemap-limits`** — fails when a file has more than 50,000 URLs (or, for an index, 50,000 child
   sitemaps) or is more than 50 MiB uncompressed, the sitemaps.org limits Google enforces. The table
   lists every checked file with entry count, compressed and uncompressed size, and gzip or not.
+
+- **`sitemap-url-status`** — requests a **sample** of the URLs the sitemap lists and passes only if
+  every one returns `2xx`; a redirect (`3xx`, shown with its target), `4xx`/`5xx`, or an unreachable
+  URL fails. It is a spot check, not a crawl, and the result says how many of how many listed URLs
+  were checked:
+  - **Which URLs**: evenly spread across the listed URLs (first and last always included), the same
+    on every run, so a CI assertion is stable and a broken tail is caught, not only the top.
+  - **How many**: 10 by default; set **`LHCI_SEO_SITEMAP_SAMPLE_SIZE`** (a whole number, clamped to
+    1-25, anything else falls back to 10) on a job that should check more. It is an environment
+    variable, like the private-network opt-in: it is a bound on requests to your site, so a page must
+    not be able to change it.
+  - **Bounds**: 5 requests at a time, 5 s per request (one retry for a network error, never for an
+    HTTP status), 30 s total; URLs the budget did not reach are listed as not checked.
+  - **Only same-origin URLs are requested.** A listed URL on another host, scheme or port is counted
+    and skipped, never fetched, so a sitemap cannot point this check at other hosts.
+  - Redirects are reported, not followed, and pages are never downloaded (status only). Whether a
+    page is `noindex` is not checked here; that belongs to the later sitemap-vs-indexability check.
+  - Not-applicable when no sitemap URL list could be checked.
 
 ### Auditing a site on localhost or a private network (`LHCI_SEO_ALLOW_PRIVATE_NETWORK`)
 
@@ -429,7 +447,7 @@ module.exports = {
 };
 ```
 
-This adds all twenty-seven audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all twenty-eight audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
@@ -437,16 +455,17 @@ This adds all twenty-seven audits (`structured-data-json-ld`, `structured-data-s
 `favicon-presence`, `favicon-quality`, `manifest-icons`, `open-graph-completeness`,
 `open-graph-canonical-match`, `open-graph-image-reachable`, `twitter-card-completeness`,
 `social-preview-content`, `robots-txt-sitemap-declared`, `robots-txt-crawler-access`,
-`robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`) on top of
+`robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
+`sitemap-url-status`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the twenty-seven audits are part of this fork's shared `all`/`recommended` presets
+None of the twenty-eight audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all twenty-seven here are opt-in via `configPath`, so they can't be part of that
+default, and all twenty-eight here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
@@ -498,6 +517,9 @@ module.exports = {
         'sitemap-limits': ['error', {minScore: 1}],
         // Search engines tolerate duplicates, and matching is deliberately exact-string.
         'sitemap-duplicate-urls': ['warn', {minScore: 1}],
+        // A listed URL that 404s or redirects is a definite defect, but this is a sample and a
+        // network blip can fail a URL; 'warn' by default, 'error' once you trust your sitemap.
+        'sitemap-url-status': ['warn', {minScore: 1}],
       },
     },
   },
