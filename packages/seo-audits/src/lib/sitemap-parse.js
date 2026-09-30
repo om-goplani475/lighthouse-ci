@@ -14,6 +14,7 @@
  * stops at the first error or when the stored-entry cap is reached.
  */
 
+import zlib from 'zlib';
 import {SaxesParser} from 'saxes';
 
 /**
@@ -23,7 +24,10 @@ import {SaxesParser} from 'saxes';
 const LIMITS = {
   MAX_DECLARED: 5,
   MAX_DOCUMENTS: 10,
-  MAX_COMPRESSED_BYTES: 15 * 1024 * 1024,
+  // Same cap as the decompressed size, not smaller: a plain (non-gzip) sitemap is legitimately up
+  // to 50 MiB on the wire, and a smaller wire cap would report a valid 20 MiB sitemap as a fetch
+  // failure. Memory and time stay bounded by this cap plus the fetcher's total deadline.
+  MAX_COMPRESSED_BYTES: 52_428_801,
   // 50 MiB + 1: one byte over the sitemaps.org limit, so "over the limit" is detectable without
   // reading an unbounded amount.
   MAX_UNCOMPRESSED_BYTES: 52_428_801,
@@ -226,9 +230,24 @@ function parseXmlInto(xml, doc) {
 }
 
 /**
+ * @param {Buffer} body
+ * @return {boolean}
+ */
+function isGzip(body) {
+  // Detected by magic bytes, not the URL: a server may gzip a plain `.xml` URL.
+  return body.length >= 2 && body[0] === 0x1f && body[1] === 0x8b;
+}
+
+/**
  * Builds a `SitemapDocument` from a successfully fetched (2xx) response body. Non-2xx and network
  * failures are recorded by the caller (gatherer) directly as documents with the matching
  * `outcome`; this function only handles bytes it was given.
+ *
+ * Gzip bodies are decompressed with a hard cap on the *output*: zlib stops at
+ * `maxUncompressedBytes` instead of inflating further, so a small "gzip bomb" cannot exhaust
+ * memory. Hitting the cap sets `exceededUncompressedLimit` and leaves `kind` null (the document
+ * was not parsed). `maxUncompressedBytes` exists so tests need not allocate 50 MiB; callers in
+ * production never pass it.
  * @param {{
  *   url: string,
  *   source: SitemapDocument['source'],
@@ -236,14 +255,44 @@ function parseXmlInto(xml, doc) {
  *   status: number,
  *   body: Buffer,
  * }} input
+ * @param {{maxUncompressedBytes?: number}} [options]
  * @return {SitemapDocument}
  */
-function parseSitemapBytes({url, source, parentUrl, status, body}) {
+function parseSitemapBytes(
+  {url, source, parentUrl, status, body},
+  {maxUncompressedBytes = LIMITS.MAX_UNCOMPRESSED_BYTES} = {}
+) {
   const doc = emptyDocument({url, source, parentUrl});
   doc.status = status;
   doc.compressedBytes = body.length;
-  doc.uncompressedBytes = body.length;
-  parseXmlInto(body, doc);
+
+  let xml = body;
+  if (isGzip(body)) {
+    doc.gzip = true;
+    try {
+      // `maxOutputLength` is a real zlib option (Node 14+; throws ERR_BUFFER_TOO_LARGE), just
+      // missing from this monorepo's pinned, 2019-era @types/node.
+      xml = zlib.gunzipSync(
+        body,
+        /** @type {import('zlib').ZlibOptions} */ ({maxOutputLength: maxUncompressedBytes})
+      );
+    } catch (err) {
+      if (err && err.code === 'ERR_BUFFER_TOO_LARGE') {
+        doc.exceededUncompressedLimit = true;
+        doc.uncompressedBytes = maxUncompressedBytes;
+      } else {
+        doc.outcome = 'decompression-error';
+        doc.errorMessage = `could not decompress gzip data: ${
+          err instanceof Error ? err.message : err
+        }`;
+      }
+      return doc;
+    }
+  }
+
+  doc.uncompressedBytes = xml.length;
+  doc.exceededUncompressedLimit = xml.length >= maxUncompressedBytes;
+  parseXmlInto(xml, doc);
   return doc;
 }
 

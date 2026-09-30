@@ -6,6 +6,7 @@
 
 /* eslint-env jest */
 
+const zlib = require('zlib');
 const {LIMITS, SITEMAP_NAMESPACE, parseSitemapBytes} = require('../../src/lib/sitemap-parse.js');
 
 const NS = SITEMAP_NAMESPACE;
@@ -187,5 +188,97 @@ describe('parseSitemapBytes — uncompressed XML', () => {
     const doc = parse(xml);
     expect(doc.parseError).toBeNull();
     expect(doc.locs).toEqual(['https://example.com/€']);
+  });
+});
+
+describe('parseSitemapBytes — gzip', () => {
+  const xml = urlset(url('https://example.com/a'), url('https://example.com/b'));
+
+  /**
+   * @param {Buffer} body
+   * @param {{maxUncompressedBytes?: number}} [options]
+   */
+  const parseBytes = (body, options) =>
+    parseSitemapBytes(
+      {
+        url: 'https://example.com/sitemap.xml',
+        source: 'declared',
+        parentUrl: null,
+        status: 200,
+        body,
+      },
+      options
+    );
+
+  it('decompresses and parses a gzip sitemap, recording both sizes', () => {
+    const gz = zlib.gzipSync(Buffer.from(xml));
+    const doc = parseBytes(gz);
+    expect(doc).toMatchObject({
+      outcome: 'ok',
+      gzip: true,
+      kind: 'urlset',
+      locs: ['https://example.com/a', 'https://example.com/b'],
+      compressedBytes: gz.length,
+      uncompressedBytes: Buffer.byteLength(xml),
+      exceededUncompressedLimit: false,
+    });
+  });
+
+  it('detects gzip by magic bytes regardless of the URL (a plain .xml URL served gzipped)', () => {
+    const doc = parseSitemapBytes({
+      url: 'https://example.com/plain-name.xml',
+      source: 'declared',
+      parentUrl: null,
+      status: 200,
+      body: zlib.gzipSync(Buffer.from(xml)),
+    });
+    expect(doc.gzip).toBe(true);
+    expect(doc.kind).toBe('urlset');
+  });
+
+  it('does not treat plain XML as gzip', () => {
+    expect(parseBytes(Buffer.from(xml)).gzip).toBe(false);
+  });
+
+  it('reports corrupt gzip data as a decompression error, not a throw', () => {
+    const gz = zlib.gzipSync(Buffer.from(xml));
+    const corrupt = Buffer.concat([
+      gz.subarray(0, 12),
+      Buffer.from('garbage-garbage'),
+      gz.subarray(20),
+    ]);
+    const doc = parseBytes(corrupt);
+    expect(doc.outcome).toBe('decompression-error');
+    expect(doc.errorMessage).toMatch(/could not decompress gzip/);
+    expect(doc.kind).toBeNull();
+    expect(doc.gzip).toBe(true);
+  });
+
+  it('reports a truncated gzip stream as a decompression error', () => {
+    const gz = zlib.gzipSync(Buffer.from(xml));
+    const doc = parseBytes(gz.subarray(0, gz.length - 10));
+    expect(doc.outcome).toBe('decompression-error');
+  });
+
+  it('stops inflating at the output cap and flags it, instead of expanding a gzip bomb', () => {
+    // 200 KB of zeros compresses to a few hundred bytes; the cap is 10 KB.
+    const bomb = zlib.gzipSync(Buffer.alloc(200 * 1024));
+    expect(bomb.length).toBeLessThan(1000);
+    const doc = parseBytes(bomb, {maxUncompressedBytes: 10 * 1024});
+    expect(doc.exceededUncompressedLimit).toBe(true);
+    expect(doc.uncompressedBytes).toBe(10 * 1024);
+    expect(doc.outcome).toBe('ok');
+    expect(doc.kind).toBeNull();
+    expect(doc.compressedBytes).toBe(bomb.length);
+  });
+
+  it('flags a plain body at or over the size limit but still parses what it has', () => {
+    const doc = parseBytes(Buffer.from(xml), {maxUncompressedBytes: 50});
+    expect(doc.exceededUncompressedLimit).toBe(true);
+    expect(doc.kind).toBe('urlset');
+  });
+
+  it('keeps the wire cap at least as large as the decompressed cap', () => {
+    expect(LIMITS.MAX_COMPRESSED_BYTES).toBeGreaterThanOrEqual(LIMITS.MAX_UNCOMPRESSED_BYTES);
   });
 });
