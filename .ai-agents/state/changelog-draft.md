@@ -235,5 +235,21 @@ fetcher injected; the audit is thin. `safeFetchStatus` additively returns `redir
 3xx. Decisions confirmed with the developer before coding (sample selection, redirects fail, size
 and how to set it). No `.lighthouserc.js` key: the sample size is an environment variable on purpose.
 
+### sitemap-robots-crossref (2026-09-30, Phase 4 item 8)
+
+**User-facing**: New opt-in audit **`sitemap-robots-crossref`** catches a sitemap that contradicts
+your robots.txt: it checks **every** URL the sitemap lists (not a sample) against robots.txt for
+Googlebot and Bingbot and fails on any that a search engine is told not to crawl, naming which one.
+Also flags a sitemap whose own path robots.txt disallows (worded as "verify": Google's documentation
+does not say whether it applies robots.txt to sitemap files). Whether the audited page is listed in
+the sitemap is shown for information only and never affects the result. Makes no requests, so it is
+fast on huge sitemaps (52,000 URLs on MDN). Suggested severity `error`. Only same-host URLs are
+checked, since robots.txt only governs its own origin.
+
+**Internal/dev**: lightweight mode on two existing artifacts (`SitemapDocuments` and core's
+`RobotsTxt`), no new gatherer or fetch. Pure logic in `src/lib/sitemap-robots-crossref.js` reusing
+`robots-parser` and the scored crawler list from `robots-access.js`. Design decisions were confirmed
+with the developer before coding. No `.lighthouserc.js` key.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->
