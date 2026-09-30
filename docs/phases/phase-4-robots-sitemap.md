@@ -27,7 +27,7 @@ Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 |---|---------|--------|--------------|
 | 1 | Sitemap declared in robots.txt | **done** | `robots-txt-sitemap-declared`, QA'd live see `docs/qa/robots-txt-sitemap.md`. Reads core's `RobotsTxt` artifact; no new gatherer. |
 | 2 | Per-UA crawl simulation + important page / CSS / JS blocked | **done** | `robots-txt-crawler-access`, QA'd live see `docs/qa/robots-txt-sitemap.md`. One audit: table of Googlebot, Googlebot-Image, Bingbot and AI crawlers (GPTBot, ClaudeBot, CCBot, PerplexityBot) vs the audited URL and same-origin CSS/JS. Scored on search-engine UAs only; AI-crawler blocking is informational (a legitimate choice) |
-| 3 | Conflicting Allow/Disallow rules | planned | `robots-txt-rule-conflicts` |
+| 3 | Conflicting Allow/Disallow rules | **done** | `robots-txt-rule-conflicts`, QA'd live see `docs/qa/robots-txt-sitemap.md`. Identical-path Allow/Disallow for one user-agent (duplicate groups merged); wildcard overlaps not detected |
 | 4 | XML sitemap valid / well-formed | planned | |
 | 5 | Sitemap URLs return 200 (bounded sample) | planned | |
 | 6 | Duplicate URLs in sitemap | planned | |
@@ -42,7 +42,9 @@ Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
 ## To do later
 
-*(none yet)*
+| Item | Basic version built | Advanced alternative, not built | Why not built now |
+|---|---|---|---|
+| 3 (robots-txt-rule-conflicts) | Identical path strings only | Wildcard/`$` overlap detection (`/a*` vs `/ab`) | Needs a pattern-intersection routine; the exact-match case is the common real mistake |
 
 ## Not possible / permanently out of scope
 

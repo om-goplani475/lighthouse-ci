@@ -62,3 +62,31 @@ unit-covered at the `robotsTxtState` level only.
 Known limitation: the "Same-origin CSS/JS" column is filled for every crawler, including AI
 crawlers and Googlebot-Image, for which rendering assets are not really the point; it is accurate
 but only meaningful for the two scored search engines.
+
+## Item 3: `robots-txt-rule-conflicts`
+
+Reads core's `RobotsTxt` artifact only. `findRuleConflicts` in `src/lib/robots-txt.js` merges groups
+naming the same user-agent (crawlers combine them), then flags any path string that is both Allow
+and Disallow. Scored pass/fail; the failure carries a table of user-agent, path, and the two line
+numbers.
+
+Deliberately not flagged: an Allow and Disallow of *different* paths (ordinary longest-match
+precedence), the same rule repeated, an empty `Disallow:` (means allow-all, no path to contradict),
+and the same path under different user-agents. Only identical path strings are compared, so
+wildcard overlaps (`/a*` vs `/ab`) are not detected. Google resolves a same-path tie in favor of
+Allow; other crawlers may differ, which the audit description says.
+
+Unit tests: 8 audit cases (clean, single-group conflict, split-across-groups, shared group reports
+each agent, different agents, different paths/empty Disallow, duplicate same-type rule,
+absent/unavailable).
+
+### Verified live (real `lhci collect`)
+
+- [x] `Disallow: /shop` + `Allow: /shop` under `*`: `score: 0`, one row (`*`, `/shop`, lines
+      "3 / 2").
+- [x] `googlebot` group with `Disallow: /a`, a separate `*` group, then a second `googlebot` group
+      with `Allow: /a`: `score: 0`, one row (`googlebot`, `/a`, "8 / 2") — the split-group case.
+- [x] `Disallow: /private` + `Allow: /private/public`: `score: 1`, no details.
+- [x] audit present in the `seo-extended` category in all three runs.
+
+Not exercised live: absent (score 1) and unavailable (`notApplicable`) branches — unit-covered.
