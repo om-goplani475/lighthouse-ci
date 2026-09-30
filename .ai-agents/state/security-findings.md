@@ -274,3 +274,88 @@ No `critical`/`high` findings. Nothing blocks the next feature.
 A `critical` entry with status `open` blocks Agent 00 from starting new work (see
 .ai-agents/agents/00-product-intake.md, Step 1).
 -->
+
+## 2026-09-30 — sitemap-fetch-and-parse
+
+Reviewed `git diff 299b2ab..5b76bb7` (the gatherer, `safeFetchBytes`, the parser, the three audits)
+against the checklist, with each attack case run rather than argued: the real default fetch path
+against SSRF payloads, and the parser against hostile documents. Two of the findings below are in
+code that predates this feature; both were made reachable from page-controlled input by it.
+
+### Finding 1
+
+- severity: high
+- finding: **SSRF bypass: bracketed IPv6 literals skipped the private-address check.**
+  `safe-fetch.js` guarded literal IPs with `net.isIP(url.hostname)`, but `new URL()` keeps the
+  brackets on an IPv6 host (`[::1]`) and `net.isIP('[::1]')` is `0`. Node also skips the `lookup`
+  option for literal IPs, so any IPv6 literal was fetched unvalidated. Reproduced with the real
+  `safeFetchBytes`: `http://[::ffff:127.0.0.1]/` and `http://[::ffff:7f00:1]/` were fetched (a local
+  listener answered 502), and `[::1]`/`[fd00::1]` reached the connect stage. Independently,
+  `isPrivateIPv6` only recognized the dotted `::ffff:1.2.3.4` form, but the URL parser normalizes to
+  hex (`[::ffff:169.254.169.254]` becomes `::ffff:a9fe:a9fe`, the cloud metadata address), and it
+  missed IPv4-compatible, NAT64 (`64:ff9b::/96`) and 6to4 (`2002::/16`) forms wrapping a private IPv4.
+  Exposure: a hostile page's robots.txt `Sitemap:` line (this feature), and equally an `og:image`
+  or manifest URL (Phase 1/3, `open-graph-image-reachable`, `manifest-icons`), could make the CLI
+  issue a GET to an internal service or metadata endpoint from wherever it runs. Blind (responses
+  are not shown), but a GET can have side effects and the status/error text reaches the report.
+- status: resolved on `fix/sitemap-security-review-findings` (pending merge): the URL's brackets are
+  stripped before the check, and `isPrivateIPv6` now works on the address bytes and covers mapped,
+  compatible, NAT64, 6to4, multicast, documentation and discard ranges. 31 new regression tests fail
+  on the old code and pass on the fix; the payloads above are refused before any connection.
+
+### Finding 2
+
+- severity: high
+- finding: **Quadratic-time denial of service in the sitemap parser.** `saxes`' cost per opening
+  tag grows with nesting depth, and parsing is synchronous, so no fetch timeout can interrupt it.
+  Measured: 96 KB of nested `<a>` took 17 s; a 1 MiB document did not finish in over five minutes.
+  A hostile site's sitemap (or a child sitemap listed in its index) could hang the Lighthouse run.
+- status: resolved on `fix/sitemap-security-review-findings` (pending merge): `LIMITS.MAX_DEPTH = 32`
+  (real sitemaps nest 4-6 deep); exceeding it aborts parsing immediately and is reported as a parse
+  error. The 96 KB case now takes 1 ms. Other shapes measured and fine: 1M flat elements (0.2 s), 40k
+  attributes on one tag, 4k namespace declarations, a single 20 MiB `<loc>` (0.1 s).
+
+### Finding 3
+
+- severity: low
+- finding: no overall deadline for the gatherer. Each request is bounded (10 s total, 5 s for
+  robots.txt) and the document count is bounded (10), but sequentially the worst case is about
+  105 s of network time, plus a few seconds of synchronous parsing, before a run can finish.
+  Bounded and documented, though the checklist prefers an explicit time budget.
+- status: open (backlog). Suggested: an overall budget of about 30 s after which remaining documents
+  are skipped and `documentsTruncated` is set.
+
+### Finding 4
+
+- severity: low
+- finding: pages served from private addresses (an intranet or staging site audited from CI) make
+  the sitemap audits silently not-applicable: the SSRF policy correctly refuses the page's own
+  robots.txt, but the artifact records only `discovery: 'unavailable'`, not why, so nobody can tell
+  a real "unavailable" from "refused by policy". Not a vulnerability; a diagnosability gap.
+- status: open (backlog). The README already states the localhost limitation.
+
+### Accepted by design decision, recorded for completeness
+
+- Cross-origin `Sitemap:` URLs are fetched (developer decision, 2026-09-30). A hostile robots.txt can
+  make the CLI issue at most 5 declared + 5 child GETs to public hosts of its choosing, on any port.
+  Every request has the SSRF, size, time and count bounds above.
+- Strings from the fetched site (a redirect's `Location`, an error message naming the URL) are
+  placed in report tables. They are limited by Node's header-size cap and rendered as text by
+  Lighthouse's report renderer. Response bodies are never stored, and page cookies or auth headers
+  are never sent or recorded.
+
+### Checked and found sound
+
+- Literal IPv4 in decimal, hex, octal and short forms (`2130706433`, `0x7f.1`, `017700000001`, `0`),
+  credentials in the URL, `file:` and `gopher:` schemes: all refused.
+- Names resolving to private addresses (`localhost`, `localhost.localdomain`, `127.0.0.1.nip.io`):
+  refused by `safeLookup`, so the checked address is the one connected to (DNS-rebinding resistant).
+- Redirects (including to `169.254.169.254`): reported as data, never followed.
+- Gzip bomb (60 MiB of zeros in under 200 KB): stopped at the 50 MiB + 1 output cap.
+- Slow and byte-trickling servers: ended at the total wall-clock deadline (idle timeout would not).
+- Index with hundreds of children: at most 10 documents; children with an invalid `<loc>` never
+  requested. Entry flood: stopped at 50,001. DTD entities: not expanded (`saxes` rejects them).
+- No new Puppeteer/CDP session and no Chromium flags: sandbox unaffected.
+
+No `critical` findings. Findings 1 and 2 (`high`) are fixed on a branch awaiting merge; per the
+agent's rule they should land before the next feature starts.
