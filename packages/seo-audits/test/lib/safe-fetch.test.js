@@ -12,8 +12,10 @@ const {
   safeLookup,
   safeFetchJson,
   safeFetchStatus,
+  safeFetchBytes,
   fetchJsonWithLookup,
   statusWithLookup,
+  fetchBytesWithLookup,
 } = require('../../src/lib/safe-fetch.js');
 
 describe('isPrivateOrReservedIp', () => {
@@ -261,4 +263,107 @@ describe('statusWithLookup — request mechanics, against a real local server', 
       statusWithLookup(`http://127.0.0.1:${port}/slow`, permissiveLookup, {timeoutMs: 200})
     ).rejects.toThrow(/timed out/);
   }, 10000);
+});
+
+describe('safeFetchBytes — integration against a real local server', () => {
+  it('refuses to fetch a loopback URL — same SSRF protection as safeFetchJson', async () => {
+    await expect(safeFetchBytes('http://127.0.0.1:1/sitemap.xml')).rejects.toThrow(
+      /private\/reserved/
+    );
+  });
+
+  it('refuses the cloud metadata address', async () => {
+    await expect(safeFetchBytes('http://169.254.169.254/latest/meta-data/')).rejects.toThrow(
+      /private\/reserved/
+    );
+  });
+
+  it('refuses a non-http(s) scheme and an invalid URL', async () => {
+    await expect(safeFetchBytes('file:///etc/passwd')).rejects.toThrow(/scheme must be http/);
+    await expect(safeFetchBytes('not a url')).rejects.toThrow(/not a valid URL/);
+  });
+});
+
+describe('fetchBytesWithLookup — request mechanics, against a real local server', () => {
+  /** @type {http.Server} */
+  let server;
+  /** @type {number} */
+  let port;
+  const binary = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0x00, 0x80, 0x7f]);
+
+  beforeEach(async () => {
+    server = http.createServer((req, res) => {
+      if (req.url === '/binary') {
+        res.writeHead(200, {'Content-Type': 'application/gzip'});
+        res.end(binary);
+      } else if (req.url === '/not-found') {
+        res.writeHead(404);
+        res.end('missing');
+      } else if (req.url === '/moved') {
+        res.writeHead(301, {Location: 'http://169.254.169.254/latest/meta-data/'});
+        res.end();
+      } else if (req.url === '/too-big') {
+        res.writeHead(200);
+        res.end(Buffer.alloc(2000, 0x61));
+      } else if (req.url === '/trickle') {
+        // One byte every 50ms, forever: never idle long enough to trip a socket idle timeout.
+        res.writeHead(200);
+        const timer = setInterval(() => res.write('x'), 50);
+        res.on('close', () => clearInterval(timer));
+      } else if (req.url === '/slow') {
+        // Never responds.
+      } else {
+        res.writeHead(404);
+        res.end();
+      }
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    port = server.address().port;
+  });
+
+  afterEach(async () => {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  });
+
+  const get = (path, options) =>
+    fetchBytesWithLookup(`http://127.0.0.1:${port}${path}`, permissiveLookup, options);
+
+  it('returns the exact bytes, including non-text binary content', async () => {
+    const result = await get('/binary');
+    expect(result.status).toBe(200);
+    expect(Buffer.compare(result.body, binary)).toBe(0);
+    expect(result.redirectLocation).toBeNull();
+  });
+
+  it('returns a non-2xx status rather than rejecting', async () => {
+    const result = await get('/not-found');
+    expect(result.status).toBe(404);
+    expect(result.body.toString()).toBe('missing');
+  });
+
+  it('returns a redirect with its Location and does not follow it', async () => {
+    const result = await get('/moved');
+    expect(result.status).toBe(301);
+    expect(result.redirectLocation).toBe('http://169.254.169.254/latest/meta-data/');
+    expect(result.body.length).toBe(0);
+  });
+
+  it('rejects a response exceeding the byte cap', async () => {
+    await expect(get('/too-big', {maxBytes: 1000})).rejects.toThrow(/exceeded 1000 bytes/);
+  });
+
+  it('rejects a server that never responds after the timeout', async () => {
+    await expect(get('/slow', {timeoutMs: 200})).rejects.toThrow(/timed out/);
+  }, 10000);
+
+  it('enforces a total deadline even when the server keeps trickling bytes', async () => {
+    await expect(get('/trickle', {timeoutMs: 300})).rejects.toThrow(/timed out/);
+  }, 10000);
+
+  it('rejects a non-http scheme', async () => {
+    await expect(fetchBytesWithLookup('ftp://example.com/a.xml', permissiveLookup)).rejects.toThrow(
+      /scheme must be http/
+    );
+  });
 });
