@@ -12,8 +12,8 @@
  * document-h1-count, h1-title-relevance, robots-directives-report, robots-directives-conflict,
  * canonical-https, favicon-presence, favicon-quality, manifest-icons,
  * open-graph-completeness, open-graph-canonical-match, open-graph-image-reachable,
- * twitter-card-completeness, and social-preview-content gatherer/audits on top of Lighthouse's
- * default set.
+ * twitter-card-completeness, social-preview-content, and robots-txt-sitemap-declared
+ * gatherer/audits on top of Lighthouse's default set.
  *
  * Paths below are plain relative strings, not require.resolve() calls: this file is
  * ESM (no bare `require`), and Lighthouse's own module resolver
@@ -56,6 +56,7 @@ const config = {
     './audits/open-graph-image-reachable.js',
     './audits/twitter-card-completeness.js',
     './audits/social-preview-content.js',
+    './audits/robots-txt-sitemap-declared.js',
   ],
   categories: {
     'seo-extended': {
@@ -82,6 +83,7 @@ const config = {
         {id: 'open-graph-image-reachable', weight: 1},
         {id: 'twitter-card-completeness', weight: 1},
         {id: 'social-preview-content', weight: 1},
+        {id: 'robots-txt-sitemap-declared', weight: 1},
       ],
     },
   },
