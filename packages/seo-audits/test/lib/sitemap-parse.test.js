@@ -191,6 +191,47 @@ describe('parseSitemapBytes — uncompressed XML', () => {
   });
 });
 
+describe('parseSitemapBytes — nesting depth (security review finding: quadratic-time DoS)', () => {
+  it('stops with a parse error when elements nest deeper than the cap', () => {
+    const doc = parse(`<urlset xmlns="${NS}">` + '<a>'.repeat(LIMITS.MAX_DEPTH + 5));
+    expect(doc.parseError).not.toBeNull();
+    expect(doc.parseError.message).toContain(`deeper than ${LIMITS.MAX_DEPTH} levels`);
+    expect(doc.kind).toBe('urlset');
+  });
+
+  it('parses a hostile deeply-nested 1 MiB document in well under a second, not minutes', () => {
+    const body = `<urlset xmlns="${NS}">` + '<a>'.repeat(350_000);
+    const started = Date.now();
+    const doc = parse(body);
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(doc.parseError).not.toBeNull();
+  });
+
+  it('is not slowed by a deep document that also closes every tag', () => {
+    const n = 100_000;
+    const started = Date.now();
+    const doc = parse(`<urlset xmlns="${NS}">` + '<a>'.repeat(n) + '</a>'.repeat(n) + '</urlset>');
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(doc.parseError).not.toBeNull();
+  });
+
+  it('accepts exactly MAX_DEPTH nested elements and rejects one more', () => {
+    // <urlset> is the first element, so it plus (MAX_DEPTH - 1) `<a>` is MAX_DEPTH deep.
+    const nested = n => `<urlset xmlns="${NS}">` + '<a>'.repeat(n) + '</a>'.repeat(n) + '</urlset>';
+    expect(parse(nested(LIMITS.MAX_DEPTH - 1)).parseError).toBeNull();
+    expect(parse(nested(LIMITS.MAX_DEPTH)).parseError).not.toBeNull();
+  });
+
+  it('still accepts realistic sitemap nesting with extension elements', () => {
+    const doc = parse(
+      `<urlset xmlns="${NS}" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">` +
+        '<url><loc>https://example.com/a</loc><image:image><image:loc>https://example.com/i.png</image:loc></image:image></url></urlset>'
+    );
+    expect(doc.parseError).toBeNull();
+    expect(doc.locs).toEqual(['https://example.com/a']);
+  });
+});
+
 describe('parseSitemapBytes — gzip', () => {
   const xml = urlset(url('https://example.com/a'), url('https://example.com/b'));
 

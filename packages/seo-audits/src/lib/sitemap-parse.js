@@ -34,9 +34,16 @@ const LIMITS = {
   // 50,000 (the sitemaps.org per-file URL limit) + 1, for the same reason.
   MAX_ENTRIES_STORED: 50_001,
   MAX_LOC_LENGTH: 2048,
+  // Real sitemaps nest 4-6 levels (urlset > url > image:image > image:loc). saxes' cost per opening
+  // tag grows with the current depth, so an unbounded depth is a quadratic-time denial of service:
+  // measured, a 96 KB document of nested tags took 17 s and a 1 MiB one would run for many minutes,
+  // with parsing synchronous so no timeout can interrupt it.
+  MAX_DEPTH: 32,
   MAX_INVALID_LOC_EXAMPLES: 20,
   REQUEST_TIMEOUT_MS: 10_000,
 };
+
+class StopParsing extends Error {}
 
 const SITEMAP_NAMESPACE = 'http://www.sitemaps.org/schemas/sitemap/0.9';
 const CHUNK_BYTES = 64 * 1024;
@@ -161,6 +168,18 @@ function parseXmlInto(xml, doc) {
     const local = tag.local;
     const uri = tag.uri;
 
+    if (stack.length >= LIMITS.MAX_DEPTH) {
+      doc.parseError = {
+        message: `elements are nested deeper than ${LIMITS.MAX_DEPTH} levels`,
+        line: parser.line,
+        column: parser.column,
+      };
+      stopped = true;
+      // Throw rather than just flagging: saxes would otherwise keep processing the rest of the
+      // current chunk, and its per-tag cost is what makes deep nesting expensive.
+      throw new StopParsing();
+    }
+
     if (stack.length === 0) {
       doc.kind =
         local === 'urlset' ? 'urlset' : local === 'sitemapindex' ? 'sitemapindex' : 'invalid';
@@ -212,10 +231,14 @@ function parseXmlInto(xml, doc) {
   });
 
   let offset = 0;
-  while (!stopped && offset < xml.length) {
-    const end = Math.min(offset + CHUNK_BYTES, xml.length);
-    parser.write(decoder.decode(xml.subarray(offset, end), {stream: true}));
-    offset = end;
+  try {
+    while (!stopped && offset < xml.length) {
+      const end = Math.min(offset + CHUNK_BYTES, xml.length);
+      parser.write(decoder.decode(xml.subarray(offset, end), {stream: true}));
+      offset = end;
+    }
+  } catch (err) {
+    if (!(err instanceof StopParsing)) throw err;
   }
   if (!stopped) {
     // Flush the decoder and let saxes report an unexpected end of document (no root, unclosed
