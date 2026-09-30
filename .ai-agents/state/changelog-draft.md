@@ -251,5 +251,24 @@ checked, since robots.txt only governs its own origin.
 `robots-parser` and the scored crawler list from `robots-access.js`. Design decisions were confirmed
 with the developer before coding. No `.lighthouserc.js` key.
 
+### llms-txt-structure (2026-09-30, Phase 4 item 10)
+
+**User-facing**: New opt-in audit **`llms-txt-structure`** checks a site's `/llms.txt`, if it has one,
+against the llmstxt.org format: it fails on no H1 title (the only required part), a link-like item
+that is broken (`- [name]` with no URL), an empty or non-http(s) link URL, and a file that is really
+an HTML page (a single-page app answering every path with its index page). Everything else that real
+files do (no summary, plain-text items, sub-bullets, an H1 that is not first) is shown as a note and
+never fails; it was tuned against Stripe, Anthropic's docs, nodejs.org and llmstxt.org. A site with no
+`llms.txt` is not-applicable, not a failure. **llms.txt is an unratified community proposal and the
+audit says it does not claim any search engine or AI system uses it.** Suggested severity `warn`. When
+the file cannot be fetched (for example a localhost site without `LHCI_SEO_ALLOW_PRIVATE_NETWORK=1`),
+the report carries a run warning saying why. Links inside the file are not checked yet.
+
+**Internal/dev**: lightweight mode: a small `LlmsTxt` gatherer (one `safeFetchBytes` to the page
+origin's `/llms.txt`, 1 MiB, 5 s, no redirects, run warning when unavailable) and a thin audit over a
+pure parser in `src/lib/llms-txt.js`. The first version was too strict and failed real files from
+Anthropic and Stripe; it was loosened during live QA so only unambiguous violations fail. Deferred:
+link reachability, `llms-full.txt`, subpath files. No `.lighthouserc.js` key.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->
