@@ -1,14 +1,15 @@
-# Current plan — sitemap-fetch-and-parse
+# Current plan — sitemap-indexability
 
-- [x] task-01: Declare the saxes dependency — complete
-- [x] task-02: safeFetchBytes in safe-fetch — complete
-- [x] task-03: Sitemap XML parse core (uncompressed) — complete
-- [x] task-04: Gzip handling and decompressed-size cap — complete
-- [x] task-05: SitemapDocuments gatherer: discovery and root documents — complete
-- [x] task-06: Sitemap index following and document cap — complete
-- [x] task-07: Gatherer integration test against a local server — complete
-- [x] task-08: sitemap-valid audit — complete
-- [x] task-09: sitemap-duplicate-urls audit — complete
-- [x] task-10: sitemap-limits audit — complete
-- [x] task-11: Register the gatherer and audits in the Lighthouse config — complete
-- [x] task-12: README update — complete
+- [ ] task-01: Declare the parse5 dependency — pending
+- [ ] task-02: HTML head signal extraction — pending
+- [ ] task-03: Scoped noindex evaluation — pending
+- [ ] task-04: safeFetchPrefix in safe-fetch — pending
+- [ ] task-05: urlSample typedefs — pending
+- [ ] task-06: Pin sitemap-url-status current output — pending
+- [ ] task-07: checkUrls passes fetcher fields through — pending
+- [ ] task-08: collectUrlSample — pending
+- [ ] task-09: Collect urlSample in the SitemapDocuments gatherer — pending
+- [ ] task-10: Refactor sitemap-url-status onto the artifact — pending
+- [ ] task-11: sitemap-indexability audit — pending
+- [ ] task-12: Register the audit in the Lighthouse config — pending
+- [ ] task-13: README update — pending

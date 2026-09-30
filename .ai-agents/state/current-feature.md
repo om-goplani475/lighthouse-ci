@@ -1,10 +1,11 @@
 # Current feature
 
 - slug: sitemap-indexability
-- stage: 02-contract-complete (Gate 1 review pending)
+- stage: 03-sequenced
 - spec: docs/feature-specs/sitemap-indexability.md
 - audit_spec: docs/audit-specs/sitemap-indexability.md
 - contract: docs/feature-contracts/sitemap-indexability.md
+- task_sequence: docs/task-sequences/sitemap-indexability.md
 - phase: 4 (robots-sitemap), branch phase-4-robots-sitemap: see docs/phases/phase-4-robots-sitemap.md
   (roadmap row 9; refactors the merged item-5 audit `sitemap-url-status` onto a shared gatherer)
 
