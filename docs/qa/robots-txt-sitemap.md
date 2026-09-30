@@ -26,3 +26,39 @@ Not exercised live: the `notApplicable` branch (5xx / fetch failure) — covered
 
 Note: the sitemap URL is not fetched, so a declared-but-dead sitemap still passes here by design;
 validity and reachability are items 4-5.
+
+## Item 2: `robots-txt-crawler-access`
+
+Covers roadmap items "per-UA rule simulation", "important pages accidentally blocked" and
+"CSS/JS accidentally blocked" in one audit. Reads core's `RobotsTxt` artifact plus
+`NetworkRecords` (to learn which same-origin CSS/JS the page actually loaded). Adds
+`robots-parser@^3.0.1` to `packages/seo-audits/package.json`; it is already a Lighthouse
+dependency, so `yarn.lock` and the installed version (3.0.1) are unchanged.
+
+Scored on Googlebot and Bingbot only (page blocked, or any same-origin CSS/JS blocked). Googlebot-
+Image and the AI crawlers (GPTBot, ClaudeBot, CCBot, PerplexityBot) appear in the table but never
+fail the audit. Cross-origin CSS/JS is skipped, since robots.txt only governs its own origin.
+
+Unit tests (11 cases in `test/lib/robots-access.test.js`): permissive file, page blocked, AI
+crawler blocked but not scored, blocked CSS/JS listed, cross-origin/image/data: URLs ignored,
+specific group beats `*`, Googlebot-Image fallback to the `googlebot` group and its override by an
+explicit group, URL list cap, result shape.
+
+### Verified live (real `lhci collect`)
+
+Three local sites, each serving a page that loads `/assets/site.css` and `/assets/app.js`:
+
+- [x] `Disallow: /assets/` for `*` plus `GPTBot: Disallow: /`: `score: 0`, "Googlebot is blocked
+      from 2 CSS/JS file(s); Bingbot is blocked from 2 CSS/JS file(s)". Page shown Allowed for
+      both, GPTBot shown Blocked but not in the explanation.
+- [x] `Disallow:` (permissive): `score: 1`, all seven rows Allowed / None blocked.
+- [x] `Googlebot: Disallow: /` only: `score: 0`, "Googlebot is blocked from this page; Googlebot is
+      blocked from 2 CSS/JS file(s)"; Bingbot Allowed. Googlebot-Image shown Blocked via the
+      fallback to the `googlebot` group (confirms that behavior live, not just in Jest).
+
+Not exercised live: the `notApplicable` (robots.txt 5xx) and absent-robots.txt (score 1) branches —
+unit-covered at the `robotsTxtState` level only.
+
+Known limitation: the "Same-origin CSS/JS" column is filled for every crawler, including AI
+crawlers and Googlebot-Image, for which rendering assets are not really the point; it is accurate
+but only meaningful for the two scored search engines.

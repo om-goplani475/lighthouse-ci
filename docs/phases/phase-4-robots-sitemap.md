@@ -26,7 +26,7 @@ Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 | # | Feature | Status | Slug / notes |
 |---|---------|--------|--------------|
 | 1 | Sitemap declared in robots.txt | **done** | `robots-txt-sitemap-declared`, QA'd live see `docs/qa/robots-txt-sitemap.md`. Reads core's `RobotsTxt` artifact; no new gatherer. |
-| 2 | Per-UA crawl simulation + important page / CSS / JS blocked | planned | `robots-txt-crawler-access` — one audit: table of Googlebot, Googlebot-Image, Bingbot and AI crawlers (GPTBot, ClaudeBot, CCBot, PerplexityBot) vs the audited URL and same-origin CSS/JS. Scored on search-engine UAs only; AI-crawler blocking is informational (a legitimate choice) |
+| 2 | Per-UA crawl simulation + important page / CSS / JS blocked | **done** | `robots-txt-crawler-access`, QA'd live see `docs/qa/robots-txt-sitemap.md`. One audit: table of Googlebot, Googlebot-Image, Bingbot and AI crawlers (GPTBot, ClaudeBot, CCBot, PerplexityBot) vs the audited URL and same-origin CSS/JS. Scored on search-engine UAs only; AI-crawler blocking is informational (a legitimate choice) |
 | 3 | Conflicting Allow/Disallow rules | planned | `robots-txt-rule-conflicts` |
 | 4 | XML sitemap valid / well-formed | planned | |
 | 5 | Sitemap URLs return 200 (bounded sample) | planned | |
