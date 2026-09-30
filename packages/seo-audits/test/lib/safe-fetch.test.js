@@ -367,3 +367,64 @@ describe('fetchBytesWithLookup — request mechanics, against a real local serve
     );
   });
 });
+
+describe('IPv6 literal handling (security review finding: bracketed IPv6 literals bypassed the check)', () => {
+  it.each([
+    ['::ffff:7f00:1', 'IPv4-mapped loopback, hex form (what URL parsing normalizes to)'],
+    ['::ffff:a9fe:a9fe', 'IPv4-mapped cloud metadata address, hex form'],
+    ['::ffff:a00:1', 'IPv4-mapped 10.0.0.1'],
+    ['::ffff:c0a8:101', 'IPv4-mapped 192.168.1.1'],
+    ['0:0:0:0:0:ffff:7f00:1', 'IPv4-mapped, fully expanded'],
+    ['::ffff:127.0.0.1', 'IPv4-mapped, dotted form'],
+    ['::127.0.0.1', 'deprecated IPv4-compatible'],
+    ['::7f00:1', 'deprecated IPv4-compatible, hex'],
+    ['64:ff9b::7f00:1', 'NAT64 wrapping 127.0.0.1'],
+    ['64:ff9b::a9fe:a9fe', 'NAT64 wrapping the metadata address'],
+    ['2002:7f00:1::1', '6to4 wrapping 127.0.0.1'],
+    ['2002:a9fe:a9fe::', '6to4 wrapping the metadata address'],
+    ['ff02::1', 'multicast'],
+    ['2001:db8::1', 'documentation range'],
+    ['fe80::1%eth0', 'zone-id link-local (unparseable: refused rather than guessed)'],
+    ['::1', 'loopback'],
+    ['fd00::1', 'unique-local'],
+  ])('blocks %s (%s)', ip => {
+    expect(isPrivateOrReservedIp(ip)).toBe(true);
+  });
+
+  it.each([
+    '2606:4700:4700::1111',
+    '2001:4860:4860::8888',
+    '::ffff:808:808', // IPv4-mapped 8.8.8.8
+    '64:ff9b::808:808', // NAT64 wrapping 8.8.8.8
+    '2002:808:808::1', // 6to4 wrapping 8.8.8.8
+  ])('does not block the ordinary public address %s', ip => {
+    expect(isPrivateOrReservedIp(ip)).toBe(false);
+  });
+
+  const blockedLiterals = [
+    'http://[::1]/sitemap.xml',
+    'http://[::ffff:127.0.0.1]/sitemap.xml',
+    'http://[::ffff:7f00:1]/sitemap.xml',
+    'http://[::ffff:169.254.169.254]/latest/meta-data/',
+    'http://[fd00::1]/sitemap.xml',
+    'http://[fe80::1]/sitemap.xml',
+  ];
+
+  it.each(blockedLiterals)('safeFetchBytes refuses %s before any connection', async url => {
+    await expect(safeFetchBytes(url)).rejects.toThrow(/private\/reserved/);
+  });
+
+  it.each(blockedLiterals)('safeFetchJson refuses %s before any connection', async url => {
+    await expect(safeFetchJson(url)).rejects.toThrow(/private\/reserved/);
+  });
+
+  it.each(blockedLiterals)('safeFetchStatus refuses %s before any connection', async url => {
+    await expect(safeFetchStatus(url)).rejects.toThrow(/private\/reserved/);
+  });
+
+  it('still refuses IPv4 literals in decimal, hex and octal spellings', async () => {
+    for (const url of ['http://2130706433/', 'http://0x7f.1/', 'http://017700000001/']) {
+      await expect(safeFetchBytes(url)).rejects.toThrow(/private\/reserved/);
+    }
+  });
+});

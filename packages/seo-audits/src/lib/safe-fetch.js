@@ -74,19 +74,76 @@ function isPrivateIPv4(ip) {
 }
 
 /**
+ * Expands an IPv6 address (as `net.isIPv6` accepts it: `::` compression, an optional trailing
+ * dotted IPv4) into its 16 bytes.
+ * @param {string} ip
+ * @return {number[] | null} null if it can't be parsed (the caller then refuses it).
+ */
+function ipv6ToBytes(ip) {
+  let text = ip.toLowerCase();
+  // A trailing dotted IPv4 (::ffff:1.2.3.4) is two 16-bit groups.
+  const dotted = text.match(/^(.*:)(\d+\.\d+\.\d+\.\d+)$/);
+  if (dotted) {
+    if (!net.isIPv4(dotted[2])) return null;
+    const [a, b, c, d] = dotted[2].split('.').map(Number);
+    text = `${dotted[1]}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+  const halves = text.split('::');
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(':') : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  const missing = 8 - head.length - tail.length;
+  if (halves.length === 1 ? missing !== 0 : missing < 1) return null;
+  const groups = [...head, ...Array(halves.length === 2 ? missing : 0).fill('0'), ...tail];
+  const bytes = [];
+  for (const group of groups) {
+    if (!/^[0-9a-f]{1,4}$/.test(group)) return null;
+    const value = parseInt(group, 16);
+    bytes.push(value >> 8, value & 0xff);
+  }
+  return bytes.length === 16 ? bytes : null;
+}
+
+/**
+ * @param {number[]} bytes Four bytes of an embedded IPv4 address.
+ * @return {boolean}
+ */
+function isPrivateEmbeddedIPv4(bytes) {
+  return isPrivateIPv4(bytes.join('.'));
+}
+
+/**
+ * Works on the address's bytes, not its text: the same address has many spellings, and the URL
+ * parser normalizes `[::ffff:169.254.169.254]` to the hex form `::ffff:a9fe:a9fe`, which a
+ * text-only pattern for the dotted form would miss.
  * @param {string} ip
  * @return {boolean}
  */
 function isPrivateIPv6(ip) {
-  const normalized = ip.toLowerCase();
-  if (normalized === '::1' || normalized === '::') return true;
+  const b = ipv6ToBytes(ip);
+  if (!b) return true; // Unparseable: refuse rather than guess.
+
+  const first80Zero = b.slice(0, 10).every(x => x === 0);
+  // ::/96 — the unspecified and loopback addresses, plus the deprecated IPv4-compatible range;
+  // none is a legitimate public destination.
+  if (first80Zero && b[10] === 0 && b[11] === 0) return true;
+  // ::ffff:0:0/96 — IPv4-mapped: judge the embedded IPv4 address.
+  if (first80Zero && b[10] === 0xff && b[11] === 0xff) return isPrivateEmbeddedIPv4(b.slice(12));
+  // 64:ff9b::/96 — NAT64: judge the embedded IPv4 address.
+  if (b[0] === 0x00 && b[1] === 0x64 && b[2] === 0xff && b[3] === 0x9b) {
+    if (b.slice(4, 12).every(x => x === 0)) return isPrivateEmbeddedIPv4(b.slice(12));
+  }
+  // 2002::/16 — 6to4: the embedded IPv4 address is bytes 2-5.
+  if (b[0] === 0x20 && b[1] === 0x02) return isPrivateEmbeddedIPv4(b.slice(2, 6));
   // fe80::/10 (link-local)
-  if (/^fe[89ab][0-9a-f]:/.test(normalized)) return true;
+  if (b[0] === 0xfe && (b[1] & 0xc0) === 0x80) return true;
   // fc00::/7 (unique local)
-  if (/^f[cd][0-9a-f]{2}:/.test(normalized)) return true;
-  // IPv4-mapped (::ffff:a.b.c.d) — validate the embedded IPv4 address too.
-  const mapped = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-  if (mapped) return isPrivateIPv4(mapped[1]);
+  if ((b[0] & 0xfe) === 0xfc) return true;
+  // ff00::/8 (multicast)
+  if (b[0] === 0xff) return true;
+  // 2001:db8::/32 (documentation) and 100::/64 (discard-only)
+  if (b[0] === 0x20 && b[1] === 0x01 && b[2] === 0x0d && b[3] === 0xb8) return true;
+  if (b[0] === 0x01 && b.slice(1, 8).every(x => x === 0)) return true;
   return false;
 }
 
@@ -98,6 +155,20 @@ function isPrivateOrReservedIp(ip) {
   if (net.isIPv4(ip)) return isPrivateIPv4(ip);
   if (net.isIPv6(ip)) return isPrivateIPv6(ip);
   return true; // Unrecognized format — refuse rather than guess.
+}
+
+/**
+ * The IP address a URL's hostname literally is, or null if it is a DNS name. `new URL()` keeps the
+ * brackets on an IPv6 literal (`[::1]`), and `net.isIP('[::1]')` is 0 — so without stripping them
+ * every IPv6 literal was treated as a DNS name, skipped this check, and (because Node also skips
+ * the `lookup` option for literals) reached the network unvalidated.
+ * @param {URL} url
+ * @return {string | null}
+ */
+function literalIpOf(url) {
+  const host = url.hostname;
+  const bare = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
+  return net.isIP(bare) ? bare : null;
 }
 
 /**
@@ -411,9 +482,10 @@ function safeFetchStatus(urlString, options) {
   } catch {
     return Promise.reject(new Error(`"${urlString}" is not a valid URL`));
   }
-  if (net.isIP(url.hostname) && isPrivateOrReservedIp(url.hostname)) {
+  const literalIp = literalIpOf(url);
+  if (literalIp && isPrivateOrReservedIp(literalIp)) {
     return Promise.reject(
-      new Error(`refusing to fetch "${urlString}": a private/reserved IP address (${url.hostname})`)
+      new Error(`refusing to fetch "${urlString}": a private/reserved IP address (${literalIp})`)
     );
   }
 
@@ -439,9 +511,10 @@ function safeFetchJson(urlString, options) {
   } catch {
     return Promise.reject(new Error(`"${urlString}" is not a valid URL`));
   }
-  if (net.isIP(url.hostname) && isPrivateOrReservedIp(url.hostname)) {
+  const literalIp = literalIpOf(url);
+  if (literalIp && isPrivateOrReservedIp(literalIp)) {
     return Promise.reject(
-      new Error(`refusing to fetch "${urlString}": a private/reserved IP address (${url.hostname})`)
+      new Error(`refusing to fetch "${urlString}": a private/reserved IP address (${literalIp})`)
     );
   }
 
@@ -466,9 +539,10 @@ function safeFetchBytes(urlString, options) {
   } catch {
     return Promise.reject(new Error(`"${urlString}" is not a valid URL`));
   }
-  if (net.isIP(url.hostname) && isPrivateOrReservedIp(url.hostname)) {
+  const literalIp = literalIpOf(url);
+  if (literalIp && isPrivateOrReservedIp(literalIp)) {
     return Promise.reject(
-      new Error(`refusing to fetch "${urlString}": a private/reserved IP address (${url.hostname})`)
+      new Error(`refusing to fetch "${urlString}": a private/reserved IP address (${literalIp})`)
     );
   }
 
