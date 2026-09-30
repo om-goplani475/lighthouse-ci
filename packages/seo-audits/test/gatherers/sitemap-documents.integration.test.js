@@ -204,3 +204,69 @@ describe('collectSitemapDocuments — against a real local server', () => {
     expect(artifact).toMatchObject({discovery: 'none', documents: []});
   });
 });
+
+describe('collectSitemapDocuments — default fetcher, private-network opt-in, real local server', () => {
+  const original = process.env.LHCI_SEO_ALLOW_PRIVATE_NETWORK;
+  /** @type {http.Server} */
+  let server;
+  let base = '';
+
+  beforeEach(async () => {
+    server = http.createServer((req, res) => {
+      if (req.url === '/robots.txt') {
+        res.writeHead(200);
+        res.end(`Sitemap: ${base}/sitemap.xml`);
+      } else if (req.url === '/sitemap.xml') {
+        res.writeHead(200);
+        res.end(urlset(`${base}/a`));
+      } else {
+        res.writeHead(404);
+        res.end();
+      }
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    base = `http://127.0.0.1:${server.address().port}`;
+  });
+
+  afterEach(async () => {
+    if (original === undefined) delete process.env.LHCI_SEO_ALLOW_PRIVATE_NETWORK;
+    else process.env.LHCI_SEO_ALLOW_PRIVATE_NETWORK = original;
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  });
+
+  it('finds and parses a sitemap served on localhost when the opt-in is set', async () => {
+    process.env.LHCI_SEO_ALLOW_PRIVATE_NETWORK = '1';
+    const artifact = await collectSitemapDocuments({finalDisplayedUrl: `${base}/page`});
+    expect(artifact.discovery).toBe('robots-txt');
+    expect(artifact.unavailableReason).toBeNull();
+    expect(artifact.documents[0]).toMatchObject({
+      outcome: 'ok',
+      kind: 'urlset',
+      locs: [`${base}/a`],
+    });
+  });
+
+  it('reports unavailable, with the reason and the setting, when the opt-in is not set', async () => {
+    delete process.env.LHCI_SEO_ALLOW_PRIVATE_NETWORK;
+    const artifact = await collectSitemapDocuments({finalDisplayedUrl: `${base}/page`});
+    expect(artifact.discovery).toBe('unavailable');
+    expect(artifact.documents).toEqual([]);
+    expect(artifact.unavailableReason).toMatch(
+      /private\/reserved.*LHCI_SEO_ALLOW_PRIVATE_NETWORK=1/
+    );
+  });
+
+  it('still refuses a sitemap that points at the cloud metadata address, opted in', async () => {
+    process.env.LHCI_SEO_ALLOW_PRIVATE_NETWORK = '1';
+    server.removeAllListeners('request');
+    server.on('request', (req, res) => {
+      res.writeHead(200);
+      res.end(req.url === '/robots.txt' ? 'Sitemap: http://169.254.169.254/latest/meta-data/' : '');
+    });
+    const artifact = await collectSitemapDocuments({finalDisplayedUrl: `${base}/page`});
+    expect(artifact.documents[0].outcome).toBe('network-error');
+    expect(artifact.documents[0].errorMessage).toMatch(/private\/reserved/);
+    expect(artifact.documents[0].errorMessage).not.toContain('LHCI_SEO_ALLOW_PRIVATE_NETWORK');
+  });
+});

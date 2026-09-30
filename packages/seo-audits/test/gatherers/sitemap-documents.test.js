@@ -7,7 +7,11 @@
 /* eslint-env jest */
 
 const zlib = require('zlib');
-const {collectSitemapDocuments} = require('../../src/gatherers/sitemap-documents.js');
+const {
+  default: SitemapDocuments,
+  collectSitemapDocuments,
+  skippedWarning,
+} = require('../../src/gatherers/sitemap-documents.js');
 const {LIMITS, SITEMAP_NAMESPACE} = require('../../src/lib/sitemap-parse.js');
 
 const PAGE = {finalDisplayedUrl: 'https://example.com/products/shoe?x=1#top'};
@@ -348,5 +352,93 @@ describe('collectSitemapDocuments — sitemap index following', () => {
       'https://example.com/c.xml': {status: 500},
     });
     expect(calls).toHaveLength(4);
+  });
+});
+
+describe('collectSitemapDocuments — why discovery was unavailable', () => {
+  it('records the reason when robots.txt cannot be fetched (e.g. refused by the SSRF policy)', async () => {
+    const {artifact} = await run({
+      'https://example.com/robots.txt': new Error(
+        'refusing to connect to "example.com": a private/reserved IP address.'
+      ),
+    });
+    expect(artifact.discovery).toBe('unavailable');
+    expect(artifact.unavailableReason).toBe(
+      'https://example.com/robots.txt could not be fetched: refusing to connect to "example.com": a private/reserved IP address.'
+    );
+  });
+
+  it('records the HTTP status when robots.txt returns a server error', async () => {
+    const {artifact} = await run({'https://example.com/robots.txt': {status: 503}});
+    expect(artifact.unavailableReason).toBe('https://example.com/robots.txt returned HTTP 503');
+  });
+
+  it('records the reason when the /sitemap.xml probe fails, for an error, a status and a redirect', async () => {
+    const robots = {'https://example.com/robots.txt': {body: ''}};
+    const url = 'https://example.com/sitemap.xml';
+    const err = (await run({...robots, [url]: new Error('boom')})).artifact;
+    expect(err.unavailableReason).toBe('boom');
+    const status = (await run({...robots, [url]: {status: 500}})).artifact;
+    expect(status.unavailableReason).toBe(`${url} returned HTTP 500`);
+    const redirect = (
+      await run({...robots, [url]: {status: 301, location: 'https://x.test/s.xml'}})
+    ).artifact;
+    expect(redirect.unavailableReason).toBe(`${url} redirects to https://x.test/s.xml`);
+  });
+
+  it.each([
+    [
+      'a found sitemap',
+      {
+        'https://example.com/robots.txt': {body: 'Sitemap: https://example.com/s.xml'},
+        'https://example.com/s.xml': {body: urlset('https://example.com/a')},
+      },
+    ],
+    ['no sitemap at all (404)', {'https://example.com/robots.txt': {body: ''}}],
+  ])('has no reason (and no warning) for %s', async (_label, routes) => {
+    const {artifact} = await run(routes);
+    expect(artifact.unavailableReason).toBeNull();
+    expect(skippedWarning(artifact)).toBeNull();
+  });
+
+  it('builds a run warning only for an unavailable discovery with a reason', () => {
+    expect(skippedWarning({discovery: 'unavailable', unavailableReason: 'x', documents: []})).toBe(
+      'Sitemap audits were skipped: x'
+    );
+    expect(
+      skippedWarning({discovery: 'unavailable', unavailableReason: null, documents: []})
+    ).toBeNull();
+    expect(skippedWarning({discovery: 'none', unavailableReason: null, documents: []})).toBeNull();
+  });
+});
+
+describe('SitemapDocuments gatherer class', () => {
+  const original = process.env.LHCI_SEO_ALLOW_PRIVATE_NETWORK;
+  afterEach(() => {
+    if (original === undefined) delete process.env.LHCI_SEO_ALLOW_PRIVATE_NETWORK;
+    else process.env.LHCI_SEO_ALLOW_PRIVATE_NETWORK = original;
+  });
+
+  it('adds a run warning naming the cause and the setting when a private host is refused', async () => {
+    delete process.env.LHCI_SEO_ALLOW_PRIVATE_NETWORK;
+    const passContext = {
+      baseArtifacts: {URL: {finalDisplayedUrl: 'http://127.0.0.1:9/'}, LighthouseRunWarnings: []},
+    };
+    // Real default fetcher: the SSRF policy refuses the loopback address before any connection.
+    const artifact = await new SitemapDocuments().getArtifact(passContext);
+    expect(artifact.discovery).toBe('unavailable');
+    expect(passContext.baseArtifacts.LighthouseRunWarnings).toHaveLength(1);
+    expect(passContext.baseArtifacts.LighthouseRunWarnings[0]).toMatch(
+      /Sitemap audits were skipped: .*private\/reserved.*LHCI_SEO_ALLOW_PRIVATE_NETWORK=1/
+    );
+  });
+
+  it('adds no warning when nothing was skipped', async () => {
+    const passContext = {
+      baseArtifacts: {URL: {finalDisplayedUrl: 'https://example.com/'}, LighthouseRunWarnings: []},
+    };
+    // Not calling the network: assert the helper contract used by getArtifact instead.
+    expect(skippedWarning({discovery: 'none', unavailableReason: null, documents: []})).toBeNull();
+    expect(passContext.baseArtifacts.LighthouseRunWarnings).toEqual([]);
   });
 });

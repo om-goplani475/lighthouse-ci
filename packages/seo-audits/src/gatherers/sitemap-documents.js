@@ -76,10 +76,10 @@ async function fetchDocument(fetchBytes, url, source, parentUrl) {
 /**
  * Classifies a robots.txt fetch: `present` (with its text), `absent` (4xx: no robots.txt, so
  * crawlers fall back to defaults), or `unavailable` (5xx, a redirect we don't follow, or a network
- * failure: nothing can be concluded).
+ * failure: nothing can be concluded), with the reason so the run can say why it skipped.
  * @param {FetchBytes} fetchBytes
  * @param {string} robotsUrl
- * @return {Promise<{state: 'present', text: string} | {state: 'absent' | 'unavailable'}>}
+ * @return {Promise<{state: 'present', text: string} | {state: 'absent'} | {state: 'unavailable', reason: string}>}
  */
 async function fetchRobots(fetchBytes, robotsUrl) {
   try {
@@ -89,10 +89,25 @@ async function fetchRobots(fetchBytes, robotsUrl) {
     });
     if (status >= 200 && status < 300) return {state: 'present', text: body.toString('utf-8')};
     if (status >= 400 && status < 500) return {state: 'absent'};
-    return {state: 'unavailable'};
-  } catch {
-    return {state: 'unavailable'};
+    return {state: 'unavailable', reason: `${robotsUrl} returned HTTP ${status}`};
+  } catch (err) {
+    return {
+      state: 'unavailable',
+      reason: `${robotsUrl} could not be fetched: ${err instanceof Error ? err.message : err}`,
+    };
   }
+}
+
+/**
+ * The run warning for a skipped sitemap check, or null when nothing was skipped. Without it, the
+ * three sitemap audits just show "not applicable" and nobody can tell a site that has no sitemap
+ * from a fetch that was refused (a localhost or private-network page, without the opt-in).
+ * @param {SitemapDocumentsArtifact} artifact
+ * @return {string | null}
+ */
+function skippedWarning(artifact) {
+  if (artifact.discovery !== 'unavailable' || !artifact.unavailableReason) return null;
+  return `Sitemap audits were skipped: ${artifact.unavailableReason}`;
 }
 
 /**
@@ -150,13 +165,17 @@ async function collectSitemapDocuments(url, {fetchBytes = safeFetchBytes} = {}) 
   /** @type {SitemapDocumentsArtifact} */
   const artifact = {
     discovery: 'unavailable',
+    unavailableReason: null,
     ignoredSitemapLines: [],
     documentsTruncated: false,
     documents: [],
   };
 
   const robots = await fetchRobots(fetchBytes, `${origin}/robots.txt`);
-  if (robots.state === 'unavailable') return artifact;
+  if (robots.state === 'unavailable') {
+    artifact.unavailableReason = robots.reason;
+    return artifact;
+  }
 
   /** @type {string[]} */
   let declared = [];
@@ -189,6 +208,10 @@ async function collectSitemapDocuments(url, {fetchBytes = safeFetchBytes} = {}) 
     probe.outcome === 'redirect'
   ) {
     artifact.discovery = 'unavailable';
+    artifact.unavailableReason =
+      probe.outcome === 'redirect'
+        ? `${probe.url} redirects to ${probe.redirectLocation}`
+        : probe.errorMessage || `${probe.url} returned HTTP ${probe.status}`;
   } else {
     artifact.discovery = 'default-location';
     artifact.documents.push(probe);
@@ -209,10 +232,13 @@ class SitemapDocuments extends BaseGatherer {
    */
   // @ts-expect-error - see the equivalent @ts-expect-error in gatherers/structured-data-json-ld.js
   // for why third-party gatherers can't satisfy Lighthouse's own closed GathererArtifacts union.
-  getArtifact(passContext) {
-    return collectSitemapDocuments(passContext.baseArtifacts.URL);
+  async getArtifact(passContext) {
+    const artifact = await collectSitemapDocuments(passContext.baseArtifacts.URL);
+    const warning = skippedWarning(artifact);
+    if (warning) passContext.baseArtifacts.LighthouseRunWarnings.push(warning);
+    return artifact;
   }
 }
 
 export default SitemapDocuments;
-export {collectSitemapDocuments, fetchDocument};
+export {collectSitemapDocuments, fetchDocument, skippedWarning};

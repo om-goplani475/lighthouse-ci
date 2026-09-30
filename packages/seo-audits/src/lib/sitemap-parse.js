@@ -80,6 +80,7 @@ const CHUNK_BYTES = 64 * 1024;
 /**
  * @typedef {{
  *   discovery: 'robots-txt' | 'default-location' | 'none' | 'unavailable',
+ *   unavailableReason: string | null,
  *   ignoredSitemapLines: string[],
  *   documentsTruncated: boolean,
  *   documents: SitemapDocument[],
