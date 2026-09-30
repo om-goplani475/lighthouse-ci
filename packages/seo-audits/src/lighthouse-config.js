@@ -14,8 +14,8 @@
  * open-graph-completeness, open-graph-canonical-match, open-graph-image-reachable,
  * twitter-card-completeness, social-preview-content, robots-txt-sitemap-declared,
  * robots-txt-crawler-access, robots-txt-rule-conflicts, sitemap-valid, sitemap-duplicate-urls,
- * sitemap-limits, sitemap-url-status, and sitemap-robots-crossref gatherers/audits on top of
- * Lighthouse's default set.
+ * sitemap-limits, sitemap-url-status, sitemap-robots-crossref, and llms-txt-structure
+ * gatherers/audits on top of Lighthouse's default set.
  *
  * Paths below are plain relative strings, not require.resolve() calls: this file is
  * ESM (no bare `require`), and Lighthouse's own module resolver
@@ -36,6 +36,7 @@ const config = {
     {id: 'Headings', gatherer: './gatherers/headings.js'},
     {id: 'FaviconLinks', gatherer: './gatherers/favicon-links.js'},
     {id: 'SitemapDocuments', gatherer: './gatherers/sitemap-documents.js'},
+    {id: 'LlmsTxt', gatherer: './gatherers/llms-txt.js'},
   ],
   audits: [
     './audits/structured-data-json-ld.js',
@@ -67,6 +68,7 @@ const config = {
     './audits/sitemap-limits.js',
     './audits/sitemap-url-status.js',
     './audits/sitemap-robots-crossref.js',
+    './audits/llms-txt-structure.js',
   ],
   categories: {
     'seo-extended': {
@@ -101,6 +103,7 @@ const config = {
         {id: 'sitemap-limits', weight: 1},
         {id: 'sitemap-url-status', weight: 1},
         {id: 'sitemap-robots-crossref', weight: 1},
+        {id: 'llms-txt-structure', weight: 1},
       ],
     },
   },
