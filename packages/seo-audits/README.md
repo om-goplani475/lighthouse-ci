@@ -276,9 +276,9 @@ itself (container vs. single-entity) lives in `src/rule-engine/schema-org-engine
   since crawlers combine them. Google resolves a tie in favor of `Allow`, so the `Disallow`
   silently does nothing. Only identical path strings are compared: wildcard overlaps (`/a*` vs
   `/ab`) are not detected (see `docs/phases/phase-4-robots-sitemap.md`).
-- **`sitemap-valid`**, **`sitemap-duplicate-urls`**, **`sitemap-limits`**, **`sitemap-url-status`**
-  (Phase 4) — four scored audits reading one shared artifact; see "Sitemap audits" below. A fifth,
-  **`sitemap-robots-crossref`**, compares that artifact with robots.txt.
+- **`sitemap-valid`**, **`sitemap-duplicate-urls`**, **`sitemap-limits`**, **`sitemap-url-status`**,
+  **`sitemap-indexability`** (Phase 4) — five scored audits reading one shared artifact; see "Sitemap
+  audits" below. A sixth, **`sitemap-robots-crossref`**, compares that artifact with robots.txt.
 
 ### A note on the SSRF-protected fetch (`manifest-icons`, `open-graph-image-reachable`, the sitemap audits, `src/lib/safe-fetch.js`)
 
@@ -310,9 +310,9 @@ server, never a real external hostname through the real request path). Fixed by 
 honor `options.all` and reply in the shape actually requested, same as real `dns.lookup` does —
 confirmed live against a real external URL both before (crash) and after (correct status) the fix.
 
-### Sitemap audits (`sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`, `sitemap-url-status`)
+### Sitemap audits (`sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`, `sitemap-url-status`, `sitemap-indexability`)
 
-All four read the `SitemapDocuments` artifact, produced once per run by
+All five read the `SitemapDocuments` artifact, produced once per run by
 `src/gatherers/sitemap-documents.js`, so a sitemap is fetched and parsed a single time however many
 audits use it. **How it works:**
 
@@ -326,6 +326,15 @@ audits use it. **How it works:**
   level deep, at most **10 documents per run**. Reaching the cap is reported as truncation, never as
   a pass for the unchecked files. Plain XML and gzip (`.xml.gz`, detected by the file's gzip magic
   bytes, not the URL) are both supported.
+- **One shared page sample.** After the documents, the same gatherer requests a **sample of the URLs
+  the sitemap lists, once each**, and both `sitemap-url-status` and `sitemap-indexability` read that
+  one result, so checking status and indexability costs no extra requests to your site. For each
+  sampled page it keeps the status, a redirect's `Location`, the `X-Robots-Tag` header(s) and content
+  type, and, for a 2xx HTML page only, the first **64 KiB** of the body, reduced on the spot to the
+  robots/googlebot/bingbot `<meta>` tags and the `<link rel="canonical">` in the `<head>` (parsed with
+  `parse5`, the spec-compliant HTML parser). Raw HTML is never stored. A non-HTML page, a compressed
+  one (`Accept-Encoding: identity` is requested, but a server may ignore it) or a non-2xx response is
+  not read, though its headers still are. Same bounds and variables as `sitemap-url-status` below.
 - **Cross-origin sitemaps are fetched.** The protocol lets robots.txt point at another host (a CDN,
   say), so those are checked too, through the same SSRF-protected path as everything else. The
   cost: a page's robots.txt can make the CLI issue a few bounded GET requests to public URLs of its
@@ -371,9 +380,33 @@ audits use it. **How it works:**
     HTTP status), 30 s total; URLs the budget did not reach are listed as not checked.
   - **Only same-origin URLs are requested.** A listed URL on another host, scheme or port is counted
     and skipped, never fetched, so a sitemap cannot point this check at other hosts.
-  - Redirects are reported, not followed, and pages are never downloaded (status only). Whether a
-    page is `noindex` is not checked here; that belongs to the later sitemap-vs-indexability check.
+  - Redirects are reported, not followed. It judges the status only: whether a page is `noindex` or
+    has a different canonical is `sitemap-indexability`'s check.
+  - Now a pure function of the shared sample: its results are unchanged from before the sample was
+    shared (pinned by a characterization test), it just makes no request of its own.
   - Not-applicable when no sitemap URL list could be checked.
+
+- **`sitemap-indexability`** (Phase 4 item 9) — scored. A sitemap asks search engines to index its
+  URLs, so a listed page that says "do not index me" or "index a different URL instead" contradicts
+  it. Judged on the same sample as `sitemap-url-status`, and only for pages that returned `2xx`
+  (anything else is `sitemap-url-status`'s finding):
+  - **noindex** fails: an `X-Robots-Tag` header or a `<meta name="robots">`, and also ones aimed only
+    at **Googlebot or Bingbot** (`<meta name="googlebot">`, `X-Robots-Tag: googlebot: noindex`).
+    `noindex` and `none` count; every other directive is ignored. The row names the crawler(s) and
+    the source. Each `X-Robots-Tag` header is read on its own, and a scope is recognized at the start
+    of a header value.
+  - **Canonical pointing elsewhere** fails: a `<link rel="canonical">` that, resolved against the
+    page's URL (relative hrefs work, the fragment is ignored), is a different URL: another path, a
+    query string, `http` vs `https`, `www` vs bare host, another host or port. A difference of only a
+    **trailing slash** is a note, not a failure; several *different* canonicals on one page are noted
+    as conflicting and not judged.
+  - **What it cannot see, stated plainly**: it reads the raw HTML head of a plain request, so a
+    noindex or canonical **added by client-side JavaScript is not seen**; it is a sample, not proof
+    for every listed URL; and blocking by robots.txt is `sitemap-robots-crossref`'s check. It never
+    lets a limit look like a pass: a page whose `<head>` was only partly read (more than 64 KiB
+    before it ends), a compressed page and a non-HTML page (only its `X-Robots-Tag` header is
+    checked) are each reported as a note.
+  - Not-applicable when no sampled page returned `2xx`.
 
 - **`sitemap-robots-crossref`** (Phase 4 item 8) — scored. A sitemap asks search engines to index
   its URLs and robots.txt tells them not to crawl some paths; a URL that is both listed and
@@ -488,7 +521,7 @@ module.exports = {
 };
 ```
 
-This adds all thirty audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all thirty-one audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
@@ -497,16 +530,16 @@ This adds all thirty audits (`structured-data-json-ld`, `structured-data-schema-
 `open-graph-canonical-match`, `open-graph-image-reachable`, `twitter-card-completeness`,
 `social-preview-content`, `robots-txt-sitemap-declared`, `robots-txt-crawler-access`,
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
-`sitemap-url-status`, `sitemap-robots-crossref`, `llms-txt-structure`) on top of
+`sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the thirty audits are part of this fork's shared `all`/`recommended` presets
+None of the thirty-one audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all thirty here are opt-in via `configPath`, so they can't be part of that
+default, and all thirty-one here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
@@ -561,6 +594,10 @@ module.exports = {
         // A listed URL that 404s or redirects is a definite defect, but this is a sample and a
         // network blip can fail a URL; 'warn' by default, 'error' once you trust your sitemap.
         'sitemap-url-status': ['warn', {minScore: 1}],
+        // A listed noindex page is a definite contradiction, but a canonical can legitimately point
+        // at a variant, it is a sample, and JavaScript-added tags are invisible to it: 'warn' until
+        // you have confirmed your sitemap is clean, then consider 'error'.
+        'sitemap-indexability': ['warn', {minScore: 1}],
         // Listing a URL the same site disallows is a definite contradiction, not a judgment call.
         'sitemap-robots-crossref': ['error', {minScore: 1}],
         // llms.txt is an unratified proposal and optional, so 'warn' unless you want to gate on it.
