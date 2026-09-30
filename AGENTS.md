@@ -146,3 +146,7 @@ Read by the relevant agents on every run — see `.ai-agents/README.md` for whic
 - `blocking-questions.md` — read by Agents 00–03: when a design decision has more than one reasonable
   answer that changes what gets built, ask the developer with a blocking question before writing the
   stage's output file, rather than picking an answer and only noting it in the doc's prose.
+- `build-mode-selection.md` — **read this before starting any roadmap item, before anything else
+  here.** Decides full 9-stage pipeline vs. lightweight mode (no formal design docs) vs. a short
+  design conversation then lightweight-mode code, with the actual decision rule and real examples
+  from this project's history for each.
