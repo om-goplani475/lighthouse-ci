@@ -6,7 +6,7 @@
 
 /**
  * @typedef {'schema-org' | 'google-requirements' | 'eligibility' | 'duplicate-count' |
- *   'conflicting-entity'} FindingNamespace
+ *   'conflicting-entity' | 'deprecated-property'} FindingNamespace
  * @typedef {'error' | 'info'} FindingSeverity
  */
 
@@ -64,6 +64,14 @@
  *   singularTypes: string[],
  *   identityFields: Record<string, string[]>,
  * }} TypeConflictsRuleSet
+ */
+
+/** @typedef {{deprecated: Record<string, string>}} SchemaOrgDeprecationsRuleSetTypeRule */
+/**
+ * @typedef {{
+ *   version: string,
+ *   types: Record<string, SchemaOrgDeprecationsRuleSetTypeRule>,
+ * }} SchemaOrgDeprecationsRuleSet
  */
 
 /** @typedef {{font: string, maxWidthPx: {desktop: number, mobile: number}}} SerpPixelBudgetsField */

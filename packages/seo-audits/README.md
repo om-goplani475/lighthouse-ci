@@ -45,8 +45,9 @@ rationale and the agent pipeline this package was built through.
 
 ### `@graph` and `@id` reference support (Phase 2 item 5)
 
-All four structured-data audits (`structured-data-json-ld`, `structured-data-schema-properties`,
-`structured-data-rich-result-eligibility`, `structured-data-type-conflicts`) understand
+All five structured-data audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+`structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
+`structured-data-deprecated-properties`) understand
 `{"@context": ..., "@graph": [...]}` containers — a standard JSON-LD pattern common real-world
 emitters (Yoast SEO and others) use to declare several entities in one `<script>` block. Before
 this, a `@graph` block was **wrongly flagged as invalid** by `structured-data-json-ld` (it has no
@@ -97,6 +98,19 @@ itself (container vs. single-entity) lives in `src/rule-engine/schema-org-engine
   - Not-applicable only when there are zero blocks of any singular type *and* zero blocks of any
     identity-field-bearing type — a page with everything correctly non-duplicated/non-conflicting
     scores 1, it isn't skipped.
+- **`structured-data-deprecated-properties`** (Phase 2 item 6) — for the six schema types
+  `structured-data-schema-properties` already validates most deeply (`Product`, `Article`, `Event`,
+  `JobPosting`, `VideoObject`, `Review`), reports any property schema.org has superseded with a
+  newer name (e.g. `Product.reviews` → `review`, `VideoObject.interactionCount` →
+  `interactionStatistic`) sourced from schema.org's own published "Supersedes" notes on each type's
+  page. Purely informational (`scoreDisplayMode: informative`, `score` always `null`) — a deprecated
+  property usually still works and Google may still honor it, so this is a heads-up, not a validity
+  check. Not-applicable only when none of the six types appear at all; a page using only current
+  property names still gets a full report with zero rows, not `notApplicable`. Deliberately narrow
+  in two ways, both explicit scope decisions rather than gaps: only the six types already covered
+  elsewhere (not all twelve tracked types), and only each entity's own top-level properties (not
+  nested sub-objects), matching this codebase's established "start narrow, expand on real signal"
+  pattern — see the "To do later" table in `docs/phases/phase-2-structured-data.md`.
 - **`pixel-width-truncation`** — flags when the page's `<title>` or meta description would likely be
   visually truncated in Google's search results, based on **real rendered pixel width** measured via
   an off-screen canvas in the page's own browser context (a new gatherer, `PixelWidth` — not a
@@ -231,6 +245,8 @@ concerns it came from — never blended into one undifferentiated list:
   (`@context`/`@type` presence), not by `structured-data-schema-properties`.
 - **`duplicate-count`**/**`conflicting-entity`** — used by `structured-data-type-conflicts` (see
   above); `duplicate-count` drives that audit's score, `conflicting-entity` never does.
+- **`deprecated-property`** — used by `structured-data-deprecated-properties` (see above); always
+  `severity: 'info'`, never drives a score.
 
 `pixel-width-truncation` deliberately does **not** use the `Finding` model at all — it reports a
 direct measured-pixel-width-vs-budget table, not a namespaced finding, since `Finding`'s shape
@@ -258,20 +274,20 @@ module.exports = {
 };
 ```
 
-This adds all fifteen audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all sixteen audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
-`pixel-width-truncation`, `meta-description-identical-to-title`, `document-title-quality`,
-`document-h1-count`, `h1-title-relevance`, `robots-directives-report`,
-`robots-directives-conflict`, `canonical-https`, `favicon-presence`, `favicon-quality`,
-`manifest-icons`) on top of Lighthouse's default audits (via `extends: 'lighthouse:default'` — see
-`src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering any of
-Lighthouse's own defaults.
+`structured-data-deprecated-properties`, `pixel-width-truncation`,
+`meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
+`h1-title-relevance`, `robots-directives-report`, `robots-directives-conflict`, `canonical-https`,
+`favicon-presence`, `favicon-quality`, `manifest-icons`) on top of Lighthouse's default audits (via
+`extends: 'lighthouse:default'` — see `src/lighthouse-config.js`), in a new `seo-extended` category,
+without replacing or altering any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the fifteen audits are part of this fork's shared `all`/`recommended` presets
+None of the sixteen audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all fifteen here are opt-in via `configPath`, so they can't be part of that guarantee.
+default, and all sixteen here are opt-in via `configPath`, so they can't be part of that guarantee.
 Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
@@ -286,6 +302,8 @@ module.exports = {
         'structured-data-rich-result-eligibility': ['warn', {}],
         // Has a real scored component (duplicate-count) — a minScore assertion is meaningful here.
         'structured-data-type-conflicts': ['error', {}], // or 'warn'
+        // Same informational-only caveat as structured-data-rich-result-eligibility — see below.
+        'structured-data-deprecated-properties': ['warn', {}],
         // Same informational-only caveat as structured-data-rich-result-eligibility — see below.
         'pixel-width-truncation': ['warn', {}],
         // Scored normally, no approximate-ruleset caveat — a minScore assertion is meaningful here.
@@ -309,13 +327,14 @@ module.exports = {
 };
 ```
 
-**A note on asserting `structured-data-rich-result-eligibility`, `pixel-width-truncation`,
-`h1-title-relevance`, `robots-directives-report`, and `favicon-quality`**: all five audits are
+**A note on asserting `structured-data-rich-result-eligibility`,
+`structured-data-deprecated-properties`, `pixel-width-truncation`, `h1-title-relevance`,
+`robots-directives-report`, and `favicon-quality`**: all six audits are
 `scoreDisplayMode: informative` (none ever has a pass/fail score, by design — see
 above). Verified live (`lhci collect`/`lhci assert` against a real page): Lighthouse itself
 normalizes an `informative` audit's LHR `score` to `1` before `lhci assert` ever reads it
 (`node_modules/lighthouse/core/audits/audit.js`'s `_normalizeAuditScore`) — so a `minScore`
-assertion on any of the five **always passes**, at any threshold, regardless of what the report
+assertion on any of the six **always passes**, at any threshold, regardless of what the report
 actually shows. This means there's genuinely nothing to gate CI on with `minScore` for any of them;
 the common case is to simply not add them to `assertions` at all, since an `['error', {}]` entry
 will never actually fail — it isn't dangerous, just a no-op as a CI gate. (An earlier draft of this

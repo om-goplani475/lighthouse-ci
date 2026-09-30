@@ -7,6 +7,7 @@
  * setting (a first-class Lighthouse setting — see docs/configuration.md). Adds the
  * structured-data-json-ld, structured-data-schema-properties,
  * structured-data-rich-result-eligibility, structured-data-type-conflicts,
+ * structured-data-deprecated-properties,
  * pixel-width-truncation, meta-description-identical-to-title, document-title-quality,
  * document-h1-count, h1-title-relevance, robots-directives-report, robots-directives-conflict,
  * canonical-https, favicon-presence, favicon-quality, and manifest-icons gatherer/audits on top
@@ -36,6 +37,7 @@ const config = {
     './audits/structured-data-schema-properties.js',
     './audits/structured-data-rich-result-eligibility.js',
     './audits/structured-data-type-conflicts.js',
+    './audits/structured-data-deprecated-properties.js',
     './audits/pixel-width-truncation.js',
     './audits/meta-description-identical-to-title.js',
     './audits/document-title-quality.js',
@@ -56,6 +58,7 @@ const config = {
         {id: 'structured-data-schema-properties', weight: 1},
         {id: 'structured-data-rich-result-eligibility', weight: 1},
         {id: 'structured-data-type-conflicts', weight: 1},
+        {id: 'structured-data-deprecated-properties', weight: 1},
         {id: 'pixel-width-truncation', weight: 1},
         {id: 'meta-description-identical-to-title', weight: 1},
         {id: 'document-title-quality', weight: 1},

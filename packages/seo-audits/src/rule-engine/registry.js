@@ -150,3 +150,17 @@ export function resolveSerpPixelBudgetsRuleset(versionOrCurrent = 'current') {
     )
   );
 }
+
+/**
+ * @param {string} [versionOrCurrent]
+ * @return {import('./types.js').SchemaOrgDeprecationsRuleSet}
+ */
+export function resolveSchemaOrgDeprecationsRuleset(versionOrCurrent = 'current') {
+  return /** @type {import('./types.js').SchemaOrgDeprecationsRuleSet} */ (
+    resolveRuleset(
+      path.join(RULES_ROOT, 'schema-org-deprecations'),
+      path.join(RULES_ROOT, 'schema', 'schema-org-deprecations-ruleset.schema.json'),
+      versionOrCurrent
+    )
+  );
+}

@@ -1,0 +1,51 @@
+{
+  "version": "2026-10",
+  "types": {
+    "Product": {
+      "deprecated": {
+        "serviceAudience": "audience",
+        "awards": "award",
+        "hasProductReturnPolicy": "hasMerchantReturnPolicy",
+        "reviews": "review"
+      }
+    },
+    "Article": {
+      "deprecated": {
+        "awards": "award"
+      }
+    },
+    "Event": {
+      "deprecated": {
+        "actors": "actor",
+        "attendees": "attendee",
+        "directors": "director",
+        "language": "inLanguage",
+        "performers": "performer",
+        "reviews": "review",
+        "subEvents": "subEvent"
+      }
+    },
+    "JobPosting": {
+      "deprecated": {
+        "incentives": "incentiveCompensation",
+        "benefits": "jobBenefits"
+      }
+    },
+    "VideoObject": {
+      "deprecated": {
+        "actors": "actor",
+        "awards": "award",
+        "encodings": "encoding",
+        "fileFormat": "encodingFormat",
+        "language": "inLanguage",
+        "interactionCount": "interactionStatistic",
+        "free": "isAccessibleForFree",
+        "isBasedOnUrl": "isBasedOn",
+        "reviews": "review"
+      }
+    },
+    "Review": {
+      "deprecated": {}
+    }
+  }
+}
