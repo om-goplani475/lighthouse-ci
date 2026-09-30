@@ -160,7 +160,88 @@ function buildConflictResult({metaContent, headerValue}) {
   };
 }
 
+/**
+ * Directive keys that can start an `X-Robots-Tag` value. Used to tell a directive that takes a value
+ * (`max-snippet: 20`, `unavailable_after: <date>`) from a user-agent scope (`googlebot: noindex`):
+ * both look like `word: ...`, and only the word tells them apart.
+ */
+const KNOWN_DIRECTIVE_KEYS = new Set([
+  'index',
+  'noindex',
+  'follow',
+  'nofollow',
+  'none',
+  'all',
+  'nosnippet',
+  'noarchive',
+  'notranslate',
+  'noimageindex',
+  'max-snippet',
+  'max-image-preview',
+  'max-video-preview',
+  'unavailable_after',
+  'indexifembedded',
+]);
+
+/**
+ * One `X-Robots-Tag` header occurrence: either unscoped (applies to every crawler) or scoped to a
+ * user agent by a leading `agent:` that applies to the rest of that value. A scope is recognized
+ * only at the start of the value (documented limitation: `noindex, googlebot: nofollow` is read as
+ * an unscoped list).
+ * @param {string} value
+ * @return {{scope: string | null, directives: RobotsDirective[]}}
+ */
+function parseXRobotsTagValue(value) {
+  const trimmed = value.trim();
+  const colon = trimmed.indexOf(':');
+  if (colon !== -1) {
+    const first = trimmed.slice(0, colon).trim().toLowerCase();
+    if (/^[a-z0-9._-]+$/.test(first) && !KNOWN_DIRECTIVE_KEYS.has(first)) {
+      return {scope: first, directives: parseDirectives(trimmed.slice(colon + 1))};
+    }
+  }
+  return {scope: null, directives: parseDirectives(trimmed)};
+}
+
+/**
+ * Which of the given crawlers a page's robots signals block from indexing: `<meta name="robots">`
+ * (all crawlers) or a `<meta>` named for the crawler, and `X-Robots-Tag` headers that are unscoped
+ * or scoped to it. Each header occurrence is evaluated on its own. Only `noindex`/`none` count;
+ * every other directive (including `unavailable_after`) is ignored.
+ * @param {Array<'googlebot' | 'bingbot'>} crawlers
+ * @param {{metas: Array<{name: string, content: string}>, xRobotsTag: string[]}} signals
+ * @return {Array<{crawler: 'googlebot' | 'bingbot', via: string[]}>} Only the blocked crawlers.
+ */
+function noindexFor(crawlers, {metas, xRobotsTag}) {
+  const headers = xRobotsTag.map(parseXRobotsTagValue);
+  /** @type {Array<{crawler: 'googlebot' | 'bingbot', via: string[]}>} */
+  const blocked = [];
+  for (const crawler of crawlers) {
+    /** @type {string[]} */
+    const via = [];
+    for (const meta of metas) {
+      if (
+        (meta.name === 'robots' || meta.name === crawler) &&
+        blocksIndexing(parseDirectives(meta.content))
+      ) {
+        via.push(`<meta name="${meta.name}">`);
+      }
+    }
+    for (const header of headers) {
+      if (
+        (header.scope === null || header.scope === crawler) &&
+        blocksIndexing(header.directives)
+      ) {
+        via.push('X-Robots-Tag header');
+      }
+    }
+    if (via.length) blocked.push({crawler, via: [...new Set(via)]});
+  }
+  return blocked;
+}
+
 export {
+  noindexFor,
   parseDirectives,
   blocksIndexing,
   buildReportResult,
