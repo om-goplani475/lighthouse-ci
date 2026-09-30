@@ -53,7 +53,7 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('meta-description');
     expect(auditIds).toContain('document-title');
 
-    // And all sixteen of this fork's audits are actually added, not just defaults preserved.
+    // And all twenty of this fork's audits are actually added, not just defaults preserved.
     expect(auditIds).toContain('structured-data-json-ld');
     expect(auditIds).toContain('structured-data-schema-properties');
     expect(auditIds).toContain('structured-data-rich-result-eligibility');
@@ -70,9 +70,13 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('favicon-presence');
     expect(auditIds).toContain('favicon-quality');
     expect(auditIds).toContain('manifest-icons');
+    expect(auditIds).toContain('open-graph-completeness');
+    expect(auditIds).toContain('open-graph-canonical-match');
+    expect(auditIds).toContain('open-graph-image-reachable');
+    expect(auditIds).toContain('twitter-card-completeness');
   }, 30000);
 
-  it('adds the seo-extended category with all sixteen audits, without touching the core seo category', async () => {
+  it('adds the seo-extended category with all twenty audits, without touching the core seo category', async () => {
     const {categories} = await resolveConfig();
 
     expect(categories['seo-extended']).toBeDefined();
@@ -85,6 +89,9 @@ describe('seo-audits lighthouse-config', () => {
       'h1-title-relevance',
       'manifest-icons',
       'meta-description-identical-to-title',
+      'open-graph-canonical-match',
+      'open-graph-completeness',
+      'open-graph-image-reachable',
       'pixel-width-truncation',
       'robots-directives-conflict',
       'robots-directives-report',
@@ -93,6 +100,7 @@ describe('seo-audits lighthouse-config', () => {
       'structured-data-rich-result-eligibility',
       'structured-data-schema-properties',
       'structured-data-type-conflicts',
+      'twitter-card-completeness',
     ]);
     expect(categories['seo']).toBeDefined();
   }, 30000);

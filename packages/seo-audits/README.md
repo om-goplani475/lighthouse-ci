@@ -212,8 +212,35 @@ itself (container vs. single-entity) lives in `src/rule-engine/schema-org-engine
   own page load already collected — see "A note on the SSRF-protected fetch" below before relying
   on or extending this. Not-applicable when there's no manifest link at all — most pages aren't
   meant to be installable, and that's a legitimate choice.
+- **`open-graph-completeness`** (Phase 3) — checks Open Graph (`og:*`) tags against the actual
+  protocol spec (`ogp.me`), not a guessed list: `og:title`/`og:type`/`og:image`/`og:url` are
+  genuinely required (scored); `og:description`/`og:site_name`/`og:image:alt` (the last only when
+  an `og:image` is present) are recommended and reported informationally, never failing the audit
+  on their own. Deliberately does **not** check `og:image` pixel dimensions/aspect ratio — the
+  spec states no minimum or recommended dimensions, so a numeric threshold here would be an
+  invented, unverified number; see `docs/phases/phase-3-social-metadata.md`'s "To do later". No
+  new gatherer — reads Lighthouse core's own `MetaElements` artifact, whose `property` field is
+  exactly what `og:*` tags use (`robots-directives-report` reads the same artifact's `name` field
+  for `<meta name="robots">`).
+- **`open-graph-canonical-match`** — scored. `og:url` is defined by the Open Graph protocol as the
+  page's canonical URL; flags when it disagrees with the page's actual `<link rel="canonical">`.
+  Not-applicable when either is absent (presence is `open-graph-completeness`'s/core's `canonical`
+  audit's concern) or unparseable.
+- **`open-graph-image-reachable`** — scored. Fetches the `og:image` URL and confirms it resolves —
+  a broken share image is a real, user-visible defect no markup-only check can catch. Reuses
+  `safe-fetch.js`'s SSRF-protected request path via a new `safeFetchStatus` export (status-only,
+  never downloads the image body). Not-applicable when there's no `og:image` at all.
+- **`twitter-card-completeness`** — scored. `twitter:card` is the only tag genuinely required on
+  its own; `twitter:title`/`twitter:description`/`twitter:image` fall back to their
+  `og:title`/`og:description`/`og:image` equivalents when the `twitter:`-specific tag is absent, so
+  they're checked as "required, with an Open Graph fallback." `twitter:site`/`twitter:creator`
+  (attribution) and `twitter:image:alt` (when an image is present) are recommended, informational
+  only. **Sourcing caveat, stated plainly**: X's official Cards documentation is largely
+  paywalled/degraded since the platform's ownership change and couldn't be directly verified the
+  way schema.org's pages were for `structured-data-deprecated-properties` — what's checked here is
+  corroborated across multiple secondary sources, not a single fetched authoritative page.
 
-### A note on the SSRF-protected fetch (`manifest-icons`, `src/lib/safe-fetch.js`)
+### A note on the SSRF-protected fetch (`manifest-icons`, `open-graph-image-reachable`, `src/lib/safe-fetch.js`)
 
 Fetching a URL *discovered on the page* (as opposed to the page itself, which Lighthouse's own
 runner already handles) is real SSRF attack surface — an attacker-controlled page could point its
@@ -225,10 +252,23 @@ the exact one connected to, via Node's `lookup` request option, not re-resolved)
 following, and a bounded timeout + response-size cap. Verified live: fetching a manifest URL
 pointing at a closed local port was refused before any connection was attempted, with the refusal
 reason surfaced in the audit's own `explanation`. See `test/lib/safe-fetch.test.js` for the full
-protection test suite (16 cases) — including one case that caught a real bypass during
-development: Node's `http`/`https` client silently skips the custom `lookup` option when the URL's
-hostname is already a literal IP address, so a raw-IP manifest URL would have bypassed
-`safeLookup` entirely without an explicit pre-check for that case (now present, and tested).
+protection test suite — including one case that caught a real bypass during development: Node's
+`http`/`https` client silently skips the custom `lookup` option when the URL's hostname is already
+a literal IP address, so a raw-IP manifest URL would have bypassed `safeLookup` entirely without an
+explicit pre-check for that case (now present, and tested).
+
+**A second real bug caught during Phase 3 live QA, not just a new-feature edge case**: `safeLookup`
+always replied to Node's `lookup` request with a single `(address, family)` tuple. Node's own
+`net.connect` requests `{all: true}` and expects an *array* back whenever Happy Eyeballs is active
+— the default since Node 20 (`net.getDefaultAutoSelectFamily()`), which is the normal case for any
+real `http.request`/`https.request` to a hostname, not an edge case. The mismatch made Node's own
+connect logic throw `Invalid IP address: undefined`, silently breaking every real outbound fetch to
+a non-literal-IP hostname — this would have broken `manifest-icons` in production against any real
+manifest URL, not just the newly-added `open-graph-image-reachable` that happened to surface it
+first (existing tests only exercised loopback/literal-IP targets and a permissive-lookup local test
+server, never a real external hostname through the real request path). Fixed by having `safeLookup`
+honor `options.all` and reply in the shape actually requested, same as real `dns.lookup` does —
+confirmed live against a real external URL both before (crash) and after (correct status) the fix.
 
 ### Finding namespaces
 
@@ -274,20 +314,21 @@ module.exports = {
 };
 ```
 
-This adds all sixteen audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all twenty audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
 `h1-title-relevance`, `robots-directives-report`, `robots-directives-conflict`, `canonical-https`,
-`favicon-presence`, `favicon-quality`, `manifest-icons`) on top of Lighthouse's default audits (via
-`extends: 'lighthouse:default'` — see `src/lighthouse-config.js`), in a new `seo-extended` category,
-without replacing or altering any of Lighthouse's own defaults.
+`favicon-presence`, `favicon-quality`, `manifest-icons`, `open-graph-completeness`,
+`open-graph-canonical-match`, `open-graph-image-reachable`, `twitter-card-completeness`) on top of
+Lighthouse's default audits (via `extends: 'lighthouse:default'` — see `src/lighthouse-config.js`),
+in a new `seo-extended` category, without replacing or altering any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the sixteen audits are part of this fork's shared `all`/`recommended` presets
+None of the twenty audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all sixteen here are opt-in via `configPath`, so they can't be part of that guarantee.
+default, and all twenty here are opt-in via `configPath`, so they can't be part of that guarantee.
 Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
@@ -321,6 +362,10 @@ module.exports = {
         // Purely informational, always passes — see below.
         'favicon-quality': ['warn', {}],
         'manifest-icons': ['error', {}], // or 'warn'
+        'open-graph-completeness': ['error', {}], // or 'warn'
+        'open-graph-canonical-match': ['error', {}], // or 'warn'
+        'open-graph-image-reachable': ['error', {}], // or 'warn'
+        'twitter-card-completeness': ['error', {}], // or 'warn'
       },
     },
   },

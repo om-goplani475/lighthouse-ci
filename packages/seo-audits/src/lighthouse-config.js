@@ -10,8 +10,9 @@
  * structured-data-deprecated-properties,
  * pixel-width-truncation, meta-description-identical-to-title, document-title-quality,
  * document-h1-count, h1-title-relevance, robots-directives-report, robots-directives-conflict,
- * canonical-https, favicon-presence, favicon-quality, and manifest-icons gatherer/audits on top
- * of Lighthouse's default set.
+ * canonical-https, favicon-presence, favicon-quality, manifest-icons,
+ * open-graph-completeness, open-graph-canonical-match, open-graph-image-reachable, and
+ * twitter-card-completeness gatherer/audits on top of Lighthouse's default set.
  *
  * Paths below are plain relative strings, not require.resolve() calls: this file is
  * ESM (no bare `require`), and Lighthouse's own module resolver
@@ -49,6 +50,10 @@ const config = {
     './audits/favicon-presence.js',
     './audits/favicon-quality.js',
     './audits/manifest-icons.js',
+    './audits/open-graph-completeness.js',
+    './audits/open-graph-canonical-match.js',
+    './audits/open-graph-image-reachable.js',
+    './audits/twitter-card-completeness.js',
   ],
   categories: {
     'seo-extended': {
@@ -70,6 +75,10 @@ const config = {
         {id: 'favicon-presence', weight: 1},
         {id: 'favicon-quality', weight: 1},
         {id: 'manifest-icons', weight: 1},
+        {id: 'open-graph-completeness', weight: 1},
+        {id: 'open-graph-canonical-match', weight: 1},
+        {id: 'open-graph-image-reachable', weight: 1},
+        {id: 'twitter-card-completeness', weight: 1},
       ],
     },
   },
