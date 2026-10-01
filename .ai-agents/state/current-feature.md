@@ -1,8 +1,9 @@
 # Current feature
 
 - slug: sitemap-indexability
-- stage: 04-implemented (Gate 3 review pending; no PR: not pushing, per developer's push-it-yourself rule)
+- stage: 05-merged (into phase-4-robots-sitemap; no PR, ff-only merge; /write-qa, /security-review, /ci-integration pending)
 - base_branch: phase-4-robots-sitemap
+- merged_head: 593f514
 - base_commit: 58c6a52
 - spec: docs/feature-specs/sitemap-indexability.md
 - audit_spec: docs/audit-specs/sitemap-indexability.md
