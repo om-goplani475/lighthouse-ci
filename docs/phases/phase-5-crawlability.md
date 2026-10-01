@@ -6,7 +6,7 @@ every item is done, deferred, to-do-later, or marked not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
-**Status: in progress (2026-10-01).** All five items done (1-3 `transport-security`, 5 `soft-not-found`, 4 `url-variants`), merged into this branch and QA'd live. Ready to close out (merging into `main` is the developer's call).
+**Status: complete (2026-10-01).** All five items done (1-3 `transport-security`, 5 `soft-not-found`, 4 `url-variants`), merged into this branch and QA'd live. Ready to close out (merging into `main` is the developer's call).
 
 ## Planning decisions (2026-10-01)
 
@@ -82,3 +82,35 @@ item 4 (the host-variant gatherer, short design conversation, then lightweight c
 ## Not possible / permanently out of scope
 
 None identified yet.
+
+## Closing record (2026-10-01)
+
+- **Shipped (7 audits, all QA'd live with real Lighthouse and `lhci assert` runs)**: `mixed-content`,
+  `hsts-quality`, `ssl-certificate-expiry` (feature `transport-security`), `soft-not-found`,
+  `url-variant-consistency`, `redirect-chain-length`, `redirect-loop`. The fork now has 38 audits in the
+  `seo-extended` category. QA record: `docs/qa/transport-security.md`, `docs/qa/soft-not-found.md`,
+  `docs/qa/url-variants.md`.
+- **Deferred to the multi-page crawler** (developer's choice, 2026-10-01): internal URLs returning 4xx/5xx,
+  internal links that redirect, redirect chains/loops on internal links. See "Deferred" above.
+- **Real findings from QA worth keeping**: (1) an audit id with a hyphen followed by a digit (`soft-404`)
+  makes every `lhci assert` fail on a phantom audit, an LHCI quirk found only by a live assert run; the audit
+  is `soft-not-found`, a guard test covers it, and the rule is in `.ai-agents/prompts/lighthouse-conventions.md`.
+  (2) A page could inflate the `mixed-content` result to 10 MB with long insecure URLs; fixed and logged as
+  Finding 7. (3) Chrome refuses an expired certificate and Lighthouse then stops, so `ssl-certificate-expiry`'s
+  0 score is reachable only with certificate errors ignored; its 15-day warning band is the real value.
+- **Pipeline used**: `transport-security` ran the full 9-stage pipeline although planned lightweight (noted
+  above); `soft-not-found` and `url-variants` were lightweight after short design conversations. The first
+  Phase 5 `/intake` re-checked Lighthouse core before scoping, which found that mixed content and HSTS were
+  already partly covered by core's `is-on-https`/`has-hsts`; the fork versions were built on purpose, for the
+  active/passive split and a pass/fail threshold.
+- **Security**: one `low` finding (Finding 7), found by running an attack and fixed; no `critical`, `high`
+  or `medium`; none open. The two outbound-request gatherers (`Soft404Probe`, `UrlVariants`) follow a redirect
+  only to the page's own host variants and never to another origin; reviewed with a spy server in
+  `.ai-agents/state/security-findings.md`.
+- **Tests**: 969 seo-audits tests pass, also under Node 18.20.8 (what CI pins); repo-wide typecheck and lint
+  are clean. The 12 failing suites in a full `npm run test` outside seo-audits were compared against the
+  pre-Phase-4 base (same families fail there) and are unrelated; see `.ai-agents/state/ci-backlog.md`.
+  **Not verified**: `packages/viewer` rendering of the new audits, `npm run start:seed-database`, and a real
+  GitHub Actions run with the environment variables.
+- **Branch**: `phase-5-crawlability`, 23 commits ahead of `main` before this closing record. Per `AGENTS.md`
+  it merges into `main` with `--ff-only` and is then deleted.

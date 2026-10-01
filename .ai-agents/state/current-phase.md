@@ -1,9 +1,7 @@
 # Current phase
 
-- phase: 5 (crawlability & status codes)
-- branch: phase-5-crawlability
-- roadmap: docs/phases/phase-5-crawlability.md
-- status: in-progress
+- phase: none active — see below
+- status: n/a
 
 <!-- Phase 1 (page-metadata) closed 2026-09-30: every item (0-6) done or closed-no-build-needed,
 ff-merged into main (a1e8313), branch phase-1-page-metadata deleted. See
@@ -35,6 +33,14 @@ parser), a private-network opt-in for CI (LHCI_SEO_ALLOW_PRIVATE_NETWORK), and a
 budget. See docs/phases/phase-4-robots-sitemap.md, including its "How the plan changed" section and
 "Closing record". One open item outside this phase: the 12 failing suites in a full `npm run test` were
 never compared with the base branch (.ai-agents/state/ci-backlog.md). -->
+
+<!-- Phase 5 (crawlability & status codes) closed 2026-10-01: all five tracker rows done or deferred, seven
+audits shipped (38 in the fork), one low security finding found and fixed, none open. ff-merged into main,
+branch phase-5-crawlability deleted. Link-level checks (4xx/5xx internal URLs, redirecting links) were
+deferred to the multi-page crawler by the developer's choice. Notable: an LHCI quirk where an audit id with a
+hyphen followed by a digit breaks `lhci assert` (rule in lighthouse-conventions.md), and two gatherers that
+follow redirects only to the page's own host variants. See docs/phases/phase-5-crawlability.md, including its
+"How the plan changed" section and "Closing record". -->
 
 <!-- When the next phase starts: if it gets a phase branch, update this file the same way
 phase-1-page-metadata's/phase-3-social-metadata's entries looked (phase/branch/roadmap/status:

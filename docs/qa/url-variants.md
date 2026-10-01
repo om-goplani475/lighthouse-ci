@@ -1,7 +1,7 @@
 # QA checklist: URL variants (`url-variant-consistency`, `redirect-chain-length`, `redirect-loop`)
 
 - slug: url-variants
-- merged: not yet (branch `feat/url-variants`, lightweight mode after a short design conversation, to merge into `phase-5-crawlability`)
+- merged: see git log (into `phase-5-crawlability`, ff-only, lightweight mode after a short design conversation)
 
 Covers the `UrlVariants` gatherer and the three audits reading it. Verified with the real gatherer and real
 `lhci assert`/Lighthouse runs against seven public sites and ten planted scenarios (real HTTP and HTTPS
