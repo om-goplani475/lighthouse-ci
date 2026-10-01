@@ -1,7 +1,9 @@
 # Current phase
 
-- phase: none active — see below
-- status: n/a
+- phase: 5 (crawlability & status codes)
+- branch: phase-5-crawlability
+- roadmap: docs/phases/phase-5-crawlability.md
+- status: in-progress
 
 <!-- Phase 1 (page-metadata) closed 2026-09-30: every item (0-6) done or closed-no-build-needed,
 ff-merged into main (a1e8313), branch phase-1-page-metadata deleted. See
