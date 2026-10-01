@@ -417,3 +417,83 @@ Reviewed as built: a new gatherer with one outbound request.
   confirms it does not throw; (5) data exposure: the report shows line numbers, format problems and
   link counts, never the file's contents beyond short problem descriptions.
 - status: n/a
+
+## 2026-10-01 — sitemap-indexability
+
+Reviewed `git diff 58c6a52..593f514` (13 commits: `safeFetchPrefix`, `html-head-signals`, `noindexFor`,
+the page sample in `SitemapDocuments`, the refactored `sitemap-url-status`, the new audit). The new
+surface is a body read from page-controlled URLs, an HTML parse of attacker-influenced text, and
+strings from the audited site flowing into the report. Every attack below was **run against the real
+code**, not argued from reading it.
+
+### Finding 5
+
+- severity: medium (found during the build and fixed before merge; recorded because it is the kind of
+  thing a review must keep looking for)
+- finding: **`parse5` is quadratic in the nesting depth of block elements, and parsing is synchronous.**
+  64 KiB of `<div>` took 1.6 s to parse, and the same holds for about a dozen other elements (`ul`,
+  `ol`, `dl`, `nav`, `pre`, `menu`, `main`, `center`, ...), so it is not specific to `div`. With 25 sampled
+  pages that is about 40 s of blocked event loop that no fetch timeout can interrupt, from a page the
+  audited site controls. Same class as the sitemap-XML nesting finding (Finding 2).
+- status: resolved in task 2, before merge: the parser is given only the text up to the 2,000th `<`
+  (a real page has under a hundred head tags). Re-measured after the fix: the worst of **121 element
+  names**, nested to the byte limit, is **83 ms** from the body and **92 ms** from inside the head, so 25
+  pages cost about 2 s at the very worst. Nine of the ten timing tests fail without the limit, so they do
+  guard it. Other hostile shapes measured at under 50 ms: a 64 KiB attribute value, 30,000 entities,
+  NULs and control bytes, unterminated tags, adoption-agency and Noah's-Ark patterns, a gzip bomb fed
+  to the parser as text.
+
+### Finding 6 (updates open Finding 3)
+
+- severity: low
+- finding: the gatherer's worst-case wall time grew. Finding 3 (open) noted roughly 105 s for the
+  documents. The page sample adds up to about **30 s**: measured with 25 listed pages that never send
+  headers, `collectSitemapDocuments` took **30.1 s** (30 requests, every page retried once, 15 pages
+  errored, 10 reported not-checked), because the 30 s budget stops new requests but lets in-flight ones
+  finish. Combined worst case is therefore about 135-145 s. Still bounded and reported honestly, still
+  no overall deadline.
+- status: open (backlog), the same fix as Finding 3: one overall budget for the whole gatherer. The
+  developer plans to address Findings 1-4 after this item; this one should be fixed with Finding 3.
+
+### Checked and found sound
+
+- **Slow-loris response** (a header sent one byte every 100 ms, forever): ended at the total deadline
+  (1,501 ms for a 1,500 ms deadline), as a rejection.
+- **Unbounded fast body** declared `text/html`: capped at 64 KiB in 79 ms, resolved as truncated, request
+  destroyed. A reset after the headers resolves as truncated with the partial body.
+- **Mislabelled gzip** (a 50 MiB bomb served as `text/html` with no `Content-Encoding`): the 50 KB on the
+  wire was read as bytes and never decompressed (no decompression exists on this path), so nothing can
+  expand; it parses to no signals and is marked head-incomplete, so it cannot look like a clean pass. A
+  declared `Content-Encoding` other than identity skips the body entirely and still returns the headers.
+- **300 aborted requests** (caps, resets, deadline expiries): no uncaught exception, no unhandled
+  rejection, and the active-handle count did not grow.
+- **Same-origin rule** against 20 tricky URLs: userinfo (`example.com@evil.test`), suffix
+  (`example.com.evil.test`), percent-encoded slash, other port, other scheme, `www`, subdomain, the
+  metadata address (plain and IPv4-mapped), `localhost`, `file:`, `javascript:`, protocol-relative,
+  relative, and a Cyrillic homograph were all **skipped, never requested**. The one that looked odd,
+  `https://example.com\@evil.test/x`, is requested but its host is `example.com` in both the URL parser
+  and Node's `http.request` (a backslash is a slash for https), so it cannot reach `evil.test`.
+- **Nothing the page says is ever fetched**: `sitemap-indexability.js` and `html-head-signals.js` import no
+  fetch code, and a canonical's target is only compared and displayed, never requested. A redirect's
+  `Location` is recorded (capped at 1,000 characters), never followed.
+- **Address policy** is the one shared decision point (`isBlockedAddress`), covered by tests through the
+  real default path: loopback refused without the opt-in, metadata, IPv6 literals and `0.0.0.0` refused
+  even with it, no hint advertised for the ones it cannot unblock.
+- **Data exposure**: the request carries only `Accept` and `Accept-Encoding`: no cookies, no auth.
+  Response headers kept are an allowlist of four (`x-robots-tag`, `content-type`, `content-encoding`,
+  `location`), capped at 10 values of 1,000 characters; a `Set-Cookie` is never stored (tested).
+  Raw HTML is never stored in the artifact (tested by serializing it). Strings from the site reaching the
+  report are the listed URL and a resolved canonical URL; Lighthouse's renderer shows them as text.
+- **Hidden-signal evasion**: a `noindex` meta hidden in a comment, a script string, `<noscript>` or
+  `<template>`, or placed in the body, is correctly not counted; a signal that precedes a 3,000-tag
+  flood is kept and the head is marked incomplete.
+- **Sandbox**: no new CDP session, no Chromium flag. Unchanged.
+
+### Not verified
+
+- `parse5@7.1.2` was not checked against a vulnerability database from here (no such lookup was
+  available). It is a widely used, pure-JavaScript parser already in the dependency tree via `jsdom`.
+- The audit cannot see a noindex or canonical injected by client-side JavaScript (stated in its own
+  description). That is a coverage limit, not a vulnerability.
+
+No `critical` or `high` findings. Finding 6 is `low` (open, with Finding 3); Finding 5 is resolved.
