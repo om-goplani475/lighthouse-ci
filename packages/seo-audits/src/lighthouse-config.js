@@ -86,6 +86,8 @@ const config = {
     './audits/indexability-verdict.js',
     './audits/indexability-conflicts.js',
     './audits/crawl-coverage.js',
+    './audits/duplicate-titles.js',
+    './audits/duplicate-descriptions.js',
   ],
   categories: {
     'seo-extended': {
@@ -132,6 +134,8 @@ const config = {
         {id: 'indexability-verdict', weight: 1},
         {id: 'indexability-conflicts', weight: 1},
         {id: 'crawl-coverage', weight: 1},
+        {id: 'duplicate-titles', weight: 1},
+        {id: 'duplicate-descriptions', weight: 1},
       ],
     },
   },
