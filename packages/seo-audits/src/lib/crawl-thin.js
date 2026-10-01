@@ -109,6 +109,7 @@ function buildThinContentProduct(artifact) {
     {key: 'note', valueType: 'text', label: 'Note'},
   ];
   const shown = others.slice(0, MAX_ROWS);
+  /** @type {Array<{url: string, words: number | string, ratio: string, note: string}>} */
   const items = [
     {
       url: clip(audited.finalUrl || audited.url),
