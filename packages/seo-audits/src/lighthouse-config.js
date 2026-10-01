@@ -88,6 +88,7 @@ const config = {
     './audits/crawl-coverage.js',
     './audits/duplicate-titles.js',
     './audits/duplicate-descriptions.js',
+    './audits/thin-content.js',
   ],
   categories: {
     'seo-extended': {
@@ -136,6 +137,7 @@ const config = {
         {id: 'crawl-coverage', weight: 1},
         {id: 'duplicate-titles', weight: 1},
         {id: 'duplicate-descriptions', weight: 1},
+        {id: 'thin-content', weight: 1},
       ],
     },
   },
