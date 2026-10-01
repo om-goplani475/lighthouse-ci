@@ -6,7 +6,7 @@ done, deferred, to-do-later, or marked not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
-**Status: items 1-3 done (2026-10-01)**, built together as one feature (`indexability`), QA'd live; see `docs/qa/indexability.md`.
+**Status: complete (2026-10-01).** Items 1-3 built together as one feature (`indexability`), QA'd live; see `docs/qa/indexability.md`.
 
 ## Planning decisions (2026-10-01)
 
@@ -61,3 +61,25 @@ design conversation, then lightweight code. Decisions confirmed with the develop
 ## Not possible / permanently out of scope
 
 None identified yet.
+
+## Closing record (2026-10-01)
+
+- **Shipped (2 audits, QA'd live with real Lighthouse and `lhci assert` runs)**: `indexability-verdict`
+  (informational) and `indexability-conflicts` (scored), on one gatherer, `IndexabilitySignals`. The fork now
+  has 40 audits in the `seo-extended` category. QA record: `docs/qa/indexability.md`.
+- **Real findings from QA worth keeping**: (1) Lighthouse stops with `ERRORED_DOCUMENT_REQUEST` on a 4xx/5xx
+  main document, so the HTTP-status verdict and the error-page canonical conflict are reachable only with
+  `ignoreStatusCode: true` under `ci.collect.settings` (verified live, documented); (2) Chrome's final URL can
+  carry a query added after load (`https://www.google.com/?zx=...`), and the audit correctly judges that URL
+  against robots.txt; (3) a process error of mine, a stale result file read as a fresh run, was caught and the QA
+  runner now deletes its output before each run.
+- **Pipeline used**: a short design conversation (three blocking questions), then lightweight code, per
+  `.ai-agents/prompts/build-mode-selection.md`. No formal design documents.
+- **Security**: no finding. The one new request goes to a page-chosen URL (the canonical) and is made only for a
+  same-origin target, through the SSRF-protected fetch; a spy server on another port received zero requests.
+  See `.ai-agents/state/security-findings.md`.
+- **Tests**: 1,013 seo-audits tests pass, also under Node 18.20.8 (what CI pins); repo-wide typecheck and lint are
+  clean. **Not verified**: `packages/viewer` rendering of the new audits, `npm run start:seed-database`, and a real
+  GitHub Actions run with the environment variables (planned after this phase).
+- **Branch**: `phase-6-indexability`, 5 commits ahead of `main` before this closing record. Per `AGENTS.md` it
+  merges into `main` with `--ff-only` and is then deleted.

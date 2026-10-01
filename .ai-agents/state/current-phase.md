@@ -1,9 +1,7 @@
 # Current phase
 
-- phase: 6 (indexability)
-- branch: phase-6-indexability
-- roadmap: docs/phases/phase-6-indexability.md
-- status: in-progress
+- phase: none active — see below
+- status: n/a
 
 <!-- Phase 1 (page-metadata) closed 2026-09-30: every item (0-6) done or closed-no-build-needed,
 ff-merged into main (a1e8313), branch phase-1-page-metadata deleted. See
@@ -43,6 +41,13 @@ deferred to the multi-page crawler by the developer's choice. Notable: an LHCI q
 hyphen followed by a digit breaks `lhci assert` (rule in lighthouse-conventions.md), and two gatherers that
 follow redirects only to the page's own host variants. See docs/phases/phase-5-crawlability.md, including its
 "How the plan changed" section and "Closing record". -->
+
+<!-- Phase 6 (indexability) closed 2026-10-01: all three tracker rows done as one feature, two audits shipped
+(40 in the fork), no security finding. ff-merged into main, branch phase-6-indexability deleted. Notable:
+Lighthouse stops on a 4xx/5xx main document, so the HTTP-status verdict and the error-page canonical conflict need
+`ignoreStatusCode: true` under ci.collect.settings; and the audit judges the final URL Chrome reports (which can
+carry a query added after load). See docs/phases/phase-6-indexability.md, including its "How the plan changed"
+section and "Closing record". -->
 
 <!-- When the next phase starts: if it gets a phase branch, update this file the same way
 phase-1-page-metadata's/phase-3-social-metadata's entries looked (phase/branch/roadmap/status:

@@ -1,7 +1,7 @@
 # QA checklist: Indexability (`indexability-verdict`, `indexability-conflicts`)
 
 - slug: indexability
-- merged: not yet (branch `feat/indexability`, lightweight mode after a short design conversation, to merge into `phase-6-indexability`)
+- merged: e496ba4 (into `phase-6-indexability`, ff-only, lightweight mode after a short design conversation)
 
 Covers the `IndexabilitySignals` gatherer and the two audits reading it. Verified with real Lighthouse and
 `lhci assert` runs against a local server with planted pages (using `LHCI_SEO_ALLOW_PRIVATE_NETWORK=1`
