@@ -89,6 +89,21 @@
   workflow the developer shared uses, so no change is needed there.
 - status: done (documented in `docs/qa/sitemap-indexability.md`)
 
+## 2026-10-01 — transport-security
+
+- item: no gap found. No dependency was added (`package.json`, `yarn.lock` and `.github/` are unchanged by
+  the feature's diff), no new script or build step, no Docker config exists. The new suites and the
+  config-resolution test (68 tests) were run under Node 18.20.8, the version `ci.yml` pins, and pass.
+  No CI changes made.
+- status: done (nothing to do)
+
+- item: worth knowing for anyone adding the certificate assertion to a CI job: one assertion per audit id
+  means "fail on expiry, warn at 15 days" needs an `assertMatrix` (two entries on the same URL pattern),
+  and `assertMatrix` cannot be combined with `preset` or a top-level `assertions` block in the same
+  `assert` config (lhci throws "Cannot use assertMatrix with other options"). Documented in the README
+  and checked with a real `lhci assert`.
+- status: done (documented in `packages/seo-audits/README.md` and `docs/qa/transport-security.md`)
+
 <!-- Appended by Agent 08. Advisory only — does not block merges or new features. Format per entry:
 
 ## {date} — {slug}

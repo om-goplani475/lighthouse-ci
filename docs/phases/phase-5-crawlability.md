@@ -6,7 +6,7 @@ every item is done, deferred, to-do-later, or marked not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
-**Status: planned (2026-10-01).** Scoping done with the developer; nothing built yet.
+**Status: in progress (2026-10-01).** Items 1-3 done (`transport-security`, merged into this branch and QA'd live); items 4-5 planned.
 
 ## Planning decisions (2026-10-01)
 
@@ -43,13 +43,13 @@ Not in core at all: certificate expiry, host-variant consistency, soft-404 detec
 
 | # | Feature | Status | Slug / notes |
 |---|---------|--------|--------------|
-| 1 | Mixed-content detection | planned | `transport-security`, audit `mixed-content`. Reads the existing `DevtoolsLog`; no new gatherer, no new requests. |
-| 2 | HSTS header presence and quality | planned | `transport-security`, audit `hsts-quality`. Reads the main document's response headers from the `DevtoolsLog`. |
-| 3 | SSL certificate validity / expiry warning | planned | `transport-security`, audit `ssl-certificate-expiry`. Reads `securityDetails` (`validFrom`/`validTo`) from the raw `Network.responseReceived` events in the `DevtoolsLog`; no outbound request. |
+| 1 | Mixed-content detection | **done** | `transport-security`, audit `mixed-content`. QA'd live, see `docs/qa/transport-security.md`. Active content or anything blocked fails; passive upgraded content is a note. Reads `DevtoolsLog` + `InspectorIssues`; no new gatherer, no new requests. |
+| 2 | HSTS header presence and quality | **done** | `transport-security`, audit `hsts-quality`. Fails on no header, `max-age` missing/0/under one year, or `preload` without its prerequisites. |
+| 3 | SSL certificate validity / expiry warning | **done** | `transport-security`, audit `ssl-certificate-expiry`. Reads `securityDetails` (`validFrom`/`validTo`) from the raw `Network.responseReceived` events in the `DevtoolsLog`; no outbound request. Scores 1 / 0.5 (15 days or fewer, with a warning) / 0; an already-expired certificate normally aborts the run, so the warning band is the real value. |
 | 4 | HTTP → HTTPS → www normalization consistency, plus redirect chains over 2 hops and loops (for the host variants) | planned | New gatherer `UrlVariants` (outbound probes, full pipeline). Chains and loops are followed manually with a hop cap, only for the audited URL's own `http`/`https`/`www`/non-`www` variants, never for the page's links. |
 | 5 | Soft-404 detection | planned | Probes one random nonexistent path on the origin; a 200 (or a redirect to a 200) instead of a 404/410 is the finding. Extends the item-4 gatherer. |
 
-Build order: 1-3 as one lightweight-mode group (no gatherer, no outbound requests), then item 4 (the
+Build order (1-3 done): 1-3 as one lightweight-mode group (no gatherer, no outbound requests), then item 4 (the
 gatherer, full pipeline), then item 5.
 
 ## Deferred

@@ -319,5 +319,42 @@ a real hanging-server test. Security-findings housekeeping in the same change: F
 merged (`ad8557c`, `7ec20c4`), Finding 4 resolved by the private-network opt-in, Findings 3 and 6
 resolved here. **No open findings remain.**
 
+## transport-security (Phase 5, items 1-3, 2026-10-01)
+
+### Mixed content, HSTS quality and certificate expiry audits
+
+**User-facing**: three new audits in the `seo-extended` category (34 in total), all read only what
+Lighthouse already collects, so they make **no request of their own** to your site, and all are not
+applicable on a plain `http://` page.
+
+- **`mixed-content`** fails when an HTTPS page loads **active** content over `http://` (scripts,
+  stylesheets, frames, fetch/XHR, fonts, forms) or anything the browser blocked. Passive content that
+  Chrome auto-upgraded (images, audio, video) passes and is listed as a note with a plain-English "what it
+  means" column. Lighthouse's own `is-on-https` fails that same page; this one separates the two.
+- **`hsts-quality`** fails on a missing header, `max-age` missing or under one year, `max-age=0`, or
+  `preload` without its prerequisites. Core's `has-hsts` is informative and never fails.
+- **`ssl-certificate-expiry`** scores 1 with more than 15 days left, **0.5 with 15 days or fewer (plus a
+  warning)**, 0 when expired or not yet valid. Because `lhci assert` has no minimum-value check, the 0.5 is
+  what lets CI tell "expiring soon" from "fine"; to fail only on expiry but be told at 15 days, use an
+  `assertMatrix` with two entries (error at `minScore: 0.5`, warn at `minScore: 1`), documented and checked
+  with a real `lhci assert`. Chrome refuses an already-expired certificate and Lighthouse then stops, so the
+  0 score is reachable only when certificate errors are ignored; in practice this is the early warning.
+
+Suggested severities (README): `mixed-content` error, `hsts-quality` warn, certificate as above.
+
+**Internal/dev**: pure logic and typedefs in `src/lib/transport-security.js` (61 + 5 tests), input
+resolution split into `transport-security-sources.js` (it imports `MainResource`/`NetworkRecords`, which
+cannot load under Jest, the same split as `robots-sources.js`); the audit files are thin. The certificate
+is read from the raw `Network.responseReceived` event's `securityDetails`, since Lighthouse's parsed
+network record drops it. No new dependency, no config key, no environment variable.
+
+**Security**: one `low` finding found by running an attack and fixed in the same sitting: site-controlled
+strings (insecure URLs, header values, certificate names) were echoed without a bound, so a page with 60
+requests of 200 KB URLs produced a 10 MB audit result. They are now cut (URLs at 1,000 characters,
+other text at 200); the same attack gives 60 KB. Markup in a certificate subject was verified to render as
+plain text in Lighthouse's report. No `critical` or `high` findings.
+
+No `.lighthouserc.js` migration note needed: no new config keys.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->

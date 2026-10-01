@@ -505,3 +505,54 @@ code**, not argued from reading it.
   description). That is a coverage limit, not a vulnerability.
 
 No `critical` or `high` findings, and none open: Findings 3 and 6 (`low`) were resolved 2026-10-01 by the time-budget fix, and Finding 5 is resolved.
+
+## 2026-10-01 — transport-security
+
+Reviewed `git diff e8ea6a5..fcf095b` (the three audits `mixed-content`, `hsts-quality`,
+`ssl-certificate-expiry`, their pure logic and the input resolver). This feature adds **no outbound
+request, no new gatherer, no CDP session and no Chromium flag**: it only reads artifacts Lighthouse
+already collected, so SSRF, crawler abuse and sandbox risk do not apply (`safe-fetch.js` is not touched).
+The new surface is strings the audited site controls (resource URLs, header values, certificate names)
+flowing into the report. Attacks below were **run against the real code**.
+
+### Finding 7
+
+- severity: low
+- finding: **Site-controlled strings were echoed into the report without a length bound.** A page can
+  make insecure requests with very long URLs (Chrome allows URLs far beyond 200 KB): 60 requests with
+  200 KB URLs produced a **10 MB** `mixed-content` result, and a malformed `max-age=<250 KB>` header was
+  echoed back in full in the `hsts-quality` table. LHR files are stored by `packages/server` and
+  shared, so a hostile page could bloat every stored report. Lighthouse's own `is-on-https` has the same
+  property for the URLs it lists; this audit only needs to not add to it.
+- status: **resolved 2026-10-01** in the commit "fix(seo-audits): cap site-controlled strings in
+  transport-security": URLs are cut to 1,000 characters, header values and certificate
+  subject/issuer to 200, with the cut stated ("... (N more characters)"). Re-measured: the same attack
+  now yields **60 KB** (was 10 MB) and the HSTS echo **889 bytes** (was 250 KB). Four new tests fail
+  without the fix. Row count was already capped at 50 (100,000 distinct insecure requests: 12 KB, 108 ms).
+
+### Checked, no finding
+
+- **Markup and link injection through the certificate**: a certificate whose subject is
+  `[CLICK TO RENEW](https://evil.test/phish) `code` <b>bold</b>` was served to a real run. In Lighthouse's
+  own HTML report (rendered and read back from the DOM) the text appears escaped, as plain text, in both
+  the `warnings` path (expiring) and the `explanation` path (expired): **zero anchors** to the attacker's
+  URL, no injected element. The raw text is in the LHR JSON, so a different consumer that renders
+  Markdown (this repo's `packages/viewer` was not checked) would show it; the 200-character bound limits
+  how much.
+- **Parser cost on hostile input**: 250 KB header of quotes, a 250 KB quoted `max-age`, 120,000
+  directives, and 100,000 insecure requests all finish in under 250 ms; the regular expressions are
+  linear (`^\d+$`, `^"(.*)"$`).
+- **Data exposure**: no cookies, auth headers or page content are read. Response headers used: only
+  `Strict-Transport-Security`. The certificate fields kept: subject, issuer, validity dates (public by
+  nature). No request is made, so nothing is sent.
+- **Fail-safe direction**: an unfamiliar resource type is treated as active (fails), not waved through;
+  a missing certificate date is not-applicable, never a pass by default.
+
+### Not verified
+
+- `packages/viewer` rendering of the new audits (and of the unescaped certificate text) was not checked.
+- Hardening note, not a finding: `RESOLUTIONS[issue.resolutionStatus]` indexes a plain object with a
+  Chrome-supplied enum; a page cannot choose that value, so it is not reachable, but a `Map` would remove
+  the question.
+
+No `critical` or `high` findings. Finding 7 is `low` and resolved.
