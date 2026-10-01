@@ -58,7 +58,7 @@ describe('seo-audits lighthouse-config', () => {
     expect(artifactIds).toContain('SitemapDocuments');
     expect(artifactIds).toContain('LlmsTxt');
 
-    // And all thirty-one of this fork's audits are actually added, not just defaults preserved.
+    // And all thirty-four of this fork's audits are actually added, not just defaults preserved.
     expect(auditIds).toContain('structured-data-json-ld');
     expect(auditIds).toContain('structured-data-schema-properties');
     expect(auditIds).toContain('structured-data-rich-result-eligibility');
@@ -90,9 +90,12 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('sitemap-robots-crossref');
     expect(auditIds).toContain('sitemap-indexability');
     expect(auditIds).toContain('llms-txt-structure');
+    expect(auditIds).toContain('mixed-content');
+    expect(auditIds).toContain('hsts-quality');
+    expect(auditIds).toContain('ssl-certificate-expiry');
   }, 30000);
 
-  it('adds the seo-extended category with all thirty-one audits, without touching the core seo category', async () => {
+  it('adds the seo-extended category with all thirty-four audits, without touching the core seo category', async () => {
     const {categories} = await resolveConfig();
 
     expect(categories['seo-extended']).toBeDefined();
@@ -103,9 +106,11 @@ describe('seo-audits lighthouse-config', () => {
       'favicon-presence',
       'favicon-quality',
       'h1-title-relevance',
+      'hsts-quality',
       'llms-txt-structure',
       'manifest-icons',
       'meta-description-identical-to-title',
+      'mixed-content',
       'open-graph-canonical-match',
       'open-graph-completeness',
       'open-graph-image-reachable',
@@ -122,6 +127,7 @@ describe('seo-audits lighthouse-config', () => {
       'sitemap-url-status',
       'sitemap-valid',
       'social-preview-content',
+      'ssl-certificate-expiry',
       'structured-data-deprecated-properties',
       'structured-data-json-ld',
       'structured-data-rich-result-eligibility',

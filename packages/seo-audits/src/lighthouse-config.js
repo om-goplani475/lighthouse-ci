@@ -14,8 +14,9 @@
  * open-graph-completeness, open-graph-canonical-match, open-graph-image-reachable,
  * twitter-card-completeness, social-preview-content, robots-txt-sitemap-declared,
  * robots-txt-crawler-access, robots-txt-rule-conflicts, sitemap-valid, sitemap-duplicate-urls,
- * sitemap-limits, sitemap-url-status, sitemap-robots-crossref, sitemap-indexability, and
- * llms-txt-structure gatherers/audits on top of Lighthouse's default set.
+ * sitemap-limits, sitemap-url-status, sitemap-robots-crossref, sitemap-indexability,
+ * llms-txt-structure, mixed-content, hsts-quality, and ssl-certificate-expiry gatherers/audits on top
+ * of Lighthouse's default set.
  *
  * Paths below are plain relative strings, not require.resolve() calls: this file is
  * ESM (no bare `require`), and Lighthouse's own module resolver
@@ -70,6 +71,9 @@ const config = {
     './audits/sitemap-robots-crossref.js',
     './audits/sitemap-indexability.js',
     './audits/llms-txt-structure.js',
+    './audits/mixed-content.js',
+    './audits/hsts-quality.js',
+    './audits/ssl-certificate-expiry.js',
   ],
   categories: {
     'seo-extended': {
@@ -106,6 +110,9 @@ const config = {
         {id: 'sitemap-robots-crossref', weight: 1},
         {id: 'sitemap-indexability', weight: 1},
         {id: 'llms-txt-structure', weight: 1},
+        {id: 'mixed-content', weight: 1},
+        {id: 'hsts-quality', weight: 1},
+        {id: 'ssl-certificate-expiry', weight: 1},
       ],
     },
   },
