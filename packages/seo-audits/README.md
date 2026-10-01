@@ -493,6 +493,30 @@ URL is not `https:`.
     are ignored. In practice this audit is the **early warning** before that happens.
   - Not applicable when the browser reported no certificate dates (for example a reused connection).
 
+### Soft-404 check (`soft-not-found`)
+
+- **`soft-not-found`** (Phase 5) — does the site answer a URL that does not exist with a normal page? A
+  **soft 404** (a catch-all route or a single-page app answering every path with HTTP 200, or unknown
+  URLs bouncing to the homepage) lets search engines index endless junk URLs. The audit requests two
+  made-up URLs on the audited page's own origin, built from a random token and never from anything the
+  page says: a top-level path (`/lhci-seo-probe-<random>`) and a nested file-like one
+  (`/lhci-seo-probe-<random>/page.html`), because some servers soft-404 only one shape.
+  - **Fails on**: a made-up URL that returns **HTTP 2xx**, or that **redirects to a same-origin page
+    that returns 2xx** (one hop is followed, status only).
+  - **Not failures, shown in the table**: 404/410 (correct); another 4xx; a redirect to a page that is
+    itself 404/410; a redirect that redirects again (not followed further); a redirect to **another
+    origin** (never requested); a malformed or non-http `Location`; a server error (not a soft 404, but
+    the row says unknown URLs should return 404); a probe that could not be requested (judged on the
+    other one).
+  - **Requests**: at most four status-only requests (two probes, in parallel, plus one hop each), 5 s
+    each, through the SSRF-protected fetch (`LHCI_SEO_ALLOW_PRIVATE_NETWORK` applies, so auditing
+    `localhost` needs it). They will appear as 404s in your site's logs. If neither probe can be
+    requested, the run carries a warning saying why and the audit is not applicable.
+  - **Not checked (deferred to the crawler)**: "not found" wording on pages that return 200.
+  - **Audit id**: it is `soft-not-found`, not `soft-404`. `lhci assert` treats a hyphen followed by a
+    digit in an audit id as two audits (it asserts a phantom `soft404`), which would make every
+    `lhci assert` run fail whatever the audit scored; `test/lighthouse-config.test.js` guards against it.
+
 ### Auditing a site on localhost or a private network (`LHCI_SEO_ALLOW_PRIVATE_NETWORK`)
 
 The fetch path (`src/lib/safe-fetch.js`) refuses loopback and private addresses by default, because
@@ -566,7 +590,7 @@ module.exports = {
 };
 ```
 
-This adds all thirty-four audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all thirty-five audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
@@ -576,16 +600,16 @@ This adds all thirty-four audits (`structured-data-json-ld`, `structured-data-sc
 `social-preview-content`, `robots-txt-sitemap-declared`, `robots-txt-crawler-access`,
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
 `sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`, `mixed-content`, `hsts-quality`,
-`ssl-certificate-expiry`) on top of
+`ssl-certificate-expiry`, `soft-not-found`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the thirty-four audits are part of this fork's shared `all`/`recommended` presets
+None of the thirty-five audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all thirty-four here are opt-in via `configPath`, so they can't be part of that
+default, and all thirty-five here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
@@ -657,6 +681,9 @@ module.exports = {
         // 0.5 means 15 days or fewer left, 0 means expired. One assertion per audit id, so to fail
         // on expiry but be told at 15 days, see the assertMatrix recipe just below this block.
         'ssl-certificate-expiry': ['error', {minScore: 0.5}],
+        // A site that serves junk URLs as normal pages is a real defect, but it needs the site's own
+        // routing to fix and is a probe of two URLs: 'warn' first, 'error' once confirmed.
+        'soft-not-found': ['warn', {minScore: 1}],
       },
     },
   },

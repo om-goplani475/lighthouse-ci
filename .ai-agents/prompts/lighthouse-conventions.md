@@ -140,3 +140,13 @@ audit's own test.
 This file describes the mechanism as of when it was written. Lighthouse's actual API can change
 between versions — see `upstream-sync.md` for the check that catches that before you design against
 a stale assumption.
+
+## Audit ids: no hyphen followed by a digit
+
+Never give an audit an id containing a hyphen followed by a digit (`soft-404`, `h1-count` is fine,
+`h-1` is not). `lhci assert` expands every hyphenated assertion key into a camelCase alias and discards
+the alias by comparing it with a kebab-case conversion that inserts no hyphen before digits, so for
+`soft-404` the alias `soft404` survives and is asserted as an unknown audit: every `lhci assert` run
+fails with "`soft404` is not a known audit", whatever the real audit scored. Found in live QA for
+Phase 5's soft-404 check, which is why that audit is `soft-not-found`. `test/lighthouse-config.test.js`
+fails on any registered id that matches `/-\d/`.
