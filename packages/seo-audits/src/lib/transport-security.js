@@ -357,11 +357,147 @@ function hstsProduct(result, {isHttps}) {
   return product;
 }
 
+/**
+ * The TLS details of the main document's response, read from a raw devtools log. Lighthouse's parsed
+ * network record drops `securityDetails`, so the raw `Network.responseReceived` entry is the only
+ * place it survives. A redirect chain shares one requestId and only the final response is reported,
+ * so the last match is the one wanted.
+ * @param {unknown} log
+ * @param {string} requestId
+ * @return {Record<string, unknown> | null}
+ */
+function findSecurityDetails(log, requestId) {
+  if (!Array.isArray(log)) return null;
+  /** @type {Record<string, unknown> | null} */
+  let found = null;
+  for (const entry of log) {
+    if (!entry || entry.method !== 'Network.responseReceived') continue;
+    const params = entry.params;
+    if (!params || params.requestId !== requestId) continue;
+    const details = params.response && params.response.securityDetails;
+    found = details && typeof details === 'object' ? details : null;
+  }
+  return found;
+}
+
+/**
+ * @param {unknown} value
+ * @return {number | null}
+ */
+function toSeconds(value) {
+  const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+  return typeof n === 'number' && Number.isFinite(n) ? n : null;
+}
+
+/**
+ * @param {Record<string, unknown> | null} securityDetails CDP `Network.SecurityDetails`.
+ * @param {number} nowSeconds
+ * @return {CertificateResult | null} Null when the details carry no usable validity dates.
+ */
+function evaluateCertificate(securityDetails, nowSeconds) {
+  if (!securityDetails) return null;
+  const validFrom = toSeconds(securityDetails.validFrom);
+  const validTo = toSeconds(securityDetails.validTo);
+  if (validFrom === null || validTo === null) return null;
+
+  const daysRemaining = Math.floor((validTo - nowSeconds) / 86_400);
+  /** @type {CertificateResult['state']} */
+  let state = 'ok';
+  if (nowSeconds < validFrom) state = 'not-yet-valid';
+  else if (nowSeconds >= validTo) state = 'expired';
+  else if (daysRemaining <= CERT_WARN_DAYS) state = 'expiring-soon';
+
+  const text = (/** @type {unknown} */ v) => (typeof v === 'string' && v ? v : null);
+  return {
+    subject: text(securityDetails.subjectName),
+    issuer: text(securityDetails.issuer),
+    validFrom,
+    validTo,
+    daysRemaining,
+    state,
+  };
+}
+
+/**
+ * @param {number} seconds
+ * @return {string}
+ */
+const isoDate = seconds => new Date(seconds * 1000).toISOString().slice(0, 10);
+
+/**
+ * @param {CertificateResult | null} result
+ * @return {Product}
+ */
+function certificateProduct(result) {
+  if (!result) {
+    return {
+      score: 1,
+      notApplicable: true,
+      explanation:
+        'The browser reported no certificate dates for this page (for example a reused connection).',
+    };
+  }
+
+  /** @type {import('lighthouse/types/audit.js').default.Details.Table['headings']} */
+  const headings = [
+    {key: 'subject', valueType: 'text', label: 'Issued to'},
+    {key: 'issuer', valueType: 'text', label: 'Issuer'},
+    {key: 'validFrom', valueType: 'text', label: 'Valid from'},
+    {key: 'validTo', valueType: 'text', label: 'Valid until'},
+    {key: 'daysRemaining', valueType: 'numeric', label: 'Days remaining'},
+  ];
+  const details = Audit.makeTableDetails(headings, [
+    {
+      subject: result.subject || '',
+      issuer: result.issuer || '',
+      validFrom: isoDate(result.validFrom),
+      validTo: isoDate(result.validTo),
+      daysRemaining: result.daysRemaining,
+    },
+  ]);
+  const who = result.subject ? `The certificate for ${result.subject}` : 'The certificate';
+
+  if (result.state === 'expired') {
+    return {
+      score: 0,
+      displayValue: 'Expired',
+      explanation: `${who} expired on ${isoDate(result.validTo)}.`,
+      details,
+    };
+  }
+  if (result.state === 'not-yet-valid') {
+    return {
+      score: 0,
+      displayValue: 'Not yet valid',
+      explanation: `${who} is not valid until ${isoDate(result.validFrom)}.`,
+      details,
+    };
+  }
+  const days = result.daysRemaining;
+  const displayValue = days === 1 ? '1 day remaining' : `${days} days remaining`;
+  if (result.state === 'expiring-soon') {
+    return {
+      score: 0.5,
+      displayValue,
+      warnings: [
+        `${who} expires on ${isoDate(
+          result.validTo
+        )} (${days} day(s) from now); renew it before then.`,
+      ],
+      details,
+    };
+  }
+  return {score: 1, displayValue, details};
+}
+
 export {
   classifyMixedContent,
   mixedContentProduct,
   evaluateHsts,
   hstsProduct,
+  findSecurityDetails,
+  evaluateCertificate,
+  certificateProduct,
   HSTS_MIN_MAX_AGE,
   CERT_WARN_DAYS,
   MAX_ROWS,

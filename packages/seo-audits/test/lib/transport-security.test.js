@@ -11,6 +11,9 @@ const {
   mixedContentProduct,
   evaluateHsts,
   hstsProduct,
+  findSecurityDetails,
+  evaluateCertificate,
+  certificateProduct,
   MAX_ROWS,
 } = require('../../src/lib/transport-security.js');
 
@@ -335,5 +338,160 @@ describe('hstsProduct', () => {
     expect(product.score).toBe(0);
     expect(product.explanation).toMatch(/No Strict-Transport-Security header/);
     expect(/** @type {any} */ (product.details).items).toHaveLength(1);
+  });
+});
+
+describe('findSecurityDetails', () => {
+  const response = (/** @type {string} */ requestId, /** @type {any} */ securityDetails) => ({
+    method: 'Network.responseReceived',
+    params: {requestId, response: {url: 'https://example.com/', securityDetails}},
+  });
+
+  it('returns the details of the matching response', () => {
+    const log = [
+      {method: 'Network.requestWillBeSent', params: {requestId: 'A'}},
+      response('B', {validTo: 1}),
+      response('A', {validTo: 2}),
+    ];
+    expect(findSecurityDetails(log, 'A')).toEqual({validTo: 2});
+  });
+
+  it('takes the last matching response when a request id repeats', () => {
+    expect(
+      findSecurityDetails([response('A', {validTo: 1}), response('A', {validTo: 2})], 'A')
+    ).toEqual({
+      validTo: 2,
+    });
+  });
+
+  it('is null with no match, no details, or a log that is not an array', () => {
+    expect(findSecurityDetails([response('B', {validTo: 1})], 'A')).toBeNull();
+    expect(findSecurityDetails([response('A', undefined)], 'A')).toBeNull();
+    expect(findSecurityDetails([response('A', 'nope')], 'A')).toBeNull();
+    expect(findSecurityDetails(undefined, 'A')).toBeNull();
+    expect(findSecurityDetails({}, 'A')).toBeNull();
+  });
+
+  it('tolerates malformed entries', () => {
+    const log = [
+      null,
+      7,
+      {},
+      {method: 'Network.responseReceived'},
+      {method: 'Network.responseReceived', params: {requestId: 'A'}},
+      response('A', {validTo: 3}),
+    ];
+    expect(findSecurityDetails(log, 'A')).toEqual({validTo: 3});
+  });
+});
+
+describe('evaluateCertificate', () => {
+  const DAY = 86_400;
+  const NOW = 1_800_000_000;
+  const cert = (/** @type {number} */ fromOffset, /** @type {number} */ toOffset, extra = {}) => ({
+    subjectName: 'example.com',
+    issuer: 'Test CA',
+    validFrom: NOW + fromOffset,
+    validTo: NOW + toOffset,
+    ...extra,
+  });
+
+  it('is null without usable dates', () => {
+    expect(evaluateCertificate(null, NOW)).toBeNull();
+    expect(evaluateCertificate({}, NOW)).toBeNull();
+    expect(evaluateCertificate({validFrom: NOW, validTo: NaN}, NOW)).toBeNull();
+    expect(evaluateCertificate({validFrom: 'soon', validTo: NOW}, NOW)).toBeNull();
+    expect(evaluateCertificate({validFrom: NOW, validTo: ''}, NOW)).toBeNull();
+  });
+
+  it('is ok well before expiry', () => {
+    expect(evaluateCertificate(cert(-DAY, 60 * DAY), NOW)).toMatchObject({
+      state: 'ok',
+      daysRemaining: 60,
+      subject: 'example.com',
+      issuer: 'Test CA',
+    });
+  });
+
+  it('warns at exactly 15 days and passes at 16', () => {
+    expect(evaluateCertificate(cert(-DAY, 15 * DAY), NOW)?.state).toBe('expiring-soon');
+    expect(evaluateCertificate(cert(-DAY, 16 * DAY), NOW)?.state).toBe('ok');
+    expect(evaluateCertificate(cert(-DAY, 16 * DAY - 1), NOW)?.state).toBe('expiring-soon');
+  });
+
+  it('is expired at and after validTo, with a negative day count', () => {
+    expect(evaluateCertificate(cert(-90 * DAY, 0), NOW)?.state).toBe('expired');
+    const past = evaluateCertificate(cert(-90 * DAY, -3 * DAY), NOW);
+    expect(past).toMatchObject({state: 'expired', daysRemaining: -3});
+  });
+
+  it('is not yet valid before validFrom', () => {
+    expect(evaluateCertificate(cert(2 * DAY, 90 * DAY), NOW)?.state).toBe('not-yet-valid');
+  });
+
+  it('accepts dates given as numeric strings, and nulls out non-string names', () => {
+    const r = evaluateCertificate(
+      {validFrom: String(NOW - DAY), validTo: String(NOW + 30 * DAY), subjectName: 5, issuer: ''},
+      NOW
+    );
+    expect(r).toMatchObject({state: 'ok', subject: null, issuer: null});
+  });
+});
+
+describe('certificateProduct', () => {
+  const DAY = 86_400;
+  const NOW = 1_800_000_000;
+  const product = (/** @type {number} */ toOffset, fromOffset = -90 * DAY) =>
+    certificateProduct(
+      evaluateCertificate(
+        {
+          subjectName: 'example.com',
+          issuer: 'Test CA',
+          validFrom: NOW + fromOffset,
+          validTo: NOW + toOffset,
+        },
+        NOW
+      )
+    );
+
+  it('is not applicable, with a reason, when there are no dates', () => {
+    const p = certificateProduct(null);
+    expect(p).toMatchObject({score: 1, notApplicable: true});
+    expect(p.explanation).toMatch(/no certificate dates/);
+  });
+
+  it('passes with days remaining and no warning', () => {
+    const p = product(60 * DAY);
+    expect(p).toMatchObject({score: 1, displayValue: '60 days remaining'});
+    expect(p.warnings).toBeUndefined();
+    expect(/** @type {any} */ (p.details).items[0]).toMatchObject({
+      subject: 'example.com',
+      daysRemaining: 60,
+    });
+  });
+
+  it('scores 0.5 with a warning inside the 15-day band', () => {
+    const p = product(10 * DAY);
+    expect(p.score).toBe(0.5);
+    expect(p.displayValue).toBe('10 days remaining');
+    expect(p.warnings).toHaveLength(1);
+    expect(String(p.warnings && p.warnings[0])).toMatch(/example\.com .* renew/);
+  });
+
+  it('uses the singular for one day', () => {
+    expect(product(DAY).displayValue).toBe('1 day remaining');
+  });
+
+  it('scores 0 when expired, saying when', () => {
+    const p = product(-2 * DAY);
+    expect(p.score).toBe(0);
+    expect(p.displayValue).toBe('Expired');
+    expect(p.explanation).toMatch(/expired on \d{4}-\d{2}-\d{2}/);
+  });
+
+  it('scores 0 when not yet valid', () => {
+    const p = product(90 * DAY, 2 * DAY);
+    expect(p.score).toBe(0);
+    expect(p.explanation).toMatch(/not valid until/);
   });
 });
