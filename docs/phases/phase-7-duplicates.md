@@ -33,7 +33,7 @@ repo has no crawler, so three decisions were confirmed with the developer:
 | # | Feature | Status | Slug / notes |
 |---|---------|--------|--------------|
 | 0 | Multi-page crawler core (prerequisite) | **done** | `site-crawler`, full 9-stage pipeline: bounded same-origin fetch at depth 1, versioned snapshot, on-disk cache, `SiteCrawl` gatherer. Spec: `docs/feature-specs/site-crawler.md`. |
-| 1 | Duplicate titles and duplicate meta descriptions across crawled pages | planned | reads the snapshot |
+| 1 | Duplicate titles and duplicate meta descriptions across crawled pages | **done** | `duplicate-titles`, `duplicate-descriptions` (one shared lib, `crawl-duplicates.js`), built lightweight after a short design conversation: exact match after trim + case-fold, empties ignored, fails when the audited page shares a value with at least one other crawled page. QA'd live with `lhci collect` + `lhci assert` against a local site. |
 | 2 | Text-to-HTML ratio / thin-content flagging | planned | reads the snapshot (and the audited page) |
 | 3 | Duplicate or conflicting canonical declarations across pages | planned | reads the snapshot |
 | 4 | Exact duplicate visible content (hash of normalised text) | planned | reads the snapshot; needs full-body reads, so it sets the crawler's body-size cap |

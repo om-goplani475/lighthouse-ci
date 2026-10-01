@@ -611,6 +611,13 @@ Lighthouse run** as the `SiteCrawl` gatherer; `lhci autorun` needs no extra step
 - **`crawl-coverage`** (informational, never fails) shows what was crawled, what was blocked or skipped, and the limits
   in one table. Leave it out of `assertions`: Lighthouse normalises an informational score to 1, so a `minScore`
   assertion on it always passes.
+- **`duplicate-titles`** and **`duplicate-descriptions`** (scored) fail when at least one other crawled page has the
+  same `<title>` (or meta description) as the audited page. Values match when equal after trimming and ignoring case,
+  nothing fuzzier (`Home | Site` and `Home - Site` are different). An empty value never counts: a missing title or
+  description is already reported by Lighthouse's own SEO audits, and the audit is not applicable when the audited page
+  has none. Two requested URLs that end on one final URL are one page. They only see the pages the crawl reached (the
+  audited page, its own links and the sitemap URLs), so a duplicate on a page the crawl did not reach is not reported:
+  read `crawl-coverage` for how much was seen. Both are `assert`-able, e.g. `'duplicate-titles': ['error', {minScore: 1}]`.
 
 **Environment variables** (read per run, clamped; a page can never change them):
 
@@ -717,7 +724,7 @@ module.exports = {
 };
 ```
 
-This adds all forty-one audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all forty-three audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
@@ -728,16 +735,16 @@ This adds all forty-one audits (`structured-data-json-ld`, `structured-data-sche
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
 `sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`, `mixed-content`, `hsts-quality`,
 `ssl-certificate-expiry`, `soft-not-found`, `url-variant-consistency`, `redirect-chain-length`,
-`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`) on top of
+`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the forty-one audits are part of this fork's shared `all`/`recommended` presets
+None of the forty-three audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all forty-one here are opt-in via `configPath`, so they can't be part of that
+default, and all forty-three here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
