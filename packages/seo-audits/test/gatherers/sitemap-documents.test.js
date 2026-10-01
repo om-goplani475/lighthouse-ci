@@ -607,3 +607,179 @@ describe('collectSitemapDocuments — the sampled page section (urlSample)', () 
     expect(artifact.urlSample.pages.map(p => p.error)).toEqual(['ECONNREFUSED', null]);
   });
 });
+
+describe('collectSitemapDocuments — the shared time budget for discovery and the documents', () => {
+  const ROBOTS3 = {
+    body: 'Sitemap: https://example.com/a.xml\nSitemap: https://example.com/b.xml\nSitemap: https://example.com/c.xml',
+  };
+  const index = (...locs) =>
+    `<sitemapindex xmlns="${NS}">${locs
+      .map(l => `<sitemap><loc>${l}</loc></sitemap>`)
+      .join('')}</sitemapindex>`;
+
+  /**
+   * A fetcher that advances a fake clock by `cost(url)` per request, and records the timeout each
+   * request was given.
+   */
+  function timedFetch(routes, cost, clock) {
+    const seen = [];
+    const fetchBytes = async (url, options) => {
+      seen.push([url, options.timeoutMs]);
+      clock.now += cost(url);
+      const route = routes[url];
+      if (!route) return {status: 404, redirectLocation: null, body: Buffer.alloc(0)};
+      return {
+        status: route.status ?? 200,
+        redirectLocation: null,
+        body: Buffer.from(route.body ?? ''),
+      };
+    };
+    return {fetchBytes, seen};
+  }
+
+  it('stops fetching declared sitemaps once the budget is used up, and says the run was cut short', async () => {
+    const clock = {now: 0};
+    const {fetchBytes, seen} = timedFetch(
+      {
+        'https://example.com/robots.txt': ROBOTS3,
+        'https://example.com/a.xml': {body: urlset('https://example.com/p1')},
+        'https://example.com/b.xml': {body: urlset('https://example.com/p2')},
+        'https://example.com/c.xml': {body: urlset('https://example.com/p3')},
+      },
+      url => (url.endsWith('robots.txt') ? 100 : 20_000),
+      clock
+    );
+    const artifact = await collectSitemapDocuments(PAGE, {
+      fetchBytes,
+      fetchPage: harmlessFetchPage,
+      env: {},
+      now: () => clock.now,
+      documentsBudgetMs: 30_000,
+    });
+    // robots.txt (0.1 s) + a.xml (20 s) leaves ~9.9 s: b.xml is fetched, c.xml has no time left.
+    expect(artifact.documents.map(d => d.url)).toEqual([
+      'https://example.com/a.xml',
+      'https://example.com/b.xml',
+    ]);
+    expect(artifact.documentsTruncated).toBe(true);
+    expect(seen.map(s => s[0])).not.toContain('https://example.com/c.xml');
+  });
+
+  it('gives each request no more time than the budget has left, so the phase cannot overrun', async () => {
+    const clock = {now: 0};
+    const {fetchBytes, seen} = timedFetch(
+      {
+        'https://example.com/robots.txt': ROBOTS3,
+        'https://example.com/a.xml': {body: urlset('https://example.com/p1')},
+        'https://example.com/b.xml': {body: urlset('https://example.com/p2')},
+      },
+      url => (url.endsWith('a.xml') ? 6_000 : 0),
+      clock
+    );
+    await collectSitemapDocuments(PAGE, {
+      fetchBytes,
+      fetchPage: harmlessFetchPage,
+      env: {},
+      now: () => clock.now,
+      documentsBudgetMs: 12_000,
+    });
+    const timeouts = Object.fromEntries(seen);
+    expect(timeouts['https://example.com/robots.txt']).toBe(5_000); // its own limit is below what is left
+    expect(timeouts['https://example.com/a.xml']).toBe(10_000); // 12 s left, capped at the request limit
+    expect(timeouts['https://example.com/b.xml']).toBe(6_000); // only 6 s left: clamped to what remains
+  });
+
+  it('does not start a request with under a second left (it could only time out)', async () => {
+    const clock = {now: 0};
+    const {fetchBytes, seen} = timedFetch(
+      {
+        'https://example.com/robots.txt': ROBOTS3,
+        'https://example.com/a.xml': {body: urlset('https://example.com/p1')},
+      },
+      url => (url.endsWith('a.xml') ? 9_500 : 0),
+      clock
+    );
+    const artifact = await collectSitemapDocuments(PAGE, {
+      fetchBytes,
+      fetchPage: harmlessFetchPage,
+      env: {},
+      now: () => clock.now,
+      documentsBudgetMs: 10_000,
+    });
+    // 0.5 s left after a.xml: below the one-second minimum, so b.xml and c.xml are never requested.
+    expect(seen.map(s => s[0])).toEqual([
+      'https://example.com/robots.txt',
+      'https://example.com/a.xml',
+    ]);
+    expect(artifact.documentsTruncated).toBe(true);
+  });
+
+  it("stops following an index's children when the budget runs out, and flags it", async () => {
+    const clock = {now: 0};
+    const children = Array.from({length: 6}, (_, i) => `https://example.com/c${i}.xml`);
+    const routes = {
+      'https://example.com/robots.txt': {body: 'Sitemap: https://example.com/index.xml'},
+      'https://example.com/index.xml': {body: index(...children)},
+    };
+    for (const c of children) routes[c] = {body: urlset('https://example.com/p')};
+    const {fetchBytes, seen} = timedFetch(routes, url => (url.includes('/c') ? 15_000 : 0), clock);
+    const artifact = await collectSitemapDocuments(PAGE, {
+      fetchBytes,
+      fetchPage: harmlessFetchPage,
+      env: {},
+      now: () => clock.now,
+      documentsBudgetMs: 40_000,
+    });
+    // 15 s each: c0 and c1 fit (30 s); 10 s left for c2 (clamped); then nothing is left for c3.
+    const fetchedChildren = seen.filter(s => s[0].includes('/c')).map(s => s[0]);
+    expect(fetchedChildren).toEqual([children[0], children[1], children[2]]);
+    expect(artifact.documentsTruncated).toBe(true);
+  });
+
+  it("still takes the page sample from the documents it did fetch, with the sample's own budget", async () => {
+    const clock = {now: 0};
+    const {fetchBytes} = timedFetch(
+      {
+        'https://example.com/robots.txt': ROBOTS3,
+        'https://example.com/a.xml': {
+          body: urlset('https://example.com/p1', 'https://example.com/p2'),
+        },
+      },
+      url => (url.endsWith('a.xml') ? 50_000 : 0), // the first document alone exhausts the documents budget
+      clock
+    );
+    const pagesRequested = [];
+    const artifact = await collectSitemapDocuments(PAGE, {
+      fetchBytes,
+      fetchPage: async url => {
+        pagesRequested.push(url);
+        return harmlessFetchPage();
+      },
+      env: {},
+      now: () => clock.now,
+      documentsBudgetMs: 40_000,
+    });
+    expect(artifact.documentsTruncated).toBe(true);
+    expect(artifact.urlSample.pages.map(p => p.url)).toEqual([
+      'https://example.com/p1',
+      'https://example.com/p2',
+    ]);
+    expect(pagesRequested).toHaveLength(2);
+  });
+
+  it('is invisible when there is time to spare: the default budget does not alter a normal run', async () => {
+    const {artifact} = await run({
+      'https://example.com/robots.txt': ROBOTS3,
+      'https://example.com/a.xml': {body: urlset('https://example.com/p1')},
+      'https://example.com/b.xml': {body: urlset('https://example.com/p2')},
+      'https://example.com/c.xml': {body: urlset('https://example.com/p3')},
+    });
+    expect(artifact.documents).toHaveLength(3);
+    expect(artifact.documentsTruncated).toBe(false);
+  });
+
+  it('exposes the documents budget as a constant of 40 seconds', () => {
+    expect(LIMITS.DOCUMENTS_BUDGET_MS).toBe(40_000);
+    expect(LIMITS.MIN_REQUEST_MS).toBe(1_000);
+  });
+});

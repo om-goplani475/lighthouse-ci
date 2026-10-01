@@ -36,6 +36,24 @@ const ROBOTS_TIMEOUT_MS = 5_000;
 const ROBOTS_MAX_BYTES = 1024 * 1024;
 
 /**
+ * A shared time budget for discovery and the sitemap documents. `timeout(max)` is how long the next
+ * request may take: its own limit, or the time left if that is shorter, so the phase as a whole
+ * cannot overrun the budget; `null` means too little is left to bother starting a request.
+ * @param {number} totalMs
+ * @param {() => number} now
+ * @return {{timeout: (maxMs: number) => number | null}}
+ */
+function createBudget(totalMs, now) {
+  const deadline = now() + totalMs;
+  return {
+    timeout(maxMs) {
+      const left = deadline - now();
+      return left < LIMITS.MIN_REQUEST_MS ? null : Math.min(maxMs, left);
+    },
+  };
+}
+
+/**
  * Fetches one sitemap document and turns whatever happened into a `SitemapDocument`.
  * @param {FetchBytes} fetchBytes
  * @param {string} url
@@ -43,11 +61,17 @@ const ROBOTS_MAX_BYTES = 1024 * 1024;
  * @param {string | null} parentUrl
  * @return {Promise<SitemapDocument>}
  */
-async function fetchDocument(fetchBytes, url, source, parentUrl) {
+async function fetchDocument(
+  fetchBytes,
+  url,
+  source,
+  parentUrl,
+  timeoutMs = LIMITS.REQUEST_TIMEOUT_MS
+) {
   let response;
   try {
     response = await fetchBytes(url, {
-      timeoutMs: LIMITS.REQUEST_TIMEOUT_MS,
+      timeoutMs,
       maxBytes: LIMITS.MAX_COMPRESSED_BYTES,
     });
   } catch (err) {
@@ -82,10 +106,10 @@ async function fetchDocument(fetchBytes, url, source, parentUrl) {
  * @param {string} robotsUrl
  * @return {Promise<{state: 'present', text: string} | {state: 'absent'} | {state: 'unavailable', reason: string}>}
  */
-async function fetchRobots(fetchBytes, robotsUrl) {
+async function fetchRobots(fetchBytes, robotsUrl, timeoutMs = ROBOTS_TIMEOUT_MS) {
   try {
     const {status, body} = await fetchBytes(robotsUrl, {
-      timeoutMs: ROBOTS_TIMEOUT_MS,
+      timeoutMs,
       maxBytes: ROBOTS_MAX_BYTES,
     });
     if (status >= 200 && status < 300) return {state: 'present', text: body.toString('utf-8')};
@@ -133,9 +157,10 @@ function isAbsoluteHttpUrl(value) {
  * check is never presented as a complete one.
  * @param {FetchBytes} fetchBytes
  * @param {SitemapDocumentsArtifact} artifact Mutated: children are appended to `documents`.
+ * @param {{timeout: (maxMs: number) => number | null}} budget
  * @return {Promise<void>}
  */
-async function followIndexes(fetchBytes, artifact) {
+async function followIndexes(fetchBytes, artifact, budget) {
   const roots = artifact.documents.filter(
     doc => doc.outcome === 'ok' && doc.kind === 'sitemapindex'
   );
@@ -148,8 +173,16 @@ async function followIndexes(fetchBytes, artifact) {
         artifact.documentsTruncated = true;
         return;
       }
+      const timeoutMs = budget.timeout(LIMITS.REQUEST_TIMEOUT_MS);
+      if (timeoutMs === null) {
+        // The shared time budget is used up: no more documents, and say so.
+        artifact.documentsTruncated = true;
+        return;
+      }
       seen.add(childUrl);
-      artifact.documents.push(await fetchDocument(fetchBytes, childUrl, 'index-child', root.url));
+      artifact.documents.push(
+        await fetchDocument(fetchBytes, childUrl, 'index-child', root.url, timeoutMs)
+      );
     }
   }
 }
@@ -158,9 +191,10 @@ async function followIndexes(fetchBytes, artifact) {
  * Discovery and the sitemap documents themselves; the page sample is added by the caller.
  * @param {{finalDisplayedUrl: string}} url
  * @param {FetchBytes} fetchBytes
+ * @param {{timeout: (maxMs: number) => number | null}} budget
  * @return {Promise<SitemapDocumentsArtifact>}
  */
-async function collectDocuments(url, fetchBytes) {
+async function collectDocuments(url, fetchBytes, budget) {
   const origin = new URL(url.finalDisplayedUrl).origin;
 
   /** @type {SitemapDocumentsArtifact} */
@@ -173,7 +207,11 @@ async function collectDocuments(url, fetchBytes) {
     urlSample: null,
   };
 
-  const robots = await fetchRobots(fetchBytes, `${origin}/robots.txt`);
+  const robots = await fetchRobots(
+    fetchBytes,
+    `${origin}/robots.txt`,
+    budget.timeout(ROBOTS_TIMEOUT_MS) ?? ROBOTS_TIMEOUT_MS
+  );
   if (robots.state === 'unavailable') {
     artifact.unavailableReason = robots.reason;
     return artifact;
@@ -193,15 +231,28 @@ async function collectDocuments(url, fetchBytes) {
   if (declared.length > 0) {
     artifact.discovery = 'robots-txt';
     for (const sitemapUrl of declared) {
-      artifact.documents.push(await fetchDocument(fetchBytes, sitemapUrl, 'declared', null));
+      const timeoutMs = budget.timeout(LIMITS.REQUEST_TIMEOUT_MS);
+      if (timeoutMs === null) {
+        artifact.documentsTruncated = true;
+        break;
+      }
+      artifact.documents.push(
+        await fetchDocument(fetchBytes, sitemapUrl, 'declared', null, timeoutMs)
+      );
     }
-    await followIndexes(fetchBytes, artifact);
+    await followIndexes(fetchBytes, artifact, budget);
     return artifact;
   }
 
   // Nothing declared: probe the default location. A 404/410 means "no sitemap" (item 1's
   // concern); any other failure means we can't tell.
-  const probe = await fetchDocument(fetchBytes, `${origin}/sitemap.xml`, 'default-location', null);
+  const probe = await fetchDocument(
+    fetchBytes,
+    `${origin}/sitemap.xml`,
+    'default-location',
+    null,
+    budget.timeout(LIMITS.REQUEST_TIMEOUT_MS) ?? LIMITS.REQUEST_TIMEOUT_MS
+  );
   if (probe.status === 404 || probe.status === 410) {
     artifact.discovery = 'none';
   } else if (
@@ -217,7 +268,7 @@ async function collectDocuments(url, fetchBytes) {
   } else {
     artifact.discovery = 'default-location';
     artifact.documents.push(probe);
-    await followIndexes(fetchBytes, artifact);
+    await followIndexes(fetchBytes, artifact, budget);
   }
   return artifact;
 }
@@ -234,15 +285,23 @@ async function collectDocuments(url, fetchBytes) {
  *   fetchPage?: typeof safeFetchPrefix,
  *   env?: NodeJS.ProcessEnv,
  *   now?: () => number,
+ *   documentsBudgetMs?: number,
  * }} [deps] Injectable so tests never touch the network; production always uses the
  *   SSRF-protected defaults.
  * @return {Promise<SitemapDocumentsArtifact>}
  */
 async function collectSitemapDocuments(
   url,
-  {fetchBytes = safeFetchBytes, fetchPage = safeFetchPrefix, env, now} = {}
+  {
+    fetchBytes = safeFetchBytes,
+    fetchPage = safeFetchPrefix,
+    env,
+    now,
+    documentsBudgetMs = LIMITS.DOCUMENTS_BUDGET_MS,
+  } = {}
 ) {
-  const artifact = await collectDocuments(url, fetchBytes);
+  const budget = createBudget(documentsBudgetMs, now ?? Date.now);
+  const artifact = await collectDocuments(url, fetchBytes, budget);
   if (artifact.discovery === 'robots-txt' || artifact.discovery === 'default-location') {
     artifact.urlSample = await collectUrlSample(artifact.documents, {fetchPage, env, now});
   }

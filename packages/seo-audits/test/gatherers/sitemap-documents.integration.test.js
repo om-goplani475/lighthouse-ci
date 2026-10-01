@@ -370,3 +370,50 @@ describe('collectSitemapDocuments — sampled pages, real local server', () => {
     expect(artifact.urlSample).toBeNull();
   });
 });
+
+describe('collectSitemapDocuments — the time budget, real hanging server', () => {
+  /** @type {http.Server} */
+  let server;
+  let base = '';
+
+  beforeEach(async () => {
+    server = http.createServer((req, res) => {
+      if (req.url === '/robots.txt') {
+        res.writeHead(200);
+        res.end(Array.from({length: 5}, (_, i) => `Sitemap: ${base}/s${i}.xml`).join('\n'));
+      }
+      // every sitemap hangs: it never sends a byte
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    base = `http://127.0.0.1:${server.address().port}`;
+  });
+
+  afterEach(async () => {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  });
+
+  it('ends a run of hanging sitemaps at the budget instead of 5 x the request timeout', async () => {
+    const started = Date.now();
+    const artifact = await collectSitemapDocuments(
+      {finalDisplayedUrl: `${base}/page`},
+      {
+        // Real request code with the permissive test-only lookup and the default 10 s request
+        // timeout: only the budget can end this early.
+        fetchBytes: (url, opts) => fetchBytesWithLookup(url, permissiveLookup, opts),
+        fetchPage: url => fetchPrefixWithLookup(url, permissiveLookup, {timeoutMs: 1000}),
+        documentsBudgetMs: 2500,
+      }
+    );
+    const elapsed = Date.now() - started;
+    // Without the budget this would take 5 x 10 s = 50 s. With 2.5 s it ends within a few seconds.
+    expect(elapsed).toBeLessThan(5000);
+    expect(artifact.documentsTruncated).toBe(true);
+    expect(artifact.documents.length).toBeLessThan(5);
+    expect(artifact.documents.every(d => d.outcome === 'network-error')).toBe(true);
+    // The document that was running when the budget ended was cut at the time left, not at 10 s.
+    expect(artifact.documents[artifact.documents.length - 1].errorMessage).toMatch(
+      /timed out after \d+ms/
+    );
+  }, 20000);
+});

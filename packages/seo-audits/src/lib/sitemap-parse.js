@@ -41,6 +41,13 @@ const LIMITS = {
   MAX_DEPTH: 32,
   MAX_INVALID_LOC_EXAMPLES: 20,
   REQUEST_TIMEOUT_MS: 10_000,
+  // One shared budget for discovering and fetching the sitemap files (robots.txt included). Without
+  // it the worst case was ~105 s (a robots.txt plus ten documents that each use their full request
+  // timeout). Past it, remaining documents are not fetched and `documentsTruncated` is set. The page
+  // sample has its own, separate 30 s budget (see sitemap-url-sample.js).
+  DOCUMENTS_BUDGET_MS: 40_000,
+  // A request given less time than this would only time out, so it is not started.
+  MIN_REQUEST_MS: 1_000,
 };
 
 class StopParsing extends Error {}
