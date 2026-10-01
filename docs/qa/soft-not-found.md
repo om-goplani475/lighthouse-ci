@@ -1,7 +1,7 @@
 # QA checklist: Soft-404 check (`soft-not-found`)
 
 - slug: soft-not-found
-- merged: not yet (branch `feat/soft-404`, lightweight mode, to merge into `phase-5-crawlability`)
+- merged: a6fc84f (into `phase-5-crawlability`, ff-only, lightweight mode)
 
 Covers the `soft-not-found` audit and the `Soft404Probe` gatherer. Verified with real Lighthouse and
 `lhci assert` runs against local servers with planted behaviours (using

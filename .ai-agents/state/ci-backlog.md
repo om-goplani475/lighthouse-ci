@@ -115,6 +115,17 @@
   `LHCI_SEO_ALLOW_PRIVATE_NETWORK=1` (the run warns and the audit is not applicable without it).
 - status: done (documented in the README and the audit description)
 
+## 2026-10-01 — url-variants
+
+- item: no gap found. No dependency, workflow or Docker change; the new suites and the config test were
+  run under Node 18.20.8, the version `ci.yml` pins.
+- status: done (nothing to do)
+
+- item: for any CI job: the probes send up to 18 status-only requests to the audited site's own `http://`
+  and `www` forms (visible in its logs). A staging site on a non-default port, `localhost` or an IP address
+  gets "not applicable", not a failure: the variants only make sense at the real host name on ports 80/443.
+- status: done (documented in the README and each audit's description)
+
 <!-- Appended by Agent 08. Advisory only — does not block merges or new features. Format per entry:
 
 ## {date} — {slug}

@@ -377,5 +377,33 @@ variable. Built in lightweight mode (see `docs/phases/phase-5-crawlability.md`).
 
 No `.lighthouserc.js` migration note needed: no new config keys.
 
+## url-variants (Phase 5 item 4, 2026-10-01)
+
+### Redirect consistency, chain length and loops for the URL's own forms
+
+**User-facing**: three new `seo-extended` audits (38 in total) that share one probe of the audited page's
+other forms: `http://` of the same host, and the host with `www` added or removed over `http` and `https`,
+always with the page's own path and query.
+
+- **`url-variant-consistency`** fails when another form serves the page directly (the same content at two
+  URLs), ends at a different origin, ends in an error, or drops the path/query. A temporary redirect (302)
+  and a form that does not exist are notes, not failures. Suggested severity: `warn`.
+- **`redirect-chain-length`** fails when a form takes more than 2 redirects (a geo/locale hop counts) or is
+  still redirecting after 5. Suggested: `warn`.
+- **`redirect-loop`** fails when a redirect returns to a URL already visited. Suggested: `error`.
+
+Redirects are followed by hand and only to the page's own host variants; any other target is recorded and
+never requested. At most three variants x 5 hops, 5 s per request, 20 s per variant, through the
+SSRF-protected fetch; the requests show in your site's logs. `www` is toggled only for an apex or `www.`
+host (not `app.example.com`: wildcard DNS would answer and be reported as a duplicate). Nothing is probed for
+an IP, `localhost`, a non-default port or a non-HTTPS page, where the audits are not applicable and say why.
+Redirects of the site's links wait for the crawler.
+
+**Internal/dev**: gatherer `UrlVariants`, pure logic in `src/lib/url-variants.js` (50 tests), three thin
+audits; built in lightweight mode after a short design conversation (probe the audited path, temporary
+redirects as notes, three audits on one gatherer). No new dependency, config key or environment variable.
+
+No `.lighthouserc.js` migration note needed: no new config keys.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->

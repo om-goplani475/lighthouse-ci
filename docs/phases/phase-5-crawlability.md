@@ -6,7 +6,7 @@ every item is done, deferred, to-do-later, or marked not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
-**Status: in progress (2026-10-01).** Items 1-3 done (`transport-security`, merged into this branch and QA'd live) and item 5 done (`soft-not-found`); item 4 planned.
+**Status: in progress (2026-10-01).** All five items done (1-3 `transport-security`, 5 `soft-not-found`, 4 `url-variants`), merged into this branch and QA'd live. Ready to close out (merging into `main` is the developer's call).
 
 ## Planning decisions (2026-10-01)
 
@@ -46,12 +46,12 @@ Not in core at all: certificate expiry, host-variant consistency, soft-404 detec
 | 1 | Mixed-content detection | **done** | `transport-security`, audit `mixed-content`. QA'd live, see `docs/qa/transport-security.md`. Active content or anything blocked fails; passive upgraded content is a note. Reads `DevtoolsLog` + `InspectorIssues`; no new gatherer, no new requests. |
 | 2 | HSTS header presence and quality | **done** | `transport-security`, audit `hsts-quality`. Fails on no header, `max-age` missing/0/under one year, or `preload` without its prerequisites. |
 | 3 | SSL certificate validity / expiry warning | **done** | `transport-security`, audit `ssl-certificate-expiry`. Reads `securityDetails` (`validFrom`/`validTo`) from the raw `Network.responseReceived` events in the `DevtoolsLog`; no outbound request. Scores 1 / 0.5 (15 days or fewer, with a warning) / 0; an already-expired certificate normally aborts the run, so the warning band is the real value. |
-| 4 | HTTP → HTTPS → www normalization consistency, plus redirect chains over 2 hops and loops (for the host variants) | planned | New gatherer `UrlVariants` (outbound probes, full pipeline). Chains and loops are followed manually with a hop cap, only for the audited URL's own `http`/`https`/`www`/non-`www` variants, never for the page's links. |
+| 4 | HTTP → HTTPS → www normalization consistency, plus redirect chains over 2 hops and loops (for the host variants) | **done** | New gatherer `UrlVariants` (outbound probes), built after a short design conversation, then lightweight code; three audits `url-variant-consistency`, `redirect-chain-length`, `redirect-loop`, QA'd live: see `docs/qa/url-variants.md`. Chains and loops are followed manually with a hop cap, only for the audited URL's own `http`/`https`/`www`/non-`www` variants, never for the page's links. |
 | 5 | Soft-404 detection | **done** | audit `soft-not-found` (id is not `soft-404`: see the README and `lighthouse-conventions.md`), gatherer `Soft404Probe`. Built lightweight, independent of item 4. Two made-up URLs (top-level and nested `.html`), one same-origin redirect hop, QA'd live: see `docs/qa/soft-not-found.md`. |
 
 Build order (1-3 and 5 done): 1-3 as one group (no gatherer, no outbound requests; built with the full
 pipeline although planned lightweight, see below), item 5 next because it did not depend on item 4, then
-item 4 (the host-variant gatherer, short design conversation, then lightweight code).
+item 4 (the host-variant gatherer, short design conversation, then lightweight code): all done.
 
 ## How the plan changed while building
 
@@ -62,6 +62,8 @@ item 4 (the host-variant gatherer, short design conversation, then lightweight c
   built first as its own gatherer instead of extending item 4's.
 - **The audit id is `soft-not-found`**: live `lhci assert` showed that an id with a hyphen followed by a
   digit (`soft-404`) makes every assert run fail on a phantom `soft404` audit (an LHCI quirk).
+
+- **Item 4's three roadmap rows became three audits on one gatherer** (consistency, chain length, loop), chosen with the developer so severities can differ (loops `error`, chains `warn`). Decisions made in the design conversation: probe the audited page's path and query (so a redirect that drops the path is caught), and a temporary redirect (302/307) is a note, not a failure. Added without a separate question, stated in the README: no `www` toggle for subdomains (wildcard DNS false positives), and no probing for IPs, `localhost`, non-default ports or non-HTTPS pages.
 
 ## Deferred
 

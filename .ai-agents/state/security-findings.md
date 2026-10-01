@@ -579,3 +579,34 @@ makes up to four status-only requests to the audited page's own origin.
 - Finding: none. `low`/`medium`/`high`/`critical`: 0. (One non-security defect was found in QA, an audit id
   that breaks `lhci assert`; see `docs/qa/soft-not-found.md`.)
 - Not verified: the Windows/IPv6-only network behaviour of `safeFetchStatus` (unchanged by this feature).
+
+## 2026-10-01 — url-variants (Phase 5 item 4, lightweight mode after a design conversation)
+
+Reviewed with the security checklist while building (no formal review stage; this is the first Phase 5
+gatherer that follows redirects, so the attacks below were **run against the real gatherer**, with a spy
+server). New surface: up to three redirect-following probes of the audited URL's own host variants.
+
+- **SSRF**: every URL starts from the audited page's own host (`http://host`, and the host with `www`
+  toggled) and path; each request goes through `safeFetchStatus` (scheme allowlist, address policy,
+  DNS-rebinding-safe lookup, no automatic redirect, 5 s). The one derived URL is a redirect target, and it
+  is requested **only if its host is one of the page's own two host variants, on the default port, over
+  http or https**. A redirect to another host, a lookalike (`example.com.evil.test`), `169.254.169.254`, a
+  CDN, another port, `file:` or `javascript:` is recorded and never requested: a spy server on another
+  port received **zero** requests, and the unit tests assert the exact list of requested URLs.
+  Note the audited host is `finalDisplayedUrl`, so a page that redirects to a chosen host makes that host
+  the base; the address policy (not the variant rule) is what stops that from reaching a private address,
+  and it does (the opt-in is the only way past it).
+- **Crawler abuse**: bounded at three variants, 5 hops each (6 requests per variant at most), 5 s per
+  request and a 20 s budget per variant (the variants run in parallel), so about 20 s worst case and 18
+  requests at most. Loops end at the first revisited URL (fragment ignored), a redirect to itself costs one
+  extra request, and an endless chain of distinct URLs stops at the hop limit (tested with 20 distinct hops:
+  6 requests made).
+- **Wildcard-DNS false positives**: not a security issue but an accuracy one, found while designing: probing
+  `www.app.example.com` would be answered by a wildcard record and reported as a duplicate. `www` is toggled
+  only for an apex or `www.` host; stated in the README.
+- **Data exposure**: no cookies or auth headers are sent; only the status and `Location` of each hop are
+  stored. URLs and error text in the report are cut (1,000 and 300 characters).
+- **Sandbox**: no new CDP session or Chromium flag.
+- Finding: none. `critical`/`high`/`medium`/`low`: 0.
+- Not verified: behaviour of the hop-following against a server that answers each hop slowly but within
+  5 s (the 20 s per-variant budget is unit-tested with a fake clock only).
