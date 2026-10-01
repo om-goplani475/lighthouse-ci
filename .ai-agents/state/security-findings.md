@@ -448,10 +448,10 @@ code**, not argued from reading it.
   NULs and control bytes, unterminated tags, adoption-agency and Noah's-Ark patterns, a gzip bomb fed
   to the parser as text.
 
-### Finding 6 (updates open Finding 3)
+### Finding 6 (updates Finding 3)
 
 - severity: low
-- finding: the gatherer's worst-case wall time grew. Finding 3 (open) noted roughly 105 s for the
+- finding: the gatherer's worst-case wall time grew. Finding 3 noted roughly 105 s for the
   documents. The page sample adds up to about **30 s**: measured with 25 listed pages that never send
   headers, `collectSitemapDocuments` took **30.1 s** (30 requests, every page retried once, 15 pages
   errored, 10 reported not-checked), because the 30 s budget stops new requests but lets in-flight ones
@@ -504,4 +504,4 @@ code**, not argued from reading it.
 - The audit cannot see a noindex or canonical injected by client-side JavaScript (stated in its own
   description). That is a coverage limit, not a vulnerability.
 
-No `critical` or `high` findings. Finding 6 is `low` (open, with Finding 3); Finding 5 is resolved.
+No `critical` or `high` findings, and none open: Findings 3 and 6 (`low`) were resolved 2026-10-01 by the time-budget fix, and Finding 5 is resolved.

@@ -57,7 +57,13 @@
   failures were never confirmed against `phase-4-robots-sitemap` before the merge. Worth running the
   same suites on the base commit (or reading a recent green CI run) so a real regression can't hide
   behind "probably environment".
-- status: open
+- resolved 2026-10-01: ran every suite outside seo-audits on `main` (d81c198) and on the pre-Phase-4 base
+  (9825814). Same failure families on both (CLI, server e2e/Storybook, viewer e2e, utils build-context):
+  12 failing suites / 106 tests on main, 14 / 111 on base. The sets differ by a few suites that fail
+  intermittently under load (collect-psi on main; autorun-start-server, collect, upload on base), so those
+  are flaky, not caused by this work. `git diff 9825814..main` touches nothing outside `packages/seo-audits`,
+  `docs/` and `.ai-agents/`, so a regression from Phase 4 is not possible in those packages.
+- status: done
 
 ## 2026-10-01 — sitemap-indexability
 
@@ -73,7 +79,8 @@
   `npm run test` (mostly Storybook/Puppeteer image tests in `packages/server`) have never been compared
   with the base branch. This feature again touched only `packages/seo-audits`, so it adds no new
   evidence either way.
-- status: open
+- resolved (same check as above) 2026-10-01: ran every suite outside seo-audits on `main` (d81c198) and on the pre-Phase-4 base
+- status: done
 
 - item: worth knowing for any CI job that runs these audits: `lhci assert` prints "All results
   processed!" and exits 0 when there is no report to check, so a `lhci collect` that failed to produce
