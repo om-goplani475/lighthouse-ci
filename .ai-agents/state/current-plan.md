@@ -1,11 +1,13 @@
-# Current plan — transport-security
+# Current plan — site-crawler
 
-- [x] task-01: Mixed-content classification — complete
-- [x] task-02: HSTS evaluation — complete
-- [x] task-03: Certificate expiry evaluation — complete
-- [x] task-04: Resolve inputs from the devtools log — complete
-- [x] task-05: mixed-content audit — complete
-- [x] task-06: hsts-quality audit — complete
-- [x] task-07: ssl-certificate-expiry audit — complete
-- [x] task-08: Register the audits — complete
-- [x] task-09: README — complete
+- [ ] task-01: Declare the htmlparser2 dependency — pending
+- [ ] task-02: Crawl snapshot types and helpers — pending
+- [ ] task-03: Page extraction with htmlparser2 — pending
+- [ ] task-04: User-agent option on safeFetchPrefix — pending
+- [ ] task-05: Crawl snapshot cache — pending
+- [ ] task-06: The crawl orchestration — pending
+- [ ] task-07: The SiteCrawl gatherer — pending
+- [ ] task-08: The crawl-coverage audit — pending
+- [ ] task-09: Register the gatherer and audit — pending
+- [ ] task-10: Integration test against a real local site — pending
+- [ ] task-11: README — pending
