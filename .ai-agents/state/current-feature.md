@@ -1,7 +1,9 @@
 # Current feature
 
 - slug: sitemap-indexability
-- stage: 03-sequenced
+- stage: 04-implemented (Gate 3 review pending; no PR: not pushing, per developer's push-it-yourself rule)
+- base_branch: phase-4-robots-sitemap
+- base_commit: 58c6a52
 - spec: docs/feature-specs/sitemap-indexability.md
 - audit_spec: docs/audit-specs/sitemap-indexability.md
 - contract: docs/feature-contracts/sitemap-indexability.md
