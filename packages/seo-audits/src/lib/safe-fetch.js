@@ -455,6 +455,21 @@ function statusWithLookup(urlString, lookup, {timeoutMs = 5000} = {}) {
   });
 }
 
+const MAX_USER_AGENT_LENGTH = 200;
+
+/**
+ * @param {unknown} value
+ * @return {value is string}
+ */
+function isValidUserAgent(value) {
+  return (
+    typeof value === 'string' &&
+    value.length >= 1 &&
+    value.length <= MAX_USER_AGENT_LENGTH &&
+    /^[\x20-\x7e]+$/.test(value)
+  );
+}
+
 /**
  * Fetches raw response bytes, for callers (sitemaps) that need the body itself and the status of
  * *any* response — unlike `fetchJsonWithLookup` this resolves non-2xx responses (including a 3xx
@@ -464,17 +479,24 @@ function statusWithLookup(urlString, lookup, {timeoutMs = 5000} = {}) {
  * `timeoutMs` is a *total* wall-clock deadline for the whole request, not only a socket idle
  * timeout like its siblings: a server trickling one byte every few seconds never trips an idle
  * timeout, and with a multi-MiB byte cap could otherwise hold a request open almost indefinitely.
+ * `userAgent` (optional) is sent as the `User-Agent` header, validated exactly as in `fetchPrefixWithLookup`
+ * (printable ASCII, 1 to 200 characters, otherwise rejected before any lookup or connection). Absent, no
+ * `User-Agent` is sent, exactly as before.
  * @param {string} urlString
  * @param {typeof safeLookup} lookup
- * @param {{timeoutMs?: number, maxBytes?: number}} [options]
+ * @param {{timeoutMs?: number, maxBytes?: number, userAgent?: string}} [options]
  * @return {Promise<{status: number, redirectLocation: string | null, body: Buffer}>}
  */
 function fetchBytesWithLookup(
   urlString,
   lookup,
-  {timeoutMs = 10_000, maxBytes = 15 * 1024 * 1024} = {}
+  {timeoutMs = 10_000, maxBytes = 15 * 1024 * 1024, userAgent} = {}
 ) {
   return new Promise((resolve, reject) => {
+    if (userAgent !== undefined && !isValidUserAgent(userAgent)) {
+      reject(new Error('refusing to fetch: userAgent must be 1 to 200 printable ASCII characters'));
+      return;
+    }
     /** @type {URL} */
     let url;
     try {
@@ -510,7 +532,10 @@ function fetchBytesWithLookup(
         method: 'GET',
         // @ts-expect-error - see fetchJsonWithLookup's identical comment on `lookup`.
         lookup,
-        headers: {Accept: 'application/xml, text/xml, application/gzip, */*'},
+        headers: {
+          Accept: 'application/xml, text/xml, application/gzip, */*',
+          ...(userAgent === undefined ? {} : {'User-Agent': userAgent}),
+        },
       },
       res => {
         const status = res.statusCode ?? 0;
@@ -597,21 +622,6 @@ function collectPrefixHeaders(rawHeaders) {
     }
   }
   return headers;
-}
-
-const MAX_USER_AGENT_LENGTH = 200;
-
-/**
- * @param {unknown} value
- * @return {value is string}
- */
-function isValidUserAgent(value) {
-  return (
-    typeof value === 'string' &&
-    value.length >= 1 &&
-    value.length <= MAX_USER_AGENT_LENGTH &&
-    /^[\x20-\x7e]+$/.test(value)
-  );
 }
 
 /**
@@ -828,9 +838,10 @@ function safeFetchJson(urlString, options) {
  * Fetches a URL's raw bytes, with the same SSRF/DoS protections as `safeFetchJson`: scheme
  * allowlist, private/reserved-IP blocking (literal and post-DNS), DNS-rebinding-resistant lookup,
  * no redirects followed, a total timeout, and a byte cap. Non-2xx responses are *returned*, not
- * thrown, so the caller can record the status (and a redirect's `Location`).
+ * thrown, so the caller can record the status (and a redirect's `Location`). An optional validated
+ * `userAgent` identifies the caller (see `fetchBytesWithLookup`).
  * @param {string} urlString
- * @param {{timeoutMs?: number, maxBytes?: number}} [options]
+ * @param {{timeoutMs?: number, maxBytes?: number, userAgent?: string}} [options]
  * @return {Promise<{status: number, redirectLocation: string | null, body: Buffer}>}
  */
 function safeFetchBytes(urlString, options) {

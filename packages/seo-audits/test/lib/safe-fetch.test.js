@@ -1043,3 +1043,111 @@ describe('fetchPrefixWithLookup and safeFetchPrefix: the userAgent option', () =
     });
   });
 });
+
+describe('fetchBytesWithLookup and safeFetchBytes: the userAgent option', () => {
+  /** @type {http.Server} */
+  let server;
+  let port = 0;
+  /** @type {Array<Record<string, string | string[] | undefined>>} */
+  let requests = [];
+  /** @type {string[]} */
+  let lookups = [];
+
+  beforeEach(async () => {
+    requests = [];
+    lookups = [];
+    server = http.createServer((req, res) => {
+      requests.push(req.headers);
+      res.writeHead(200, {'Content-Type': 'text/plain'});
+      res.end('User-agent: *');
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    port = /** @type {any} */ (server.address()).port;
+  });
+  afterEach(async () => {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  });
+
+  const spyLookup = (
+    /** @type {string} */ hostname,
+    /** @type {any} */ options,
+    /** @type {any} */ callback
+  ) => {
+    lookups.push(hostname);
+    if (options && options.all) callback(null, [{address: '127.0.0.1', family: 4}]);
+    else callback(null, '127.0.0.1', 4);
+  };
+  const url = () => `http://example.test:${port}/robots.txt`;
+
+  it('sends a valid user-agent as the User-Agent header and still returns the body', async () => {
+    const result = await fetchBytesWithLookup(url(), spyLookup, {
+      userAgent: 'lhci-seo-audits-crawler/1.0',
+    });
+    expect(requests[0]['user-agent']).toBe('lhci-seo-audits-crawler/1.0');
+    expect(result.status).toBe(200);
+    expect(result.body.toString()).toBe('User-agent: *');
+  });
+
+  it('accepts the shortest and the longest allowed values', async () => {
+    await fetchBytesWithLookup(url(), spyLookup, {userAgent: 'a'});
+    await fetchBytesWithLookup(url(), spyLookup, {userAgent: 'a'.repeat(200)});
+    expect(requests[1]['user-agent']).toHaveLength(200);
+  });
+
+  it('sends no User-Agent header when the option is absent, and keeps the Accept header', async () => {
+    await fetchBytesWithLookup(url(), spyLookup);
+    await fetchBytesWithLookup(url(), spyLookup, {timeoutMs: 2000, maxBytes: 1000});
+    for (const headers of requests) {
+      expect(headers['user-agent']).toBeUndefined();
+      expect(headers.accept).toMatch(/application\/xml/);
+    }
+  });
+
+  it.each([
+    ['empty', ''],
+    ['too long', 'a'.repeat(201)],
+    ['CRLF header injection', 'ok\r\nX-Injected: 1'],
+    ['NUL', 'a\0b'],
+    ['a tab', 'a\tb'],
+    ['non-ASCII', 'café'],
+    ['a number', 5],
+    ['null', null],
+    ['an array', ['x']],
+  ])('rejects %s before any DNS lookup or connection', async (_name, value) => {
+    await expect(
+      fetchBytesWithLookup(url(), spyLookup, {userAgent: /** @type {any} */ (value)})
+    ).rejects.toThrow(/userAgent must be 1 to 200 printable ASCII/);
+    expect(lookups).toEqual([]);
+    expect(requests).toEqual([]);
+  });
+
+  describe('through the real default path', () => {
+    const original = process.env[ALLOW_PRIVATE_NETWORK_ENV];
+    afterEach(() => {
+      if (original === undefined) delete process.env[ALLOW_PRIVATE_NETWORK_ENV];
+      else process.env[ALLOW_PRIVATE_NETWORK_ENV] = original;
+    });
+
+    it('sends the header when opted in, and still refuses a loopback URL when not', async () => {
+      process.env[ALLOW_PRIVATE_NETWORK_ENV] = '1';
+      await safeFetchBytes(`http://127.0.0.1:${port}/`, {userAgent: 'crawler/1'});
+      expect(requests[0]['user-agent']).toBe('crawler/1');
+
+      delete process.env[ALLOW_PRIVATE_NETWORK_ENV];
+      requests = [];
+      await expect(
+        safeFetchBytes(`http://127.0.0.1:${port}/`, {userAgent: 'crawler/1'})
+      ).rejects.toThrow(/private\/reserved/);
+      expect(requests).toEqual([]);
+    });
+
+    it('rejects an invalid user-agent without a connection even when the address is allowed', async () => {
+      process.env[ALLOW_PRIVATE_NETWORK_ENV] = '1';
+      await expect(
+        safeFetchBytes(`http://127.0.0.1:${port}/`, {userAgent: 'bad\r\nHost: evil'})
+      ).rejects.toThrow(/userAgent must be/);
+      expect(requests).toEqual([]);
+    });
+  });
+});

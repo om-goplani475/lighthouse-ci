@@ -556,15 +556,31 @@ describe('crawlSite: robots.txt', () => {
   );
 });
 
+describe('crawlSite: robots.txt identifies the crawler', () => {
+  it('sends the crawler user-agent with the robots.txt request, keeping its limits', async () => {
+    const fetchBytes = jest.fn(robots(404));
+    await crawl(makeSite({}), {fetchBytes});
+    const call = fetchBytes.mock.calls.find(([url]) => url.endsWith('/robots.txt'));
+    expect(call[1]).toMatchObject({userAgent: USER_AGENT});
+    expect(call[1].timeoutMs).toBeGreaterThan(0);
+    expect(call[1].maxBytes).toBeGreaterThan(0);
+  });
+});
+
 describe('crawlSite: the sitemap', () => {
   it('asks the Phase 4 discovery for the URLs, with the page sample switched off', async () => {
     const site = makeSite({});
     const collectSitemap = jest.fn(sitemapOf([u('/s1')]));
-    const fetchBytes = robots(404);
+    const fetchBytes = jest.fn(robots(404));
     await crawl(site, {collectSitemap, fetchBytes, env: {SOME: 'x'}});
     const [urlArg, deps] = collectSitemap.mock.calls[0];
     expect(urlArg).toEqual({finalDisplayedUrl: AUDITED});
-    expect(deps.fetchBytes).toBe(fetchBytes);
+    // The sitemap files are fetched through the same identified fetch as robots.txt.
+    await deps.fetchBytes('https://example.com/sitemap.xml', {timeoutMs: 1});
+    expect(fetchBytes).toHaveBeenLastCalledWith('https://example.com/sitemap.xml', {
+      timeoutMs: 1,
+      userAgent: USER_AGENT,
+    });
     await expect(deps.fetchPage('https://example.com/x')).rejects.toThrow(
       /does not use the sitemap page sample/
     );

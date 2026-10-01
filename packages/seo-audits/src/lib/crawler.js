@@ -409,11 +409,14 @@ async function crawlSite(rawInput) {
     pageLinks,
     env = process.env,
     fetchPage = safeFetchPrefix,
-    fetchBytes = safeFetchBytes,
+    fetchBytes: fetchBytesRaw = safeFetchBytes,
     collectSitemap = collectSitemapDocuments,
     cache = {read: readSnapshot, write: writeSnapshot},
     now = Date.now,
   } = input;
+  // robots.txt and the sitemap files identify the crawler the same way its page requests do.
+  /** @type {typeof safeFetchBytes} */
+  const fetchBytes = (url, options) => fetchBytesRaw(url, {...options, userAgent: USER_AGENT});
   /** @type {(over: Partial<SiteCrawlArtifact>) => SiteCrawlArtifact} */
   const artifact = over => ({
     state: 'unavailable',
