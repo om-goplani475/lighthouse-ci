@@ -57,8 +57,9 @@ describe('seo-audits lighthouse-config', () => {
     // The gatherer the sitemap audits depend on must resolve too, or they would all error.
     expect(artifactIds).toContain('SitemapDocuments');
     expect(artifactIds).toContain('LlmsTxt');
+    expect(artifactIds).toContain('Soft404Probe');
 
-    // And all thirty-four of this fork's audits are actually added, not just defaults preserved.
+    // And all thirty-five of this fork's audits are actually added, not just defaults preserved.
     expect(auditIds).toContain('structured-data-json-ld');
     expect(auditIds).toContain('structured-data-schema-properties');
     expect(auditIds).toContain('structured-data-rich-result-eligibility');
@@ -93,9 +94,19 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('mixed-content');
     expect(auditIds).toContain('hsts-quality');
     expect(auditIds).toContain('ssl-certificate-expiry');
+    expect(auditIds).toContain('soft-not-found');
   }, 30000);
 
-  it('adds the seo-extended category with all thirty-four audits, without touching the core seo category', async () => {
+  it('has no audit id with a hyphen followed by a digit', async () => {
+    // `lhci assert` expands a hyphenated assertion key into a camelCase alias and drops the alias by
+    // comparing against a kebab-case conversion that puts no hyphen before digits. For an id such as
+    // `soft-404` the alias `soft404` is not recognised as a duplicate, so it is asserted as an unknown
+    // audit and every `lhci assert` run fails, whatever the audit scored (found in live QA).
+    const {auditIds} = await resolveConfig();
+    expect(auditIds.filter(id => /-\d/.test(id))).toEqual([]);
+  }, 30000);
+
+  it('adds the seo-extended category with all thirty-five audits, without touching the core seo category', async () => {
     const {categories} = await resolveConfig();
 
     expect(categories['seo-extended']).toBeDefined();
@@ -127,6 +138,7 @@ describe('seo-audits lighthouse-config', () => {
       'sitemap-url-status',
       'sitemap-valid',
       'social-preview-content',
+      'soft-not-found',
       'ssl-certificate-expiry',
       'structured-data-deprecated-properties',
       'structured-data-json-ld',
