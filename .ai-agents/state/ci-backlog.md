@@ -104,6 +104,17 @@
   and checked with a real `lhci assert`.
 - status: done (documented in `packages/seo-audits/README.md` and `docs/qa/transport-security.md`)
 
+## 2026-10-01 — soft-not-found
+
+- item: no gap found. No dependency, workflow or Docker change. The new tests and the config-resolution test
+  were run under Node 18.20.8, the version `ci.yml` pins (see the run recorded below).
+- status: done (nothing to do)
+
+- item: for any CI job: the new audit makes up to four status-only requests to the audited site, and they
+  appear as 404s in its access logs; auditing `localhost` or a private staging host needs
+  `LHCI_SEO_ALLOW_PRIVATE_NETWORK=1` (the run warns and the audit is not applicable without it).
+- status: done (documented in the README and the audit description)
+
 <!-- Appended by Agent 08. Advisory only — does not block merges or new features. Format per entry:
 
 ## {date} — {slug}

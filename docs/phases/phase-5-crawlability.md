@@ -6,7 +6,7 @@ every item is done, deferred, to-do-later, or marked not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
-**Status: in progress (2026-10-01).** Items 1-3 done (`transport-security`, merged into this branch and QA'd live); items 4-5 planned.
+**Status: in progress (2026-10-01).** Items 1-3 done (`transport-security`, merged into this branch and QA'd live) and item 5 done (`soft-not-found`); item 4 planned.
 
 ## Planning decisions (2026-10-01)
 
@@ -47,10 +47,21 @@ Not in core at all: certificate expiry, host-variant consistency, soft-404 detec
 | 2 | HSTS header presence and quality | **done** | `transport-security`, audit `hsts-quality`. Fails on no header, `max-age` missing/0/under one year, or `preload` without its prerequisites. |
 | 3 | SSL certificate validity / expiry warning | **done** | `transport-security`, audit `ssl-certificate-expiry`. Reads `securityDetails` (`validFrom`/`validTo`) from the raw `Network.responseReceived` events in the `DevtoolsLog`; no outbound request. Scores 1 / 0.5 (15 days or fewer, with a warning) / 0; an already-expired certificate normally aborts the run, so the warning band is the real value. |
 | 4 | HTTP → HTTPS → www normalization consistency, plus redirect chains over 2 hops and loops (for the host variants) | planned | New gatherer `UrlVariants` (outbound probes, full pipeline). Chains and loops are followed manually with a hop cap, only for the audited URL's own `http`/`https`/`www`/non-`www` variants, never for the page's links. |
-| 5 | Soft-404 detection | planned | Probes one random nonexistent path on the origin; a 200 (or a redirect to a 200) instead of a 404/410 is the finding. Extends the item-4 gatherer. |
+| 5 | Soft-404 detection | **done** | audit `soft-not-found` (id is not `soft-404`: see the README and `lighthouse-conventions.md`), gatherer `Soft404Probe`. Built lightweight, independent of item 4. Two made-up URLs (top-level and nested `.html`), one same-origin redirect hop, QA'd live: see `docs/qa/soft-not-found.md`. |
 
-Build order (1-3 done): 1-3 as one lightweight-mode group (no gatherer, no outbound requests), then item 4 (the
-gatherer, full pipeline), then item 5.
+Build order (1-3 and 5 done): 1-3 as one group (no gatherer, no outbound requests; built with the full
+pipeline although planned lightweight, see below), item 5 next because it did not depend on item 4, then
+item 4 (the host-variant gatherer, short design conversation, then lightweight code).
+
+## How the plan changed while building
+
+- **Items 1-3 ran the full 9-stage pipeline**, not the lightweight mode planned for them. Not needed for
+  concrete checks that read existing artifacts; item 5 was built lightweight, and item 4 will be a short
+  design conversation then lightweight code.
+- **Item 5 did not depend on item 4** (a soft-404 probe is two status requests to made-up paths), so it was
+  built first as its own gatherer instead of extending item 4's.
+- **The audit id is `soft-not-found`**: live `lhci assert` showed that an id with a hyphen followed by a
+  digit (`soft-404`) makes every assert run fail on a phantom `soft404` audit (an LHCI quirk).
 
 ## Deferred
 
@@ -64,7 +75,7 @@ gatherer, full pipeline), then item 5.
 
 | Item | When | Notes |
 |---|---|---|
-| Soft-404 content heuristics ("not found" wording on a 200 page) | after the crawler | the probe in item 5 detects a site that answers every path with 200; per-page heuristics need many pages |
+| Soft-404 content heuristics ("not found" wording on a 200 page) | after the crawler | the `soft-not-found` probe detects a site that answers made-up paths with 200; per-page heuristics need many pages |
 
 ## Not possible / permanently out of scope
 

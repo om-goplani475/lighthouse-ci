@@ -556,3 +556,26 @@ flowing into the report. Attacks below were **run against the real code**.
   the question.
 
 No `critical` or `high` findings. Finding 7 is `low` and resolved.
+
+## 2026-10-01 — soft-not-found (Phase 5 item 5, lightweight mode)
+
+Reviewed with the security checklist while building (lightweight mode, no formal review stage; every
+attack below was **run against the real gatherer and `safeFetchStatus`**). New surface: a gatherer that
+makes up to four status-only requests to the audited page's own origin.
+
+- **SSRF**: every URL is built from the page's origin plus a random token, never from anything the page
+  says; every request goes through `safeFetchStatus` (scheme allowlist, address policy, no redirect
+  followed, 5 s). The one derived URL is a redirect target, and it is requested only when it is on the
+  **same origin** (scheme, host and port): a redirect to another host, port, scheme, a scheme-relative
+  URL, `169.254.169.254`, `file:` or `javascript:` is classified and never requested. Run with a spy
+  server on another port: **zero** requests reached it. A redirect loop to itself costs one extra request.
+- **Crawler abuse**: bounded at four requests (two probes in parallel, one hop each), 5 s each, about 10 s
+  worst case; a server that never answers was cut at 5 s. The probes appear as 404s in the audited site's
+  logs; that is documented in the README and the audit description.
+- **Data exposure**: the requests carry no cookies or auth headers; only the status and a `Location` are
+  read, and the `Location` is cut to 1,000 characters in the report (a 60 KB `Location` is refused by Node's
+  parser and recorded as a failed probe). Error text is cut to 300 characters.
+- **Sandbox**: no new CDP session or Chromium flag.
+- Finding: none. `low`/`medium`/`high`/`critical`: 0. (One non-security defect was found in QA, an audit id
+  that breaks `lhci assert`; see `docs/qa/soft-not-found.md`.)
+- Not verified: the Windows/IPv6-only network behaviour of `safeFetchStatus` (unchanged by this feature).

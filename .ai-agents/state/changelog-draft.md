@@ -356,5 +356,26 @@ plain text in Lighthouse's report. No `critical` or `high` findings.
 
 No `.lighthouserc.js` migration note needed: no new config keys.
 
+## soft-not-found (Phase 5 item 5, 2026-10-01)
+
+### Soft-404 check
+
+**User-facing**: a new `seo-extended` audit, **`soft-not-found`**, requests two made-up URLs on your site
+(a top-level path and a nested `.html` path) and fails if either is answered as a normal page, or redirects
+to a same-origin page that returns 200, instead of 404 or 410 (a soft 404: catch-all routes and single-page
+apps are the usual cause, and search engines index the junk URLs). One redirect hop is followed, status only;
+a redirect to another origin is never requested; a server error is shown but does not fail. It sends up to
+four status-only requests (they show as 404s in your logs) through the SSRF-protected fetch, so auditing
+`localhost` needs `LHCI_SEO_ALLOW_PRIVATE_NETWORK=1`; without it the audit is not applicable and the run
+warns. Suggested severity: `warn`. The audit id is `soft-not-found`, not `soft-404`: an id with a hyphen
+followed by a digit makes `lhci assert` fail on a phantom audit (an LHCI quirk found in live QA).
+
+**Internal/dev**: gatherer `Soft404Probe` (`src/gatherers/soft-404-probe.js`), pure logic in
+`src/lib/soft-404.js`, thin audit. A guard test fails on any registered audit id matching `/-\d/`, and the
+rule is in `.ai-agents/prompts/lighthouse-conventions.md`. No new dependency, config key or environment
+variable. Built in lightweight mode (see `docs/phases/phase-5-crawlability.md`).
+
+No `.lighthouserc.js` migration note needed: no new config keys.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->
