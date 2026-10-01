@@ -349,6 +349,13 @@ audits use it. **How it works:**
   stops after 50,001 entries. One byte over each protocol limit is what lets `sitemap-limits` prove
   a file is over it without reading an unbounded amount. These are constants, deliberately not
   configurable: a knob that loosens a resource bound is a security decision.
+- **Total time**: robots.txt and all the sitemap files share one **40 s budget**; each request gets
+  the time left if that is less than its own 10 s limit, none is started with under 1 s left, and
+  running out sets the same "only the first N sitemap files were checked" truncation the 10-file cap
+  uses, so a cut-short run is never presented as complete. The page sample has its own separate
+  **30 s** budget. Worst case for the whole gatherer, measured on a site where four sitemaps hang and
+  every sampled page hangs: **about 70 s**. The cost: a very large sitemap on a slow server can be
+  truncated where it would once have been read in full.
 
 **The audits**
 

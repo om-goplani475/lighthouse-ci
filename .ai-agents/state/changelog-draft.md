@@ -302,5 +302,22 @@ worst case and still no overall time budget (Finding 6, with Finding 3). See
 
 No `.lighthouserc.js` migration note needed: no new config keys.
 
+### gatherer total time budget (2026-10-01, closes the last open security findings)
+
+**User-facing**: a run against a slow or unresponsive site is now bounded. The sitemap gatherer used to
+have no overall deadline (worst case about 105 s for robots.txt and the sitemap files, plus up to 30 s
+for the page sample). Discovery and all sitemap files now share one **40 s** budget, and the page sample
+keeps its own **30 s**: measured worst case, a site where four sitemaps and every listed page hang,
+**70 s**. When the budget runs out the remaining files are not fetched and the audits say "only the first
+N sitemap files were checked" (the same truncation as the 10-file cap), never a silent pass. The tradeoff:
+a very large sitemap on a slow server can now be truncated where it was once read in full.
+
+**Internal/dev**: `LIMITS.DOCUMENTS_BUDGET_MS` (40 s) and `LIMITS.MIN_REQUEST_MS` (1 s) in
+`sitemap-parse.js`; a small `createBudget` in the gatherer gives each request `min(its limit, time left)`
+so the phase cannot overrun. Injectable (`documentsBudgetMs`, `now`) for tests, with fake-clock tests and
+a real hanging-server test. Security-findings housekeeping in the same change: Findings 1 and 2 marked
+merged (`ad8557c`, `7ec20c4`), Finding 4 resolved by the private-network opt-in, Findings 3 and 6
+resolved here. **No open findings remain.**
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->

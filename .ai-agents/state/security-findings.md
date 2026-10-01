@@ -298,7 +298,7 @@ code that predates this feature; both were made reachable from page-controlled i
   or manifest URL (Phase 1/3, `open-graph-image-reachable`, `manifest-icons`), could make the CLI
   issue a GET to an internal service or metadata endpoint from wherever it runs. Blind (responses
   are not shown), but a GET can have side effects and the status/error text reaches the report.
-- status: resolved on `fix/sitemap-security-review-findings` (pending merge): the URL's brackets are
+- status: **resolved and merged** (`ad8557c`, 2026-09-30): the URL's brackets are
   stripped before the check, and `isPrivateIPv6` now works on the address bytes and covers mapped,
   compatible, NAT64, 6to4, multicast, documentation and discard ranges. 31 new regression tests fail
   on the old code and pass on the fix; the payloads above are refused before any connection.
@@ -310,7 +310,7 @@ code that predates this feature; both were made reachable from page-controlled i
   tag grows with nesting depth, and parsing is synchronous, so no fetch timeout can interrupt it.
   Measured: 96 KB of nested `<a>` took 17 s; a 1 MiB document did not finish in over five minutes.
   A hostile site's sitemap (or a child sitemap listed in its index) could hang the Lighthouse run.
-- status: resolved on `fix/sitemap-security-review-findings` (pending merge): `LIMITS.MAX_DEPTH = 32`
+- status: **resolved and merged** (`7ec20c4`, 2026-09-30): `LIMITS.MAX_DEPTH = 32`
   (real sitemaps nest 4-6 deep); exceeding it aborts parsing immediately and is reported as a parse
   error. The 96 KB case now takes 1 ms. Other shapes measured and fine: 1M flat elements (0.2 s), 40k
   attributes on one tag, 4k namespace declarations, a single 20 MiB `<loc>` (0.1 s).
@@ -322,8 +322,12 @@ code that predates this feature; both were made reachable from page-controlled i
   robots.txt) and the document count is bounded (10), but sequentially the worst case is about
   105 s of network time, plus a few seconds of synchronous parsing, before a run can finish.
   Bounded and documented, though the checklist prefers an explicit time budget.
-- status: open (backlog). Suggested: an overall budget of about 30 s after which remaining documents
-  are skipped and `documentsTruncated` is set.
+- status: **resolved 2026-10-01** by the commit "fix(seo-audits): cap the sitemap gatherer's total time":
+  one shared budget of `LIMITS.DOCUMENTS_BUDGET_MS` = 40 s covers robots.txt and every sitemap document
+  (each request gets `min(its own limit, time left)`, none is started with under 1 s left, and running out
+  sets `documentsTruncated`, which the audits already report). Tradeoff accepted: a very large sitemap on a
+  slow server can now be truncated where it used to be read in full. Measured worst case after the fix:
+  see Finding 6.
 
 ### Finding 4
 
@@ -332,7 +336,8 @@ code that predates this feature; both were made reachable from page-controlled i
   the sitemap audits silently not-applicable: the SSRF policy correctly refuses the page's own
   robots.txt, but the artifact records only `discovery: 'unavailable'`, not why, so nobody can tell
   a real "unavailable" from "refused by policy". Not a vulnerability; a diagnosability gap.
-- status: open (backlog). The README already states the localhost limitation.
+- status: **resolved 2026-09-30** by the private-network opt-in (`8a4e0f4`) and the run warning that names
+  the cause and the setting (`24e1bfd`). Entry kept open until now only because this line was never updated.
 
 ### Accepted by design decision, recorded for completeness
 
@@ -452,8 +457,11 @@ code**, not argued from reading it.
   errored, 10 reported not-checked), because the 30 s budget stops new requests but lets in-flight ones
   finish. Combined worst case is therefore about 135-145 s. Still bounded and reported honestly, still
   no overall deadline.
-- status: open (backlog), the same fix as Finding 3: one overall budget for the whole gatherer. The
-  developer plans to address Findings 1-4 after this item; this one should be fixed with Finding 3.
+- status: **resolved 2026-10-01** together with Finding 3. Re-measured with the worst site the gatherer can
+  be pointed at (four of five sitemaps hang, and every sampled page hangs): **70.0 s** wall time, down
+  from the ~135-145 s estimate (40 s for discovery and the documents plus the page sample's own 30 s;
+  10 of 25 pages reported as not checked). The documents budget is also tested with a real hanging
+  server: five hanging sitemaps end at the budget instead of 5 x 10 s.
 
 ### Checked and found sound
 

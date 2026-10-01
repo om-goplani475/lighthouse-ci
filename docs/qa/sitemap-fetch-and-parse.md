@@ -201,3 +201,25 @@ above still fail.
 - [ ] Not exercised live: a real site returning HTTP 5xx for `/llms.txt`, or a file over 1 MiB
       (unit tests only)
 - [ ] Link reachability, `llms-full.txt` and subpath files: deferred, see the phase tracker
+
+## Follow-up: gatherer total time budget (security Findings 3 and 6), 2026-10-01
+
+Closes the last open security findings. Before: robots.txt plus up to ten documents could each use their
+full 10 s timeout (about 105 s), then the page sample added up to 30 s more (about 135-145 s), with no
+overall deadline.
+
+- [x] One shared **40 s** budget for robots.txt and every sitemap document (`LIMITS.DOCUMENTS_BUDGET_MS`);
+      each request gets `min(its own limit, time left)`; none starts with under 1 s left (`MIN_REQUEST_MS`);
+      running out sets `documentsTruncated`. The page sample keeps its own 30 s.
+- [x] Fake-clock tests: stops fetching declared sitemaps once the budget is gone; each request's timeout is
+      clamped to what is left (5 s for robots.txt, 10 s, then 6 s); no request starts with 0.5 s left;
+      stops following an index's children at the budget; still samples pages from the documents it did
+      fetch; invisible on a normal run. 6 of these 8 fail without the change.
+- [x] **Real hanging server**: five sitemaps that never answer end at a 2.5 s budget in under 5 s (it would
+      be 5 x 10 s = 50 s without), the last one cut at the time left, not at 10 s.
+- [x] **Measured combined worst case**, real default fetchers: four of five sitemaps hang and every sampled
+      page hangs: **70.0 s** total (40 s documents + 30 s sample; 10 of 25 pages reported not checked),
+      down from the ~135-145 s estimate.
+- [x] seo-audits suite: 816 tests pass; typecheck and lint clean.
+- [ ] Not exercised live on a public site: the budget never triggers on MDN or nodejs.org (their sitemaps
+      answer in well under a second), so it is verified with fake clocks and a real hanging server only.
