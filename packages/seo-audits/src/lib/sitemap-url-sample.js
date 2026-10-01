@@ -291,5 +291,6 @@ export {
   collectEligibleUrls,
   checkUrls,
   collectUrlSample,
+  toSampledPage,
   describeCheck,
 };
