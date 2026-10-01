@@ -270,5 +270,37 @@ pure parser in `src/lib/llms-txt.js`. The first version was too strict and faile
 Anthropic and Stripe; it was loosened during live QA so only unambiguous violations fail. Deferred:
 link reachability, `llms-full.txt`, subpath files. No `.lighthouserc.js` key.
 
+### sitemap-indexability (2026-10-01, Phase 4 item 9)
+
+**User-facing**: New opt-in audit **`sitemap-indexability`** flags a URL your sitemap lists whose own
+page says it should not be indexed: **noindex** (an `X-Robots-Tag` header or a `<meta name="robots">`,
+including ones aimed only at Googlebot or Bingbot such as `<meta name="googlebot">` or
+`X-Robots-Tag: googlebot: noindex`) or a **canonical pointing to a different URL** (a different path,
+query string, `http`/`https`, `www`, host or port; a trailing-slash-only difference is a note). It checks
+the same evenly spread sample as `sitemap-url-status` and only pages that returned 2xx. It reads each
+page's raw HTML head, so a noindex or canonical added by client-side JavaScript is not seen, and the
+report says so; a page whose head was only partly read, a compressed page and a non-HTML page are each
+reported as a note, never a silent pass. Suggested severity `warn`. On its first real run it found a
+genuine `noindex` URL in MDN's own sitemap. `sitemap-url-status` now reads the same shared sample
+(no extra requests to your site) and reports exactly what it did before.
+
+**Internal/dev**: full 9-stage pipeline for the shared page sample, which is a new capability:
+`SitemapDocuments` now also requests the sampled URLs once each via the new `safeFetchPrefix` (reads at
+most 64 KiB of a 2xx HTML body, `Accept-Encoding: identity`, headers as an allowlist with every
+`X-Robots-Tag` occurrence, resolves rather than errors at the byte cap), reduces each page to signals with
+`parse5` (new declared dependency, already in the tree; raw HTML is never stored), and records `urlSample`
+in the artifact. `sitemap-url-status` was refactored onto it behind a characterization test whose
+expected values were captured before the change. Additive `noindexFor` in `robots-directives.js` handles
+user-agent-scoped directives (the existing parser read `googlebot: noindex` as a directive named
+`googlebot`). **A real finding during the build**: `parse5` is quadratic in block-element nesting (64 KiB
+of `<div>` = 1.6 s, synchronous); the parser is now given only the text up to the 2,000th `<`
+(worst of 121 element names: 92 ms). The security review ran every attack on the new fetch path
+(slow-loris, never-ending and mislabelled-gzip bodies, 300 aborted requests, 20 same-origin evasion URLs)
+and found no `high` or `critical` issue; the one open item is that the gatherer now has a ~135-145 s
+worst case and still no overall time budget (Finding 6, with Finding 3). See
+`docs/qa/sitemap-indexability.md` and `.ai-agents/state/security-findings.md`.
+
+No `.lighthouserc.js` migration note needed: no new config keys.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->

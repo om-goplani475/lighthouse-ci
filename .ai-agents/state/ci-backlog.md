@@ -59,6 +59,29 @@
   behind "probably environment".
 - status: open
 
+## 2026-10-01 — sitemap-indexability
+
+- item: no gap found. `parse5@^7.1.1` (new declared dependency) is pure JavaScript, already in the tree
+  via `jsdom`, and its range is already in `yarn.lock`; `yarn install --frozen-lockfile` (what `ci.yml`
+  runs) passes with it declared and reports no change. The seo-audits suite (808 tests, 54 suites) was
+  run under Node 18.20.8, the version CI pins, and passes: relevant because the new tests rely on
+  `server.closeAllConnections()` and on `parse5` loading under both Jest's CommonJS transform and real
+  Node ESM. No Dockerfile exists. No CI changes made.
+- status: done (nothing to do)
+
+- item: still open from the sitemap-fetch-and-parse entry: the 12 failing suites in a full
+  `npm run test` (mostly Storybook/Puppeteer image tests in `packages/server`) have never been compared
+  with the base branch. This feature again touched only `packages/seo-audits`, so it adds no new
+  evidence either way.
+- status: open
+
+- item: worth knowing for any CI job that runs these audits: `lhci assert` prints "All results
+  processed!" and exits 0 when there is no report to check, so a `lhci collect` that failed to produce
+  one (for example Chrome refusing an interstitial) followed by a separate `lhci assert` step passes
+  silently. `lhci autorun` runs both as one pipeline and fails on a collect error, which is what the
+  workflow the developer shared uses, so no change is needed there.
+- status: done (documented in `docs/qa/sitemap-indexability.md`)
+
 <!-- Appended by Agent 08. Advisory only — does not block merges or new features. Format per entry:
 
 ## {date} — {slug}
