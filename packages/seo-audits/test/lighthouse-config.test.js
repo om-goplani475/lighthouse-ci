@@ -58,8 +58,9 @@ describe('seo-audits lighthouse-config', () => {
     expect(artifactIds).toContain('SitemapDocuments');
     expect(artifactIds).toContain('LlmsTxt');
     expect(artifactIds).toContain('Soft404Probe');
+    expect(artifactIds).toContain('UrlVariants');
 
-    // And all thirty-five of this fork's audits are actually added, not just defaults preserved.
+    // And all thirty-eight of this fork's audits are actually added, not just defaults preserved.
     expect(auditIds).toContain('structured-data-json-ld');
     expect(auditIds).toContain('structured-data-schema-properties');
     expect(auditIds).toContain('structured-data-rich-result-eligibility');
@@ -95,6 +96,9 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('hsts-quality');
     expect(auditIds).toContain('ssl-certificate-expiry');
     expect(auditIds).toContain('soft-not-found');
+    expect(auditIds).toContain('url-variant-consistency');
+    expect(auditIds).toContain('redirect-chain-length');
+    expect(auditIds).toContain('redirect-loop');
   }, 30000);
 
   it('has no audit id with a hyphen followed by a digit', async () => {
@@ -106,7 +110,7 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds.filter(id => /-\d/.test(id))).toEqual([]);
   }, 30000);
 
-  it('adds the seo-extended category with all thirty-five audits, without touching the core seo category', async () => {
+  it('adds the seo-extended category with all thirty-eight audits, without touching the core seo category', async () => {
     const {categories} = await resolveConfig();
 
     expect(categories['seo-extended']).toBeDefined();
@@ -126,6 +130,8 @@ describe('seo-audits lighthouse-config', () => {
       'open-graph-completeness',
       'open-graph-image-reachable',
       'pixel-width-truncation',
+      'redirect-chain-length',
+      'redirect-loop',
       'robots-directives-conflict',
       'robots-directives-report',
       'robots-txt-crawler-access',
@@ -146,6 +152,7 @@ describe('seo-audits lighthouse-config', () => {
       'structured-data-schema-properties',
       'structured-data-type-conflicts',
       'twitter-card-completeness',
+      'url-variant-consistency',
     ]);
     expect(categories['seo']).toBeDefined();
   }, 30000);

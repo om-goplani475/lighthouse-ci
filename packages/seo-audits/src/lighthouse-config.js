@@ -15,7 +15,8 @@
  * twitter-card-completeness, social-preview-content, robots-txt-sitemap-declared,
  * robots-txt-crawler-access, robots-txt-rule-conflicts, sitemap-valid, sitemap-duplicate-urls,
  * sitemap-limits, sitemap-url-status, sitemap-robots-crossref, sitemap-indexability,
- * llms-txt-structure, mixed-content, hsts-quality, ssl-certificate-expiry, and soft-not-found gatherers/audits on top
+ * llms-txt-structure, mixed-content, hsts-quality, ssl-certificate-expiry, soft-not-found, url-variant-consistency, redirect-chain-length, and
+ * redirect-loop gatherers/audits on top
  * of Lighthouse's default set.
  *
  * Paths below are plain relative strings, not require.resolve() calls: this file is
@@ -39,6 +40,7 @@ const config = {
     {id: 'SitemapDocuments', gatherer: './gatherers/sitemap-documents.js'},
     {id: 'LlmsTxt', gatherer: './gatherers/llms-txt.js'},
     {id: 'Soft404Probe', gatherer: './gatherers/soft-404-probe.js'},
+    {id: 'UrlVariants', gatherer: './gatherers/url-variants.js'},
   ],
   audits: [
     './audits/structured-data-json-ld.js',
@@ -76,6 +78,9 @@ const config = {
     './audits/hsts-quality.js',
     './audits/ssl-certificate-expiry.js',
     './audits/soft-not-found.js',
+    './audits/url-variant-consistency.js',
+    './audits/redirect-chain-length.js',
+    './audits/redirect-loop.js',
   ],
   categories: {
     'seo-extended': {
@@ -116,6 +121,9 @@ const config = {
         {id: 'hsts-quality', weight: 1},
         {id: 'ssl-certificate-expiry', weight: 1},
         {id: 'soft-not-found', weight: 1},
+        {id: 'url-variant-consistency', weight: 1},
+        {id: 'redirect-chain-length', weight: 1},
+        {id: 'redirect-loop', weight: 1},
       ],
     },
   },
