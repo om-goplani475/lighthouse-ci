@@ -16,7 +16,7 @@
  * robots-txt-crawler-access, robots-txt-rule-conflicts, sitemap-valid, sitemap-duplicate-urls,
  * sitemap-limits, sitemap-url-status, sitemap-robots-crossref, sitemap-indexability,
  * llms-txt-structure, mixed-content, hsts-quality, ssl-certificate-expiry, soft-not-found, url-variant-consistency, redirect-chain-length,
- * redirect-loop, indexability-verdict, and indexability-conflicts gatherers/audits on top
+ * redirect-loop, indexability-verdict, indexability-conflicts, and crawl-coverage gatherers/audits on top
  * of Lighthouse's default set.
  *
  * Paths below are plain relative strings, not require.resolve() calls: this file is
@@ -42,6 +42,7 @@ const config = {
     {id: 'Soft404Probe', gatherer: './gatherers/soft-404-probe.js'},
     {id: 'UrlVariants', gatherer: './gatherers/url-variants.js'},
     {id: 'IndexabilitySignals', gatherer: './gatherers/indexability-signals.js'},
+    {id: 'SiteCrawl', gatherer: './gatherers/site-crawl.js'},
   ],
   audits: [
     './audits/structured-data-json-ld.js',
@@ -84,6 +85,7 @@ const config = {
     './audits/redirect-loop.js',
     './audits/indexability-verdict.js',
     './audits/indexability-conflicts.js',
+    './audits/crawl-coverage.js',
   ],
   categories: {
     'seo-extended': {
@@ -129,6 +131,7 @@ const config = {
         {id: 'redirect-loop', weight: 1},
         {id: 'indexability-verdict', weight: 1},
         {id: 'indexability-conflicts', weight: 1},
+        {id: 'crawl-coverage', weight: 1},
       ],
     },
   },

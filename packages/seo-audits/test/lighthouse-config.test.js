@@ -60,8 +60,9 @@ describe('seo-audits lighthouse-config', () => {
     expect(artifactIds).toContain('Soft404Probe');
     expect(artifactIds).toContain('UrlVariants');
     expect(artifactIds).toContain('IndexabilitySignals');
+    expect(artifactIds).toContain('SiteCrawl');
 
-    // And all forty of this fork's audits are actually added, not just defaults preserved.
+    // And all forty-one of this fork's audits are actually added, not just defaults preserved.
     expect(auditIds).toContain('structured-data-json-ld');
     expect(auditIds).toContain('structured-data-schema-properties');
     expect(auditIds).toContain('structured-data-rich-result-eligibility');
@@ -102,6 +103,7 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('redirect-loop');
     expect(auditIds).toContain('indexability-verdict');
     expect(auditIds).toContain('indexability-conflicts');
+    expect(auditIds).toContain('crawl-coverage');
   }, 30000);
 
   it('has no audit id with a hyphen followed by a digit', async () => {
@@ -113,12 +115,13 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds.filter(id => /-\d/.test(id))).toEqual([]);
   }, 30000);
 
-  it('adds the seo-extended category with all forty audits, without touching the core seo category', async () => {
+  it('adds the seo-extended category with all forty-one audits, without touching the core seo category', async () => {
     const {categories} = await resolveConfig();
 
     expect(categories['seo-extended']).toBeDefined();
     expect(categories['seo-extended'].auditRefs.map(ref => ref.id).sort()).toEqual([
       'canonical-https',
+      'crawl-coverage',
       'document-h1-count',
       'document-title-quality',
       'favicon-presence',
