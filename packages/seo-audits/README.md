@@ -455,6 +455,44 @@ audits use it. **How it works:**
     the report carries a run warning saying why, including the `LHCI_SEO_ALLOW_PRIVATE_NETWORK`
     setting when that is the cause.
 
+### Transport security audits (`mixed-content`, `hsts-quality`, `ssl-certificate-expiry`)
+
+Three audits that read only what Lighthouse already collected for the page: no new gatherer and **no
+request of their own** to your site. All are navigation-only and **not applicable** when the final page
+URL is not `https:`.
+
+- **`mixed-content`** (Phase 5) — an HTTPS page that loads something over plain `http://`. Built from
+  Chrome's own report of what it blocked, auto-upgraded or allowed during the load, plus the `http:`
+  requests the page made.
+  - **Fails on**: any **active** resource (script, stylesheet, frame, fetch/XHR, font, form,
+    worker, and any type it does not recognise), however Chrome resolved it, and any resource the
+    browser **blocked**.
+  - **Notes, never failures**: **passive** resources (image, audio, video, text track, favicon) that
+    Chrome auto-upgraded or allowed with a warning. They are listed in the table with a plain-English
+    "what it means" column, because the source still says `http://`.
+  - **Limit**: it sees what Chrome reported during this load; a request made only after the page
+    settles can be missed. Lighthouse's own `is-on-https` lists the same requests without the
+    active/passive split and stays in the report.
+- **`hsts-quality`** (Phase 5) — the main document's `Strict-Transport-Security` header.
+  - **Fails on**: no header; `max-age` missing, malformed, `0`, or under 31,536,000 seconds (one year);
+    `preload` set without `includeSubDomains` or without a one-year `max-age` (the preload list would
+    reject it).
+  - **Notes**: `includeSubDomains` absent; `preload` absent (optional); more than one header (browsers
+    use only the first, and so does the audit).
+  - **Not checked**: the preload list itself, other subdomains, and that a browser has visited over
+    HTTPS first (HSTS is honoured only after that). Lighthouse's `has-hsts` is informational and stays
+    in the report; this one has a pass/fail threshold.
+- **`ssl-certificate-expiry`** (Phase 5) — the validity dates of the page's TLS certificate, read from
+  the browser's own record of the connection.
+  - **Score**: `1` with more than 15 days left; **`0.5` with 15 days or fewer** (and a warning in the
+    report); `0` once expired or not yet valid. The partial score exists so CI can tell "expiring soon"
+    from "fine" and from "expired", because `lhci assert` can gate on `minScore` but has no
+    minimum-value check.
+  - **Limit worth knowing**: Chrome refuses to load a page whose certificate has already expired and
+    Lighthouse then stops without a report, so the `0` score is reachable only when certificate errors
+    are ignored. In practice this audit is the **early warning** before that happens.
+  - Not applicable when the browser reported no certificate dates (for example a reused connection).
+
 ### Auditing a site on localhost or a private network (`LHCI_SEO_ALLOW_PRIVATE_NETWORK`)
 
 The fetch path (`src/lib/safe-fetch.js`) refuses loopback and private addresses by default, because
@@ -528,7 +566,7 @@ module.exports = {
 };
 ```
 
-This adds all thirty-one audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all thirty-four audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
@@ -537,16 +575,17 @@ This adds all thirty-one audits (`structured-data-json-ld`, `structured-data-sch
 `open-graph-canonical-match`, `open-graph-image-reachable`, `twitter-card-completeness`,
 `social-preview-content`, `robots-txt-sitemap-declared`, `robots-txt-crawler-access`,
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
-`sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`) on top of
+`sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`, `mixed-content`, `hsts-quality`,
+`ssl-certificate-expiry`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the thirty-one audits are part of this fork's shared `all`/`recommended` presets
+None of the thirty-four audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all thirty-one here are opt-in via `configPath`, so they can't be part of that
+default, and all thirty-four here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
@@ -609,11 +648,37 @@ module.exports = {
         'sitemap-robots-crossref': ['error', {minScore: 1}],
         // llms.txt is an unratified proposal and optional, so 'warn' unless you want to gate on it.
         'llms-txt-structure': ['warn', {minScore: 1}],
+        // Fails only on blocked or active content, which Chrome itself reports and which breaks the
+        // page: low false-positive risk.
+        'mixed-content': ['error', {minScore: 1}],
+        // Staging and internal hosts legitimately omit or shorten HSTS, and a CDN may set it only
+        // at the edge in production: 'warn', or 'error' on production-only jobs.
+        'hsts-quality': ['warn', {minScore: 1}],
+        // 0.5 means 15 days or fewer left, 0 means expired. One assertion per audit id, so to fail
+        // on expiry but be told at 15 days, see the assertMatrix recipe just below this block.
+        'ssl-certificate-expiry': ['error', {minScore: 0.5}],
       },
     },
   },
 };
 ```
+
+**Failing CI on certificate expiry but being told 15 days earlier.** An `assertions` map holds one
+entry per audit id, so two severities for `ssl-certificate-expiry` need an `assertMatrix` with two
+entries on the same URL pattern (verified with a real `lhci assert`: score `1` is clean, `0.5` prints a
+warning and exits 0, `0` prints an error and exits 1):
+
+```js
+assert: {
+  assertMatrix: [
+    {matchingUrlPattern: '.*', assertions: {'ssl-certificate-expiry': ['error', {minScore: 0.5}]}},
+    {matchingUrlPattern: '.*', assertions: {'ssl-certificate-expiry': ['warn', {minScore: 1}]}},
+  ],
+},
+```
+
+`assertMatrix` cannot be combined with `preset` or a top-level `assertions` block in the same `assert`
+config, so use it in a separate `lhci assert` run (or move all your assertions into matrix entries).
 
 **A note on asserting `structured-data-rich-result-eligibility`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`, `h1-title-relevance`,
