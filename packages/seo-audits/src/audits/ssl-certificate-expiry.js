@@ -10,7 +10,7 @@ import {resolveMainDocumentSecurity} from '../lib/transport-security-sources.js'
 
 const UIStrings = {
   title: 'TLS certificate is valid and not close to expiring',
-  failureTitle: 'TLS certificate is expired or not yet valid',
+  failureTitle: 'TLS certificate is expired, not yet valid, or about to expire',
   description:
     "Reads the validity dates of the page's TLS certificate from the browser. Scores 1 with more " +
     'than 15 days left, 0.5 (with a warning) with 15 days or fewer left, and 0 once it has expired ' +
