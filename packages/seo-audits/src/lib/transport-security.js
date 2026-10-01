@@ -192,4 +192,177 @@ function mixedContentProduct(result) {
   return product;
 }
 
-export {classifyMixedContent, mixedContentProduct, HSTS_MIN_MAX_AGE, CERT_WARN_DAYS, MAX_ROWS};
+/**
+ * RFC 6797 section 8.1: when a response carries more than one Strict-Transport-Security header, a
+ * browser processes only the first, so only the first is judged here (the rest is a note).
+ * @param {string[]} headerValues Every Strict-Transport-Security value of the main document.
+ * @return {HstsResult}
+ */
+function evaluateHsts(headerValues) {
+  /** @type {HstsFinding[]} */
+  const findings = [];
+  /**
+   * @param {string} directive
+   * @param {string | null} value
+   * @param {string} finding
+   */
+  const problem = (directive, value, finding) =>
+    findings.push({directive, value, finding, severity: 'problem'});
+  /**
+   * @param {string} directive
+   * @param {string | null} value
+   * @param {string} finding
+   */
+  const note = (directive, value, finding) =>
+    findings.push({directive, value, finding, severity: 'note'});
+
+  if (!headerValues.length) {
+    problem(
+      'strict-transport-security',
+      null,
+      'No Strict-Transport-Security header: browsers will keep trying http:// first, so a visitor on a hostile network can be downgraded on their first request.'
+    );
+    return {
+      present: false,
+      headerCount: 0,
+      maxAge: null,
+      includeSubDomains: false,
+      preload: false,
+      findings,
+      passes: false,
+    };
+  }
+
+  /** @type {number | null} */
+  let maxAge = null;
+  let includeSubDomains = false;
+  let preload = false;
+  let sawMaxAge = false;
+  for (const part of headerValues[0].split(';')) {
+    const directive = part.trim();
+    if (!directive) continue;
+    const eq = directive.indexOf('=');
+    const name = (eq === -1 ? directive : directive.slice(0, eq)).trim().toLowerCase();
+    const value =
+      eq === -1
+        ? ''
+        : directive
+            .slice(eq + 1)
+            .trim()
+            .replace(/^"(.*)"$/, '$1');
+    if (name === 'max-age' && !sawMaxAge) {
+      sawMaxAge = true;
+      if (/^\d+$/.test(value)) {
+        maxAge = Number(value);
+      } else {
+        problem(
+          'max-age',
+          value || null,
+          'max-age is not a non-negative whole number of seconds, so browsers ignore the whole header.'
+        );
+      }
+    } else if (name === 'includesubdomains') {
+      includeSubDomains = true;
+    } else if (name === 'preload') {
+      preload = true;
+    }
+  }
+
+  if (!sawMaxAge) {
+    problem('max-age', null, 'max-age is missing, so browsers ignore the whole header.');
+  } else if (maxAge === 0) {
+    problem(
+      'max-age',
+      '0',
+      'max-age=0 turns HSTS off: browsers delete any stored HSTS policy for this host.'
+    );
+  } else if (maxAge !== null && maxAge < HSTS_MIN_MAX_AGE) {
+    const days = Math.floor(maxAge / 86_400);
+    problem(
+      'max-age',
+      String(maxAge),
+      `max-age is ${maxAge} seconds (${days} day(s)); use at least ${HSTS_MIN_MAX_AGE} (one year).`
+    );
+  }
+  if (preload && !includeSubDomains) {
+    problem(
+      'preload',
+      null,
+      'preload is set without includeSubDomains, so the HSTS preload list would reject this host.'
+    );
+  }
+  if (preload && maxAge !== null && maxAge < HSTS_MIN_MAX_AGE) {
+    problem(
+      'preload',
+      null,
+      'preload is set with a max-age under one year, so the HSTS preload list would reject this host.'
+    );
+  }
+  if (!includeSubDomains) {
+    note('includeSubDomains', null, 'Not set: subdomains are not covered by this policy.');
+  }
+  if (!preload) note('preload', null, 'Not set (optional).');
+  if (headerValues.length > 1) {
+    note(
+      'strict-transport-security',
+      String(headerValues.length),
+      `${headerValues.length} headers sent; browsers use only the first and ignore the rest.`
+    );
+  }
+
+  return {
+    present: true,
+    headerCount: headerValues.length,
+    maxAge,
+    includeSubDomains,
+    preload,
+    findings,
+    passes: !findings.some(f => f.severity === 'problem'),
+  };
+}
+
+/**
+ * @param {HstsResult} result
+ * @param {{isHttps: boolean}} context
+ * @return {Product}
+ */
+function hstsProduct(result, {isHttps}) {
+  if (!isHttps) return {score: 1, notApplicable: true};
+
+  const rows = result.findings.map(f => ({
+    directive: f.directive,
+    value: f.value ?? '',
+    finding: f.severity === 'note' ? `Note: ${f.finding}` : f.finding,
+  }));
+  if (result.passes) {
+    rows.unshift({
+      directive: 'max-age',
+      value: String(result.maxAge),
+      finding: 'Present and at least one year.',
+    });
+  }
+  /** @type {import('lighthouse/types/audit.js').default.Details.Table['headings']} */
+  const headings = [
+    {key: 'directive', valueType: 'text', label: 'Directive'},
+    {key: 'value', valueType: 'text', label: 'Value'},
+    {key: 'finding', valueType: 'text', label: 'Finding'},
+  ];
+  const problems = result.findings.filter(f => f.severity === 'problem');
+  /** @type {Product} */
+  const product = {
+    score: result.passes ? 1 : 0,
+    details: Audit.makeTableDetails(headings, rows),
+  };
+  if (problems.length) product.explanation = problems.map(f => f.finding).join(' ');
+  return product;
+}
+
+export {
+  classifyMixedContent,
+  mixedContentProduct,
+  evaluateHsts,
+  hstsProduct,
+  HSTS_MIN_MAX_AGE,
+  CERT_WARN_DAYS,
+  MAX_ROWS,
+};

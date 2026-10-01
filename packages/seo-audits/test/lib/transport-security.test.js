@@ -9,6 +9,8 @@
 const {
   classifyMixedContent,
   mixedContentProduct,
+  evaluateHsts,
+  hstsProduct,
   MAX_ROWS,
 } = require('../../src/lib/transport-security.js');
 
@@ -212,5 +214,126 @@ describe('mixedContentProduct', () => {
     expect(items).toHaveLength(MAX_ROWS + 1);
     expect(items[MAX_ROWS].url).toBe('7 more not shown');
     expect(product.displayValue).toBe(`${MAX_ROWS + 7} insecure resources`);
+  });
+});
+
+describe('evaluateHsts', () => {
+  const problems = (/** @type {any} */ r) =>
+    r.findings
+      .filter((/** @type {any} */ f) => f.severity === 'problem')
+      .map((/** @type {any} */ f) => f.directive);
+  const notes = (/** @type {any} */ r) =>
+    r.findings
+      .filter((/** @type {any} */ f) => f.severity === 'note')
+      .map((/** @type {any} */ f) => f.directive);
+
+  it('fails when the header is absent', () => {
+    const r = evaluateHsts([]);
+    expect(r).toMatchObject({present: false, passes: false, headerCount: 0});
+    expect(problems(r)).toEqual(['strict-transport-security']);
+  });
+
+  it('passes a one-year max-age with includeSubDomains', () => {
+    const r = evaluateHsts(['max-age=31536000; includeSubDomains']);
+    expect(r).toMatchObject({
+      passes: true,
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: false,
+    });
+    expect(problems(r)).toEqual([]);
+    expect(notes(r)).toEqual(['preload']);
+  });
+
+  it('passes at exactly one year and fails one second below', () => {
+    expect(evaluateHsts(['max-age=31536000']).passes).toBe(true);
+    const below = evaluateHsts(['max-age=31535999']);
+    expect(below.passes).toBe(false);
+    expect(problems(below)).toEqual(['max-age']);
+  });
+
+  it('notes, but does not fail, a missing includeSubDomains', () => {
+    const r = evaluateHsts(['max-age=63072000']);
+    expect(r.passes).toBe(true);
+    expect(notes(r)).toContain('includeSubDomains');
+  });
+
+  it('fails a missing max-age, including an empty header value', () => {
+    expect(problems(evaluateHsts(['includeSubDomains']))).toEqual(['max-age']);
+    expect(problems(evaluateHsts(['']))).toEqual(['max-age']);
+    expect(evaluateHsts(['']).present).toBe(true);
+  });
+
+  it('fails max-age=0 once, as "turns HSTS off"', () => {
+    const r = evaluateHsts(['max-age=0']);
+    expect(problems(r)).toEqual(['max-age']);
+    expect(r.findings.find(f => f.severity === 'problem')?.finding).toMatch(/turns HSTS off/);
+  });
+
+  it('fails a malformed max-age', () => {
+    for (const v of ['max-age=abc', 'max-age=-5', 'max-age=1.5', 'max-age=']) {
+      const r = evaluateHsts([v]);
+      expect(r.passes).toBe(false);
+      expect(r.maxAge).toBeNull();
+    }
+  });
+
+  it('accepts a quoted max-age, any case, extra spaces and trailing semicolons', () => {
+    const r = evaluateHsts(['  MAX-AGE="31536000" ;  IncludeSubDomains ; ']);
+    expect(r).toMatchObject({passes: true, maxAge: 31536000, includeSubDomains: true});
+  });
+
+  it('fails preload without includeSubDomains, and preload under one year', () => {
+    expect(problems(evaluateHsts(['max-age=31536000; preload']))).toEqual(['preload']);
+    expect(problems(evaluateHsts(['max-age=86400; includeSubDomains; preload']))).toEqual([
+      'max-age',
+      'preload',
+    ]);
+  });
+
+  it('passes a complete preload-ready header with no notes about it', () => {
+    const r = evaluateHsts(['max-age=63072000; includeSubDomains; preload']);
+    expect(r.passes).toBe(true);
+    expect(notes(r)).toEqual([]);
+  });
+
+  it('judges only the first of several headers and notes the rest', () => {
+    const r = evaluateHsts(['max-age=31536000', 'max-age=0']);
+    expect(r.passes).toBe(true);
+    expect(r.headerCount).toBe(2);
+    expect(notes(r)).toContain('strict-transport-security');
+    expect(evaluateHsts(['max-age=0', 'max-age=31536000']).passes).toBe(false);
+  });
+
+  it('ignores a repeated max-age within one header and unknown directives', () => {
+    const r = evaluateHsts(['max-age=31536000; max-age=1; frobnicate=1']);
+    expect(r).toMatchObject({passes: true, maxAge: 31536000});
+  });
+});
+
+describe('hstsProduct', () => {
+  it('is not applicable on an http page', () => {
+    expect(hstsProduct(evaluateHsts([]), {isHttps: false})).toEqual({
+      score: 1,
+      notApplicable: true,
+    });
+  });
+
+  it('passes with a "present and sufficient" row first', () => {
+    const product = hstsProduct(evaluateHsts(['max-age=31536000; includeSubDomains']), {
+      isHttps: true,
+    });
+    expect(product.score).toBe(1);
+    expect(product.explanation).toBeUndefined();
+    const items = /** @type {any} */ (product.details).items;
+    expect(items[0]).toMatchObject({directive: 'max-age', value: '31536000'});
+    expect(items.some((/** @type {any} */ i) => /^Note: /.test(i.finding))).toBe(true);
+  });
+
+  it('fails with the problems as the explanation', () => {
+    const product = hstsProduct(evaluateHsts([]), {isHttps: true});
+    expect(product.score).toBe(0);
+    expect(product.explanation).toMatch(/No Strict-Transport-Security header/);
+    expect(/** @type {any} */ (product.details).items).toHaveLength(1);
   });
 });
