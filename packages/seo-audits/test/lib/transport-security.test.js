@@ -495,3 +495,51 @@ describe('certificateProduct', () => {
     expect(p.explanation).toMatch(/not valid until/);
   });
 });
+
+describe('strings that come from the audited site are bounded', () => {
+  const HUGE = 250_000;
+
+  it('shortens an insecure URL in the mixed-content table', () => {
+    const url = `http://insecure.test/${'a'.repeat(HUGE)}`;
+    const product = mixedContentProduct(classify([issue(url, 'Script', 'MixedContentBlocked')]));
+    const row = /** @type {any} */ (product.details).items[0];
+    expect(row.url.length).toBeLessThan(1_200);
+    expect(row.url.startsWith('http://insecure.test/aaa')).toBe(true);
+    expect(row.url).toMatch(/more characters\)$/);
+  });
+
+  it('keeps the whole mixed-content product small however many long URLs there are', () => {
+    const issues = Array.from({length: 80}, (_, i) =>
+      issue(`http://insecure.test/${i}/${'a'.repeat(HUGE)}`, 'Script', 'MixedContentBlocked')
+    );
+    expect(JSON.stringify(mixedContentProduct(classify(issues))).length).toBeLessThan(100_000);
+  });
+
+  it('leaves a normal URL untouched', () => {
+    const url = 'http://insecure.test/app.js?v=1';
+    const row = /** @type {any} */ (
+      mixedContentProduct(classify([issue(url, 'Script', 'MixedContentBlocked')])).details
+    ).items[0];
+    expect(row.url).toBe(url);
+  });
+
+  it('shortens a malformed max-age value echoed back from the header', () => {
+    const product = hstsProduct(evaluateHsts([`max-age=${'x'.repeat(HUGE)}`]), {isHttps: true});
+    expect(JSON.stringify(product).length).toBeLessThan(5_000);
+  });
+
+  it('shortens a certificate subject and issuer', () => {
+    const r = evaluateCertificate(
+      {
+        subjectName: 's'.repeat(HUGE),
+        issuer: 'i'.repeat(HUGE),
+        validFrom: 1_700_000_000,
+        validTo: 1_800_000_000,
+      },
+      1_750_000_000
+    );
+    expect(r && r.subject && r.subject.length).toBeLessThan(400);
+    expect(r && r.issuer && r.issuer.length).toBeLessThan(400);
+    expect(JSON.stringify(certificateProduct(r)).length).toBeLessThan(5_000);
+  });
+});

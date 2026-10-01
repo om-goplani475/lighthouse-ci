@@ -46,6 +46,22 @@ import {Audit} from 'lighthouse/core/audits/audit.js';
 const HSTS_MIN_MAX_AGE = 31_536_000;
 const CERT_WARN_DAYS = 15;
 const MAX_ROWS = 50;
+// Text the audited site controls (a resource URL, a header value, a certificate name) ends up in the
+// report, which can be stored on a server or shared. A page can make 80 requests with 250 KB URLs, so
+// everything echoed is cut to a fixed length with the cut stated.
+const MAX_URL_CHARS = 1_000;
+const MAX_TEXT_CHARS = 200;
+
+/**
+ * @param {string} text
+ * @param {number} max
+ * @return {string}
+ */
+function clip(text, max) {
+  return text.length <= max
+    ? text
+    : `${text.slice(0, max)}... (${text.length - max} more characters)`;
+}
 
 // Lowercased type names from both vocabularies we read: CDP's MixedContentResourceType (issues) and
 // CDP's Network.ResourceType (records). Everything not listed here is treated as active, the safe
@@ -155,7 +171,7 @@ function mixedContentProduct(result) {
 
   const shown = result.items.slice(0, MAX_ROWS);
   const rows = shown.map(item => ({
-    url: item.url,
+    url: clip(item.url, MAX_URL_CHARS),
     type: item.type,
     kind: item.kind === 'active' ? 'Active' : 'Passive',
     resolution:
@@ -257,7 +273,7 @@ function evaluateHsts(headerValues) {
       } else {
         problem(
           'max-age',
-          value || null,
+          value ? clip(value, MAX_TEXT_CHARS) : null,
           'max-age is not a non-negative whole number of seconds, so browsers ignore the whole header.'
         );
       }
@@ -407,7 +423,8 @@ function evaluateCertificate(securityDetails, nowSeconds) {
   else if (nowSeconds >= validTo) state = 'expired';
   else if (daysRemaining <= CERT_WARN_DAYS) state = 'expiring-soon';
 
-  const text = (/** @type {unknown} */ v) => (typeof v === 'string' && v ? v : null);
+  const text = (/** @type {unknown} */ v) =>
+    typeof v === 'string' && v ? clip(v, MAX_TEXT_CHARS) : null;
   return {
     subject: text(securityDetails.subjectName),
     issuer: text(securityDetails.issuer),
