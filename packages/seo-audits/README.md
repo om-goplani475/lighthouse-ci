@@ -517,6 +517,40 @@ URL is not `https:`.
     digit in an audit id as two audits (it asserts a phantom `soft404`), which would make every
     `lhci assert` run fail whatever the audit scored; `test/lighthouse-config.test.js` guards against it.
 
+### URL variants: redirect consistency, chain length and loops (`url-variant-consistency`, `redirect-chain-length`, `redirect-loop`)
+
+Three audits sharing one gatherer (`UrlVariants`), so the probes are made once. It requests the **audited
+page's other forms** and follows each one's redirects by hand: `http://` of the same host, and the host with
+`www` added or removed over `http://` and `https://`, always with the audited page's own path and query. A
+redirect is followed only when it goes to one of those same-site host variants; any other target is
+recorded and **never requested**. Bounds: three variants in parallel, at most 5 hops each, 5 s per request,
+20 s per variant, all through the SSRF-protected fetch (`LHCI_SEO_ALLOW_PRIVATE_NETWORK` applies). The
+requests show as extra hits in your site's logs.
+
+- **`url-variant-consistency`** — every other form should redirect to the audited URL.
+  - **Fails on**: a form that **serves the page directly** (HTTP 2xx: the same content at two URLs); a
+    chain that ends at a **different origin** than the audited one (e.g. `http://example.com` to
+    `http://www.example.com`, still insecure); a chain that ends in an **error status**; and a redirect
+    that **drops the path or query** (everyone is sent to the homepage).
+  - **Notes, never failures**: a **temporary** redirect (302/303/307; a permanent 301/308 is the usual
+    choice, but CDNs emit 302 by default); a form that does not exist (no such host, or nothing listening);
+    a redirect to another site (not followed, so not judged); a probe that timed out.
+- **`redirect-chain-length`** — **fails** when a form takes **more than 2 redirects** to resolve, or is
+  still redirecting after 5. Geo or locale redirects count (a site that sends `/` to `/in` adds a hop).
+- **`redirect-loop`** — **fails** when a redirect returns to a URL already visited, so a browser or
+  crawler never reaches a page. Lighthouse itself aborts a run whose own page loops; this finds it on the
+  variants.
+- **What is and is not probed**: `www` is toggled only for an **apex host** (two labels) or a `www.` host.
+  A subdomain such as `app.example.com` is not probed as `www.app.example.com`: wildcard DNS makes that
+  name answer, and it would be reported as a false duplicate (a three-label apex such as `example.co.uk` is
+  skipped for the same reason; a public-suffix list would fix that). Nothing is probed for an **IP
+  address, `localhost`, a non-default port, or a page not served over HTTPS**: the three audits are then
+  not applicable and say why, so a CI run against `localhost:3000` shows "not applicable", not a failure.
+- **Not checked (deferred to the crawler)**: redirects of the site's *links* (internal links that redirect,
+  chains from other pages). These audits cover the audited URL's own forms only.
+- If a request is refused by the private-network policy, the run carries a warning naming the cause and
+  the setting.
+
 ### Auditing a site on localhost or a private network (`LHCI_SEO_ALLOW_PRIVATE_NETWORK`)
 
 The fetch path (`src/lib/safe-fetch.js`) refuses loopback and private addresses by default, because
@@ -590,7 +624,7 @@ module.exports = {
 };
 ```
 
-This adds all thirty-five audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all thirty-eight audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
@@ -600,16 +634,17 @@ This adds all thirty-five audits (`structured-data-json-ld`, `structured-data-sc
 `social-preview-content`, `robots-txt-sitemap-declared`, `robots-txt-crawler-access`,
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
 `sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`, `mixed-content`, `hsts-quality`,
-`ssl-certificate-expiry`, `soft-not-found`) on top of
+`ssl-certificate-expiry`, `soft-not-found`, `url-variant-consistency`, `redirect-chain-length`,
+`redirect-loop`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the thirty-five audits are part of this fork's shared `all`/`recommended` presets
+None of the thirty-eight audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all thirty-five here are opt-in via `configPath`, so they can't be part of that
+default, and all thirty-eight here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
@@ -684,6 +719,12 @@ module.exports = {
         // A site that serves junk URLs as normal pages is a real defect, but it needs the site's own
         // routing to fix and is a probe of two URLs: 'warn' first, 'error' once confirmed.
         'soft-not-found': ['warn', {minScore: 1}],
+        // A form serving the page directly, or dropping the path, splits your pages across URLs.
+        'url-variant-consistency': ['warn', {minScore: 1}],
+        // A long chain is slow and leaks link signals, but is rarely broken.
+        'redirect-chain-length': ['warn', {minScore: 1}],
+        // A loop means a URL form is unreachable: always a defect.
+        'redirect-loop': ['error', {minScore: 1}],
       },
     },
   },
