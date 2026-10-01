@@ -640,7 +640,8 @@ a run that includes this fork's `seo-extended` category does. Use `LHCI_SEO_CRAW
 
 **Limits worth knowing.** The crawler reads **server HTML**. A site whose content is built by JavaScript serves the same
 near-empty shell for every route, so pages can look identical here when they differ in a browser; `crawl-coverage` says
-so, and notes it when the audited page shows far more text in a browser than its server HTML holds. Pages beyond the cap
+so, and notes it when the audited page shows far more text in a browser than the HTML the crawler received (either
+the content is built by script, or the server answers non-browser requests differently, as `example.com` does). Pages beyond the cap
 are a deterministic, evenly spread sample, not the whole site. `<base href>` is ignored and the body is read as UTF-8.
 
 ### Auditing a site on localhost or a private network (`LHCI_SEO_ALLOW_PRIVATE_NETWORK`)

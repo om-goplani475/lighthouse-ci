@@ -292,7 +292,10 @@ describe('script-built content', () => {
       snapshot: snapshot({pages: [page({textLength: 40})]}),
     });
     expect(scriptBuiltContent(a)).toEqual({rendered: 2000, server: 40});
-    expect(notes(buildCoverageProduct(a)).join('\n')).toMatch(/built by script/);
+    const note = notes(buildCoverageProduct(a)).join('\n');
+    expect(note).toMatch(/built by script/);
+    // It must not claim script is the only explanation: a server can also answer a crawler differently.
+    expect(note).toMatch(/answers the crawler differently from a browser/);
   });
 
   it('is not claimed for a normal page, a small difference, or missing data', () => {

@@ -100,7 +100,7 @@ function notesFor(artifact) {
   const script = scriptBuiltContent(artifact);
   if (script) {
     notes.push(
-      `The audited page shows ${script.rendered} characters of text in a browser but only ${script.server} in its server HTML: its content is built by script, so comparing pages by their server HTML is unreliable here.`
+      `The audited page shows ${script.rendered} characters of text in a browser but only ${script.server} in the HTML the crawler received: either its content is built by script, or the server answers the crawler differently from a browser, so comparing pages by their server HTML is unreliable here.`
     );
   }
   notes.push(
