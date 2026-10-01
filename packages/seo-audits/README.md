@@ -587,6 +587,62 @@ audited page: HTTP status, robots.txt (Googlebot and Bingbot), meta robots and `
   reports, which can carry a query added after load (for example `https://www.google.com/?zx=...`, which
   Google's own robots.txt disallows).
 
+### The site crawler (`crawl-coverage`, and what the cross-page audits read)
+
+Every audit before Phase 7 judges **one page**. Phase 7's duplicate-detection audits compare a page with the rest of
+the site, so this fork has a small, bounded, polite crawler whose snapshot they read. It runs **inside the normal
+Lighthouse run** as the `SiteCrawl` gatherer; `lhci autorun` needs no extra step.
+
+- **What it crawls** (one level, "depth 1"): the audited page, **the page's own internal links**, and the **URLs in
+  the site's sitemap** (found through robots.txt `Sitemap:` lines, else `/sitemap.xml`). The links *of* those pages
+  are stored but **not followed** (following links to a greater depth waits for Phase 8). Same origin only: a link or a
+  redirect to another host, port or scheme is recorded and **never requested**. HTML only, server HTML (no JavaScript
+  is run), up to 512 KiB per page.
+- **What it keeps** per page: final URL and redirect chain, status, content type, `<title>`, meta description,
+  canonicals, robots meta and `X-Robots-Tag`, the first five `<h1>` texts, a **hash** of the visible text with its
+  length and word count, and the page's internal links. **Raw HTML is never stored.**
+- **robots.txt is honoured by default**: URLs it disallows for the crawler's own user-agent
+  (`lhci-seo-audits-crawler/1.0`, falling back to `*`) are not requested and are listed as blocked. The audited page is
+  always requested once. If robots.txt cannot be read (a 5xx, a redirect, a network error) **only the audited page is
+  requested** (the crawler does not guess what robots.txt would have allowed) and the run warns.
+- **Default bounds**: 50 pages, 5 requests at a time, 5 s per request (one retry for a network error), redirects
+  followed for at most 3 rounds and at most 3 requests per page, **120 s** in total, after which the rest is recorded as
+  not checked.
+- **`crawl-coverage`** (informational, never fails) shows what was crawled, what was blocked or skipped, and the limits
+  in one table. Leave it out of `assertions`: Lighthouse normalises an informational score to 1, so a `minScore`
+  assertion on it always passes.
+
+**Environment variables** (read per run, clamped; a page can never change them):
+
+| Variable | Default | Effect |
+|---|---|---|
+| `LHCI_SEO_CRAWL` | on | `0` or `false` switches the crawl off entirely (no requests; the audits that read it are not applicable) |
+| `LHCI_SEO_CRAWL_MAX_PAGES` | 50 (1 to 200) | page cap, the audited page included |
+| `LHCI_SEO_CRAWL_TIME_BUDGET_SECONDS` | 120 (10 to 600) | total crawl time |
+| `LHCI_SEO_CRAWL_RESPECT_ROBOTS` | on | `0` or `false` requests URLs robots.txt disallows (for auditing your own staging site) |
+| `LHCI_SEO_CRAWL_CACHE_DIR` | `<tmp>/lhci-seo-crawl-<uid>` | where the snapshot cache lives (its parent must already exist) |
+| `LHCI_SEO_CRAWL_CACHE_TTL_SECONDS` | 600 (0 to 86,400) | how long a snapshot is reused; `0` disables the cache |
+
+`LHCI_SEO_ALLOW_PRIVATE_NETWORK` applies as everywhere (auditing `localhost` or a private staging host needs it; without
+it the crawl cannot run and the report carries a warning naming the setting).
+
+**The cache.** `lhci collect` runs every Lighthouse run as its own process, so a cache on disk is how several URLs, or
+several runs of one URL, crawl the site **once**: a fresh snapshot for the same origin and the same bounds is reused with
+**no request to your site**, and another URL of the same site only gets its own page requested and added. The directory
+is used only if it is a real directory (not a symlink) **owned by you with no group or other access**; anything else
+means no cache, never a trusted forgery. Files are written atomically, a corrupt or expired file is ignored, and only the
+extracted snapshot is stored.
+
+**Cost.** On a cold cache the crawl sends up to about 100 requests to the audited site (visible in its logs) and can take
+up to the time budget, inside whichever Lighthouse run first needs it. Lighthouse runs a gatherer **only when a selected
+audit needs it**, so a run limited to Lighthouse's own categories (for example `onlyCategories: ['seo']`) does not crawl;
+a run that includes this fork's `seo-extended` category does. Use `LHCI_SEO_CRAWL=0` to switch it off.
+
+**Limits worth knowing.** The crawler reads **server HTML**. A site whose content is built by JavaScript serves the same
+near-empty shell for every route, so pages can look identical here when they differ in a browser; `crawl-coverage` says
+so, and notes it when the audited page shows far more text in a browser than its server HTML holds. Pages beyond the cap
+are a deterministic, evenly spread sample, not the whole site. `<base href>` is ignored and the body is read as UTF-8.
+
 ### Auditing a site on localhost or a private network (`LHCI_SEO_ALLOW_PRIVATE_NETWORK`)
 
 The fetch path (`src/lib/safe-fetch.js`) refuses loopback and private addresses by default, because
@@ -660,7 +716,7 @@ module.exports = {
 };
 ```
 
-This adds all forty audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all forty-one audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
@@ -671,16 +727,16 @@ This adds all forty audits (`structured-data-json-ld`, `structured-data-schema-p
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
 `sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`, `mixed-content`, `hsts-quality`,
 `ssl-certificate-expiry`, `soft-not-found`, `url-variant-consistency`, `redirect-chain-length`,
-`redirect-loop`, `indexability-verdict`, `indexability-conflicts`) on top of
+`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the forty audits are part of this fork's shared `all`/`recommended` presets
+None of the forty-one audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all forty here are opt-in via `configPath`, so they can't be part of that
+default, and all forty-one here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
