@@ -646,8 +646,10 @@ and keeps a cache on disk. Every attack below was **run against the real code** 
   `lhci-seo-audits-crawler/1.0` (a new validated option on `safeFetchPrefix`), but `safeFetchBytes`, which fetches robots.txt and the
   sitemap files, has no such option, so those requests identify as nothing at all in the audited site's logs. A politeness and
   attribution gap, not an exposure: the requests are bounded and SSRF-protected like the rest.
-- status: open, accepted for now (a follow-up: the same additive, validated `userAgent` option on `safeFetchBytes`, which would also
-  identify Phase 4's sitemap requests). Recorded in `.ai-agents/state/ci-backlog.md`.
+- status: **fixed** (2026-10-01). `safeFetchBytes` has the same additive, validated `userAgent` option (printable ASCII, 1-200
+  characters, rejected before any lookup or connection; absent, no header, as before), and the crawler passes its user-agent on
+  every robots.txt and sitemap request. Verified live: a spy server saw `lhci-seo-audits-crawler/1.0` on `/robots.txt`,
+  `/sitemap.xml` and the pages. Phase 4's own standalone sitemap gatherer and `llms-txt` do not set it and are unchanged.
 
 ### Checked, no finding
 
@@ -683,4 +685,4 @@ and keeps a cache on disk. Every attack below was **run against the real code** 
   the body cap, the timing tests on hostile input, and its use for extraction only.
 - The `lhci` run under a real GitHub Actions job (the cache directory under `os.tmpdir()` on a shared runner).
 
-No `critical`, `high` or `medium` findings. Finding 8 is `low` and open (accepted).
+No `critical`, `high` or `medium` findings. Finding 8 (`low`) is fixed; none open.

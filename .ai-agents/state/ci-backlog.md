@@ -159,7 +159,7 @@
 
 - item: follow-up from the security review (Finding 8, low): give `safeFetchBytes` the same validated `userAgent` option so the
   crawler's robots.txt and sitemap requests identify themselves.
-- status: open
+- status: done (2026-10-01)
 
 <!-- Appended by Agent 08. Advisory only — does not block merges or new features. Format per entry:
 

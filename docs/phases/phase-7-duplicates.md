@@ -43,8 +43,8 @@ repo has no crawler, so three decisions were confirmed with the developer:
 - **`htmlparser2`, not `parse5`, reads page bodies.** The design's open question (can full-body parsing be made safe?) was settled by
   measurement: `parse5` took 109 s on one 512 KiB nested page, `htmlparser2` 53 ms. It is already in the dependency tree, so
   `yarn.lock` is unchanged.
-- **A new `userAgent` option on `safeFetchPrefix`** so the crawler identifies itself; `safeFetchBytes` (robots.txt, sitemaps) does not have
-  it yet (security Finding 8, low, open).
+- **A new `userAgent` option on `safeFetchPrefix`** so the crawler identifies itself; `safeFetchBytes` (robots.txt, sitemaps) got the same
+  option afterwards (security Finding 8, low, fixed).
 - **Found while building**: Node's recursive `mkdir` hangs on an uncreatable path (the cache now creates one directory level only).
 - **A QA note was reworded**: a static site that serves a browser a bigger page than a bot is not "built by script".
 

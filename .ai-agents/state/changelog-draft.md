@@ -462,8 +462,8 @@ and the audit; one new dependency, `htmlparser2@^6.1.0` (already in `yarn.lock`)
 `safeFetchPrefix`. **Why `htmlparser2`**: `parse5` took 109 s for one 512 KiB page of nested `<div>`; `htmlparser2` takes 53 ms (every
 hostile shape is asserted under 2 s). Built through the full 9-stage pipeline.
 
-**Security**: no `critical`, `high` or `medium` finding. One `low`, open (Finding 8): the crawler's robots.txt and sitemap requests
-do not send its user-agent. Found and fixed while building: Node's recursive `mkdir` hangs forever on an uncreatable cache path, and a
+**Security**: no `critical`, `high` or `medium` finding. One `low` (Finding 8): the crawler's robots.txt and sitemap requests
+did not send its user-agent; fixed with the same validated `userAgent` option on `safeFetchBytes`. Found and fixed while building: Node's recursive `mkdir` hangs forever on an uncreatable cache path, and a
 quadratic loop on repeated `<body>` tags. Live attacks (hostile servers, planted and symlinked cache files) are in `security-findings.md`.
 
 No `.lighthouserc.js` migration note needed: no new config keys.
