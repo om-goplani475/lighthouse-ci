@@ -924,3 +924,122 @@ describe('safeFetchPrefix — address policy through the real default path', () 
     await expect(safeFetchPrefix('not a url')).rejects.toThrow(/not a valid URL/);
   });
 });
+
+describe('fetchPrefixWithLookup and safeFetchPrefix: the userAgent option', () => {
+  /** @type {http.Server} */
+  let server;
+  let port = 0;
+  /** @type {Array<Record<string, string | string[] | undefined>>} */
+  let requests = [];
+
+  beforeEach(async () => {
+    requests = [];
+    server = http.createServer((req, res) => {
+      requests.push(req.headers);
+      res.writeHead(200, {'Content-Type': 'text/html'});
+      res.end('<html><head><title>x</title></head></html>');
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    port = /** @type {any} */ (server.address()).port;
+  });
+  afterEach(async () => {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  });
+
+  /** @type {string[]} */
+  let lookups = [];
+  const spyLookup = (
+    /** @type {string} */ hostname,
+    /** @type {any} */ options,
+    /** @type {any} */ callback
+  ) => {
+    lookups.push(hostname);
+    // Node asks for every address (`all: true`) when connecting by host name.
+    if (options && options.all) callback(null, [{address: '127.0.0.1', family: 4}]);
+    else callback(null, '127.0.0.1', 4);
+  };
+  beforeEach(() => {
+    lookups = [];
+  });
+  const url = () => `http://example.test:${port}/`;
+
+  it('sends a valid user-agent as the User-Agent header', async () => {
+    await fetchPrefixWithLookup(url(), spyLookup, {userAgent: 'lhci-seo-audits-crawler/1.0'});
+    expect(requests).toHaveLength(1);
+    expect(requests[0]['user-agent']).toBe('lhci-seo-audits-crawler/1.0');
+  });
+
+  it('accepts the shortest and the longest allowed values, and every printable ASCII character', async () => {
+    await fetchPrefixWithLookup(url(), spyLookup, {userAgent: 'a'});
+    await fetchPrefixWithLookup(url(), spyLookup, {userAgent: 'a'.repeat(200)});
+    const printable = Array.from({length: 0x7e - 0x20 + 1}, (_, i) =>
+      String.fromCharCode(0x20 + i)
+    ).join('');
+    await fetchPrefixWithLookup(url(), spyLookup, {userAgent: printable});
+    expect(requests).toHaveLength(3);
+    expect(requests[1]['user-agent']).toHaveLength(200);
+  });
+
+  it('sends no User-Agent header at all when the option is absent, and keeps the other headers', async () => {
+    await fetchPrefixWithLookup(url(), spyLookup);
+    await fetchPrefixWithLookup(url(), spyLookup, {timeoutMs: 2000, maxBytes: 1000});
+    for (const headers of requests) {
+      expect(headers['user-agent']).toBeUndefined();
+      expect(headers['accept-encoding']).toBe('identity');
+      expect(headers.accept).toMatch(/^text\/html/);
+    }
+  });
+
+  it.each([
+    ['empty', ''],
+    ['too long', 'a'.repeat(201)],
+    ['CRLF header injection', 'ok\r\nX-Injected: 1'],
+    ['LF only', 'a\nb'],
+    ['CR only', 'a\rb'],
+    ['NUL', 'a\0b'],
+    ['a tab', 'a\tb'],
+    ['DEL', 'a\x7fb'],
+    ['non-ASCII', 'café'],
+    ['emoji', 'bot 🤖'],
+    ['a number', 5],
+    ['null', null],
+    ['an object', {toString: () => 'x'}],
+    ['an array', ['x']],
+  ])('rejects %s before any DNS lookup or connection', async (_name, value) => {
+    await expect(
+      fetchPrefixWithLookup(url(), spyLookup, {userAgent: /** @type {any} */ (value)})
+    ).rejects.toThrow(/userAgent must be 1 to 200 printable ASCII/);
+    expect(lookups).toEqual([]);
+    expect(requests).toEqual([]);
+  });
+
+  describe('through the real default path', () => {
+    const original = process.env[ALLOW_PRIVATE_NETWORK_ENV];
+    afterEach(() => {
+      if (original === undefined) delete process.env[ALLOW_PRIVATE_NETWORK_ENV];
+      else process.env[ALLOW_PRIVATE_NETWORK_ENV] = original;
+    });
+
+    it('sends the header when opted in, and still refuses a loopback URL when not', async () => {
+      process.env[ALLOW_PRIVATE_NETWORK_ENV] = '1';
+      await safeFetchPrefix(`http://127.0.0.1:${port}/`, {userAgent: 'crawler/1'});
+      expect(requests[0]['user-agent']).toBe('crawler/1');
+
+      delete process.env[ALLOW_PRIVATE_NETWORK_ENV];
+      requests = [];
+      await expect(
+        safeFetchPrefix(`http://127.0.0.1:${port}/`, {userAgent: 'crawler/1'})
+      ).rejects.toThrow(/private\/reserved/);
+      expect(requests).toEqual([]);
+    });
+
+    it('rejects an invalid user-agent without a connection even when the address is allowed', async () => {
+      process.env[ALLOW_PRIVATE_NETWORK_ENV] = '1';
+      await expect(
+        safeFetchPrefix(`http://127.0.0.1:${port}/`, {userAgent: 'bad\r\nHost: evil'})
+      ).rejects.toThrow(/userAgent must be/);
+      expect(requests).toEqual([]);
+    });
+  });
+});

@@ -599,6 +599,21 @@ function collectPrefixHeaders(rawHeaders) {
   return headers;
 }
 
+const MAX_USER_AGENT_LENGTH = 200;
+
+/**
+ * @param {unknown} value
+ * @return {value is string}
+ */
+function isValidUserAgent(value) {
+  return (
+    typeof value === 'string' &&
+    value.length >= 1 &&
+    value.length <= MAX_USER_AGENT_LENGTH &&
+    /^[\x20-\x7e]+$/.test(value)
+  );
+}
+
 /**
  * Fetches a URL's headers and, only for a 2xx HTML response, the first `maxBytes` of its body. Built
  * for reading a page's `<head>`: it never downloads a whole page, and never reads a body it cannot
@@ -611,13 +626,26 @@ function collectPrefixHeaders(rawHeaders) {
  * rejects. `timeoutMs` is a total wall-clock deadline, as in `fetchBytesWithLookup`. Same
  * URL/scheme checks and `lookup` wiring as its siblings; not exported as public API for the same
  * reason.
+ * `userAgent` (optional) is sent as the `User-Agent` header, so a crawler can identify itself. It must be
+ * printable ASCII, 1 to 200 characters; anything else (control characters including CR/LF/NUL,
+ * non-ASCII, empty, too long, not a string) rejects before any DNS lookup or connection, because a header
+ * value is the classic place to smuggle a second header or request. Absent, no `User-Agent` is sent,
+ * exactly as before.
  * @param {string} urlString
  * @param {typeof safeLookup} lookup
- * @param {{timeoutMs?: number, maxBytes?: number}} [options]
+ * @param {{timeoutMs?: number, maxBytes?: number, userAgent?: string}} [options]
  * @return {Promise<PrefixResult>}
  */
-function fetchPrefixWithLookup(urlString, lookup, {timeoutMs = 5_000, maxBytes = 64 * 1024} = {}) {
+function fetchPrefixWithLookup(
+  urlString,
+  lookup,
+  {timeoutMs = 5_000, maxBytes = 64 * 1024, userAgent} = {}
+) {
   return new Promise((resolve, reject) => {
+    if (userAgent !== undefined && !isValidUserAgent(userAgent)) {
+      reject(new Error('refusing to fetch: userAgent must be 1 to 200 printable ASCII characters'));
+      return;
+    }
     /** @type {URL} */
     let url;
     try {
@@ -664,6 +692,7 @@ function fetchPrefixWithLookup(urlString, lookup, {timeoutMs = 5_000, maxBytes =
         headers: {
           Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5',
           'Accept-Encoding': 'identity',
+          ...(userAgent === undefined ? {} : {'User-Agent': userAgent}),
         },
       },
       res => {
@@ -833,7 +862,7 @@ function safeFetchBytes(urlString, options) {
  * literal and resolved addresses (one decision point, `isBlockedAddress`, including the private-network
  * opt-in), no redirects followed, a total deadline, and a hard cap on the bytes read.
  * @param {string} urlString
- * @param {{timeoutMs?: number, maxBytes?: number}} [options]
+ * @param {{timeoutMs?: number, maxBytes?: number, userAgent?: string}} [options]
  * @return {Promise<PrefixResult>}
  */
 function safeFetchPrefix(urlString, options) {
