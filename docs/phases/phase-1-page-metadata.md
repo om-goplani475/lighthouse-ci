@@ -9,6 +9,9 @@ possible — not on any earlier cadence.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
+**Branch status: complete.** `phase-1-page-metadata` was completed and merged into `main` (`--ff-only`,
+2026-09-30) and the branch deleted; every item below is done, deferred, to-do-later or marked not possible.
+
 ## A structural note before any feature starts here
 
 Several items in this phase's original wishlist are **site-wide** (duplicate titles/descriptions
@@ -16,8 +19,7 @@ Several items in this phase's original wishlist are **site-wide** (duplicate tit
 feature in this package has used so far — evaluates **one page at a time**; it has no way to
 compare page A's title against page B's, because it never sees page B. Cross-page duplicate
 detection needs a crawler/orchestration layer that doesn't exist anywhere in this repo yet (see
-`docs/master-roadmap.md`'s Phase 16/31 — "Site Intelligence" / "Multi-page crawling
-infrastructure", both explicitly not started). Those items are filed under "Not possible without
+`docs/master-roadmap.md`'s Phase 16 (Site Intelligence & Multi-page Crawler), explicitly not started). Those items are filed under "Not possible without
 new infrastructure" below, not folded into the single-page features — this is a real, structural
 limitation of the audit model itself, not a scoping choice that could go either way.
 
@@ -37,7 +39,7 @@ limitation of the audit model itself, not a scoping choice that could go either 
 ## Not possible without new infrastructure
 
 Not a prioritization choice — these need a crawler/multi-page orchestration layer this repo has
-never built, tracked separately (Phase 16/31 in `docs/master-roadmap.md`), before they're even
+never built, tracked separately (Phase 16 (Site Intelligence & Multi-page Crawler) in `docs/master-roadmap.md`), before they're even
 buildable as a concept, regardless of how much time is spent on them.
 
 | Item | Why | Reference |

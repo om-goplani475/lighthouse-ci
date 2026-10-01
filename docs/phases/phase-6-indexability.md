@@ -6,7 +6,7 @@ done, deferred, to-do-later, or marked not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
-**Status: complete (2026-10-01).** Items 1-3 built together as one feature (`indexability`), QA'd live; see `docs/qa/indexability.md`.
+**Status: complete (2026-10-01).** Items 1-3 built together as one feature (`indexability`), QA'd live; see `docs/qa/indexability.md`. **Merged into `main`** (`--ff-only`, 2026-10-01, branch deleted).
 
 ## Planning decisions (2026-10-01)
 
@@ -81,5 +81,5 @@ None identified yet.
 - **Tests**: 1,013 seo-audits tests pass, also under Node 18.20.8 (what CI pins); repo-wide typecheck and lint are
   clean. **Not verified**: `packages/viewer` rendering of the new audits, `npm run start:seed-database`, and a real
   GitHub Actions run with the environment variables (planned after this phase).
-- **Branch**: `phase-6-indexability`, 5 commits ahead of `main` before this closing record. Per `AGENTS.md` it
-  merges into `main` with `--ff-only` and is then deleted.
+- **Branch**: `phase-6-indexability` was 5 commits ahead of `main` before this closing record. It was **merged into
+  `main`** with `--ff-only` (tip `9b5b973`, 2026-10-01) and deleted, per `AGENTS.md`.

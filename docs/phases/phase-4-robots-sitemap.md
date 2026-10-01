@@ -7,8 +7,8 @@ once every item is done, deferred, to-do-later, or marked not possible.
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
 **Status: all ten tracker rows (the roadmap's twelve bullets) resolved 2026-10-01; no security finding
-open.** Ten audits shipped, taking the fork to 31. Ready to merge into `main` (that merge is the
-developer's call; see "Closing record" at the bottom).
+open.** Ten audits shipped, taking the fork to 31. **Merged into `main`** (`--ff-only`, 2026-10-01,
+branch deleted; see "Closing record" at the bottom).
 
 ## Planning decisions (2026-09-30)
 
@@ -110,5 +110,5 @@ developer's call; see "Closing record" at the bottom).
   Puppeteer image tests in `packages/server`) have never been compared with the base branch; it is the
   one open item in `.ai-agents/state/ci-backlog.md`. This phase changed nothing outside
   `packages/seo-audits` apart from docs and pipeline state.
-- **Branch**: `phase-4-robots-sitemap`, 63 commits ahead of `main` (before this closing record). Per `AGENTS.md` it merges into
-  `main` with `--ff-only` and is then deleted, once the developer decides to.
+- **Branch**: `phase-4-robots-sitemap` was 63 commits ahead of `main` before this closing record. It was **merged into `main`**
+  with `--ff-only` (tip `d81c198`, 2026-10-01) and deleted, per `AGENTS.md`.

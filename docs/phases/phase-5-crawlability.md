@@ -6,7 +6,7 @@ every item is done, deferred, to-do-later, or marked not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
-**Status: complete (2026-10-01).** All five items done (1-3 `transport-security`, 5 `soft-not-found`, 4 `url-variants`), merged into this branch and QA'd live. Ready to close out (merging into `main` is the developer's call).
+**Status: complete (2026-10-01).** All five items done (1-3 `transport-security`, 5 `soft-not-found`, 4 `url-variants`), merged into this branch and QA'd live. **Merged into `main`** (`--ff-only`, 2026-10-01, branch deleted; see "Closing record" at the bottom).
 
 ## Planning decisions (2026-10-01)
 
@@ -112,5 +112,5 @@ None identified yet.
   pre-Phase-4 base (same families fail there) and are unrelated; see `.ai-agents/state/ci-backlog.md`.
   **Not verified**: `packages/viewer` rendering of the new audits, `npm run start:seed-database`, and a real
   GitHub Actions run with the environment variables.
-- **Branch**: `phase-5-crawlability`, 23 commits ahead of `main` before this closing record. Per `AGENTS.md`
-  it merges into `main` with `--ff-only` and is then deleted.
+- **Branch**: `phase-5-crawlability` was 23 commits ahead of `main` before this closing record. It was **merged into
+  `main`** with `--ff-only` (tip `7bb2047`, 2026-10-01) and deleted, per `AGENTS.md`.
