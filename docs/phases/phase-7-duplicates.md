@@ -1,0 +1,59 @@
+# Phase 7 — Duplicate & Consistency Detection (site-wide)
+
+Live tracker for this phase's work in `packages/seo-audits`. Branch: `phase-7-duplicates` (off `main`), the
+sixth phase to use the phase-branch workflow in `AGENTS.md`. Merges into `main` only once every item is done,
+deferred, to-do-later, or marked not possible.
+
+Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
+
+**Status: planned (2026-10-01).** Scoped with the developer. Item 0 (the crawler) is the prerequisite for every
+other row and goes through the full 9-stage pipeline; the audits on top of it are built after it.
+
+## Planning decisions (2026-10-01)
+
+Every row of this phase compares one page with others, and every audit in the fork so far judges one page. The
+repo has no crawler, so three decisions were confirmed with the developer:
+
+1. **Build the real crawler first**, rather than a sample-based shortcut over the Phase 4 sitemap sample or a
+   multi-run aggregator. It is the "Multi-page / Site-wide Crawling Infrastructure" item in the master roadmap,
+   and Phase 8 (internal linking), the deferred Phase 5 link checks and Phase 11 build on it too.
+2. **All four rows are wanted now**: duplicate titles and descriptions, thin content / text-to-HTML ratio,
+   conflicting canonicals across pages, and exact duplicate content (a hash of the visible text).
+3. **Crawler design** (the blocking questions of the intake): it runs **inside the Lighthouse run as a
+   gatherer, with an on-disk cache keyed by origin** (each `lhci collect` run is its own child process, so a
+   cache is how a multi-URL or multi-run collect crawls once; no workflow change, `lhci autorun` just works);
+   it **honours robots.txt by default** (an environment variable can turn that off for your own staging);
+   default bounds **50 pages and 120 s**, overridable by environment variables and never by the page.
+4. **Scaled down to a core first** (2026-10-01): after asking whether a full crawler was necessary now, the developer chose
+   the crawler *core* (bounded fetch, versioned snapshot, disk cache), seeded from the sitemap URLs and the audited page's
+   own links **at depth 1**. Link-following to a greater depth waits for Phase 8, the first consumer that needs it; the
+   snapshot already stores each page's links, so nothing built now is thrown away.
+
+## Features
+
+| # | Feature | Status | Slug / notes |
+|---|---------|--------|--------------|
+| 0 | Multi-page crawler core (prerequisite) | planned | `site-crawler`, full 9-stage pipeline: bounded same-origin fetch at depth 1, versioned snapshot, on-disk cache, `SiteCrawl` gatherer. Spec: `docs/feature-specs/site-crawler.md`. |
+| 1 | Duplicate titles and duplicate meta descriptions across crawled pages | planned | reads the snapshot |
+| 2 | Text-to-HTML ratio / thin-content flagging | planned | reads the snapshot (and the audited page) |
+| 3 | Duplicate or conflicting canonical declarations across pages | planned | reads the snapshot |
+| 4 | Exact duplicate visible content (hash of normalised text) | planned | reads the snapshot; needs full-body reads, so it sets the crawler's body-size cap |
+
+## Deferred
+
+| Item | Deferred | Why |
+|------|----------|-----|
+| Near-duplicate content (similarity / shingling) | after exact-hash duplicates | the roadmap says "hash-based, then similarity"; the hash comes first and shingling is a separate cost and false-positive decision |
+| Inconsistent URL representations resolving to the same page | not selected for this phase | partly covered for one URL by `url-variant-consistency` (Phase 5); the site-wide version can reuse the snapshot later |
+
+## To do later
+
+| Item | When | Notes |
+|------|------|-------|
+| Link-following beyond depth 1 (the full crawler) | Phase 8 | needed by the link graph, orphan pages, crawl depth and the deferred Phase 5 link checks; the snapshot already stores each page's internal links |
+| Phase 8 (internal linking and site graph) and the deferred Phase 5 link checks | after the crawler | they read the same snapshot |
+| A separate `seo-crawl` command writing the snapshot ahead of `lhci collect` | if the in-run crawl time proves a problem | the crawler is a library, so a command is a thin addition |
+
+## Not possible / permanently out of scope
+
+None identified yet.
