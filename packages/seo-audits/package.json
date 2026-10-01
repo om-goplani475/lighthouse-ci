@@ -7,6 +7,7 @@
   "private": true,
   "dependencies": {
     "ajv": "6.12.6",
+    "htmlparser2": "^6.1.0",
     "lighthouse": "12.6.1",
     "parse5": "^7.1.1",
     "robots-parser": "^3.0.1",
