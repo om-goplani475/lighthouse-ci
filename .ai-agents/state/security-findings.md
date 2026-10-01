@@ -610,3 +610,24 @@ server). New surface: up to three redirect-following probes of the audited URL's
 - Finding: none. `critical`/`high`/`medium`/`low`: 0.
 - Not verified: behaviour of the hop-following against a server that answers each hop slowly but within
   5 s (the 20 s per-variant budget is unit-tested with a fake clock only).
+
+## 2026-10-01 — indexability (Phase 6, lightweight mode after a design conversation)
+
+Reviewed with the security checklist while building; every attack below was **run against the real gatherer
+and a spy server**. New surface: one request, to a URL the audited page chooses (its canonical).
+
+- **SSRF**: the canonical is page-controlled, so it is requested only when it is on the **page's own origin**
+  (scheme, host and port): a canonical on another host, a lookalike, another port, another scheme,
+  `169.254.169.254`, a scheme-relative `//evil.test`, or a non-http scheme is recorded and never requested; a
+  spy server on another port got **zero** requests, and the unit tests assert the exact list of requested URLs
+  (none). The request itself goes through `checkUrls` and `safeFetchPrefix` (scheme allowlist, address
+  policy, DNS-rebinding-safe lookup, no redirect followed). Several different canonicals are not requested
+  at all.
+- **Crawler abuse**: at most one request per audited page (plus `checkUrls`' single retry for a network
+  error), 5 s, first 64 KiB of HTML; `parse5`'s input is already capped (Finding 5).
+- **Data exposure**: no cookies or auth headers are sent; the report holds the canonical URL, the target's
+  status, redirect `Location` and robots signals (cut to 1,000 characters), never page content.
+- **Sandbox**: no new CDP session or Chromium flag; the in-page read is a single `evaluate` of a fixed
+  function (selects `link[rel~=canonical]` in the head and measures `innerText` length), isolated world.
+- Finding: none. `critical`/`high`/`medium`/`low`: 0.
+- Not verified: a target that answers slowly but inside 5 s many times (one request only, so not applicable).

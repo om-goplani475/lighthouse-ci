@@ -126,6 +126,18 @@
   gets "not applicable", not a failure: the variants only make sense at the real host name on ports 80/443.
 - status: done (documented in the README and each audit's description)
 
+## 2026-10-01 — indexability
+
+- item: no gap found. No dependency, workflow or Docker change; the new suites and the config test were run
+  under Node 18.20.8, the version `ci.yml` pins (recorded below).
+- status: done (nothing to do)
+
+- item: for any CI job: a page whose canonical points elsewhere on the same site triggers one extra
+  status request to that URL (visible in the site's logs); on `localhost` or a private staging host it needs
+  `LHCI_SEO_ALLOW_PRIVATE_NETWORK=1` or it is skipped as a note. To audit an error page (4xx/5xx) at all,
+  set `ignoreStatusCode: true` under `ci.collect.settings`; Lighthouse otherwise stops with no results.
+- status: done (documented in the README)
+
 <!-- Appended by Agent 08. Advisory only — does not block merges or new features. Format per entry:
 
 ## {date} — {slug}

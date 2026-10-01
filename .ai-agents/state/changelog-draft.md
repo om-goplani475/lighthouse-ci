@@ -405,5 +405,35 @@ redirects as notes, three audits on one gatherer). No new dependency, config key
 
 No `.lighthouserc.js` migration note needed: no new config keys.
 
+## indexability (Phase 6, 2026-10-01)
+
+### Indexability verdict and contradiction detection
+
+**User-facing**: two new `seo-extended` audits (40 in total) built on one decision tree over the signals a
+search engine weighs for the audited page: HTTP status, robots.txt (Googlebot and Bingbot), meta robots and
+`X-Robots-Tag` (including crawler-scoped values), the canonical, and the amount of visible text.
+
+- **`indexability-verdict`** (informational, never fails) shows the five steps and a plain-English verdict:
+  Indexable, Indexable but canonical elsewhere, Blocked by robots.txt, Not indexable (noindex), or Not
+  indexable (HTTP status). A deliberate noindex is legitimate, so it never fails.
+- **`indexability-conflicts`** fails when signals contradict each other: noindex that robots.txt hides from a
+  crawler, noindex together with a canonical to another URL, robots.txt blocking a page whose canonical points
+  elsewhere, a canonical on an error page, and a bad canonical target. Each row says why it matters and what to
+  do. Suggested severity: `warn` first, then `error`.
+
+When the canonical points to another URL on the same site, **one** status request is made to it (SSRF-protected,
+first 64 KiB, 5 s, no redirect followed; `LHCI_SEO_ALLOW_PRIVATE_NETWORK` applies) to catch a canonical that
+redirects, errors, is noindex, is blocked by robots.txt, or chains to yet another canonical. A cross-origin
+canonical is never requested. Limits: a canonical sent only in an HTTP `Link` header and anything a script adds
+after load are not seen. **Error pages**: Lighthouse stops on a 4xx/5xx main document, so the HTTP-status
+verdict and the error-page conflict need `ignoreStatusCode: true` under `ci.collect.settings`.
+
+**Internal/dev**: gatherer `IndexabilitySignals`, pure logic in `src/lib/indexability.js` (44 tests with the
+gatherer's), input resolution in `indexability-sources.js` (imports `MainResource`, same split as
+`robots-sources.js`), two thin audits; `toSampledPage` is now exported from `sitemap-url-sample.js` (additive).
+No new dependency, config key or environment variable.
+
+No `.lighthouserc.js` migration note needed: no new config keys.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->
