@@ -551,6 +551,42 @@ requests show as extra hits in your site's logs.
 - If a request is refused by the private-network policy, the run carries a warning naming the cause and
   the setting.
 
+### Indexability: the verdict and the contradictions (`indexability-verdict`, `indexability-conflicts`)
+
+One gatherer (`IndexabilitySignals`) and one decision tree over the signals a search engine weighs for the
+audited page: HTTP status, robots.txt (Googlebot and Bingbot), meta robots and `X-Robots-Tag`
+(including crawler-scoped values), the canonical, and how much visible text there is. Two audits read it.
+
+- **`indexability-verdict`** — informational, never fails (a deliberate noindex is legitimate). Shows the
+  five steps in a table and a plain-English verdict: *Indexable*, *Indexable, canonical elsewhere*,
+  *Blocked by robots.txt*, *Not indexable (noindex)* or *Not indexable (HTTP 4xx/5xx)*, with the reason, and
+  a pointer to `indexability-conflicts` when signals contradict each other. The text-content step is a
+  note only (under 100 characters is flagged as "little to index"; a page that builds its content late with
+  JavaScript can look empty).
+- **`indexability-conflicts`** — **fails** when signals contradict each other, which is never intentional.
+  Each row says what conflicts and why it matters:
+  - **noindex that robots.txt hides**: a crawler that may not fetch the page never sees the noindex and can
+    keep the URL in its index (checked per crawler).
+  - **noindex together with a canonical to another URL**: "don't index me" and "index that instead".
+  - **robots.txt blocks the page but its canonical points elsewhere**: the canonical cannot be read.
+  - **a canonical on an error page** (HTTP 4xx/5xx).
+  - **a bad canonical target**: when the canonical points to another URL **on the same origin**, the
+    gatherer makes **one** request to it (through the SSRF-protected fetch; first 64 KiB of HTML, 5 s, no
+    redirect followed; `LHCI_SEO_ALLOW_PRIVATE_NETWORK` applies) and flags a target that redirects, returns
+    an error, is itself noindex, is blocked by robots.txt, or declares yet another canonical (a chain). A
+    target that could not be requested, or whose `<head>` was only partly read, is a note, not a failure. A
+    cross-origin canonical is shown but never requested.
+  - Not repeated here: meta-versus-header disagreement (`robots-directives-conflict`) and a noindex page
+    listed in a sitemap (`sitemap-indexability`).
+- **Limits**: only a canonical in the live `<head>` is seen (one declared only in an HTTP `Link` header is
+  covered by Lighthouse's own `canonical` audit), and a noindex or canonical a script adds after the read is
+  missed. **Reaching the error-page branches**: Lighthouse normally stops with `ERRORED_DOCUMENT_REQUEST`
+  on a 4xx/5xx main document and produces no results, so "Not indexable (HTTP 404)" and the error-page
+  canonical conflict only appear when you set `ignoreStatusCode: true` under `ci.collect.settings`
+  (Lighthouse then records a run warning instead of stopping). The URL judged is the final URL Lighthouse
+  reports, which can carry a query added after load (for example `https://www.google.com/?zx=...`, which
+  Google's own robots.txt disallows).
+
 ### Auditing a site on localhost or a private network (`LHCI_SEO_ALLOW_PRIVATE_NETWORK`)
 
 The fetch path (`src/lib/safe-fetch.js`) refuses loopback and private addresses by default, because
@@ -624,7 +660,7 @@ module.exports = {
 };
 ```
 
-This adds all thirty-eight audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all forty audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
@@ -635,16 +671,16 @@ This adds all thirty-eight audits (`structured-data-json-ld`, `structured-data-s
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
 `sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`, `mixed-content`, `hsts-quality`,
 `ssl-certificate-expiry`, `soft-not-found`, `url-variant-consistency`, `redirect-chain-length`,
-`redirect-loop`) on top of
+`redirect-loop`, `indexability-verdict`, `indexability-conflicts`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the thirty-eight audits are part of this fork's shared `all`/`recommended` presets
+None of the forty audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all thirty-eight here are opt-in via `configPath`, so they can't be part of that
+default, and all forty here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
@@ -725,6 +761,11 @@ module.exports = {
         'redirect-chain-length': ['warn', {minScore: 1}],
         // A loop means a URL form is unreachable: always a defect.
         'redirect-loop': ['error', {minScore: 1}],
+        // Informational: Lighthouse normalizes its score to 1, so this assertion never fails; omit it if you like.
+        'indexability-verdict': ['warn', {}],
+        // Signals that contradict each other are never intentional, but the canonical-target check is a
+        // single request and a CDN can answer it oddly: 'warn' first, 'error' once confirmed.
+        'indexability-conflicts': ['warn', {minScore: 1}],
       },
     },
   },
