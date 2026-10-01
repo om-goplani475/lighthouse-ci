@@ -6,6 +6,10 @@ once every item is done, deferred, to-do-later, or marked not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
+**Status: all ten tracker rows (the roadmap's twelve bullets) resolved 2026-10-01; no security finding
+open.** Ten audits shipped, taking the fork to 31. Ready to merge into `main` (that merge is the
+developer's call; see "Closing record" at the bottom).
+
 ## Planning decisions (2026-09-30)
 
 - **Batching**: robots.txt items first as one bounded group (lightweight mode); sitemap items
@@ -20,6 +24,32 @@ Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
   Its per-UA fallback differs from Google's for `Googlebot-Image` (it falls back to `*`, Google to
   the `googlebot` group first), so a small group parser in `src/lib/robots-txt.js` handles that
   fallback and conflict detection.
+
+## How the plan changed while building (so the decisions above are not read as the final design)
+
+- **Sitemap work became a shared gatherer.** The planning note above said "no new gatherer"; that held
+  for the robots.txt audits (core's `RobotsTxt` artifact), but the sitemap audits needed a new one:
+  `SitemapDocuments` discovers robots.txt `Sitemap:` lines (else `/sitemap.xml`), fetches and parses every
+  sitemap once (gzip, one level of index, 10 files, parsed with `saxes`), and every sitemap audit reads
+  it. It was the first gatherer in this package with outbound requests, so it went through the full
+  9-stage pipeline.
+- **The page sample is shared too.** The same gatherer now requests the sampled sitemap URLs once each
+  (status, headers, the first 64 KiB of 2xx HTML reduced to meta-robots and canonical signals with
+  `parse5`), and both `sitemap-url-status` and `sitemap-indexability` read it, so checking status and
+  indexability costs no extra requests. `sitemap-url-status` was refactored onto it behind a
+  characterization test whose expected values were captured before the change.
+- **Security work that was not planned, all done:** two `high` findings found by running attacks during
+  the sitemap review (an SSRF bypass through bracketed IPv6 literals, in `safe-fetch.js` since Phase 1;
+  and a quadratic-time XML parser denial of service), a `medium` one in `parse5` found during the
+  indexability build, and a gatherer-wide time budget. See `.ai-agents/state/security-findings.md`.
+- **A private-network opt-in was added** (`LHCI_SEO_ALLOW_PRIVATE_NETWORK`) after the developer confirmed
+  CI audits `localhost`/staging, where the SSRF policy refused the page's own robots.txt and sitemap.
+  It unblocks only loopback, RFC 1918 and IPv6 unique-local; the metadata address and link-local stay
+  blocked even with it on.
+- **Sample size is an environment variable**, `LHCI_SEO_SITEMAP_SAMPLE_SIZE` (default 10, clamped 1-25),
+  not a config key: it bounds requests to the audited site, so a page must not be able to change it.
+- **`llms.txt` was tuned against real files**: the first version failed Anthropic's and Stripe's files over
+  stylistic deviations, so only unambiguous violations fail now.
 
 ## Features
 
@@ -41,13 +71,44 @@ Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 | Item | Deferred | Why |
 |---|---|---|
 | 10 (llms.txt) | Checking that the links inside llms.txt resolve, `llms-full.txt`, and `llms.txt` at a subpath | The spec mentions none of the first two; the structure check is what was chosen. Reachability would reuse the bounded status check and can be added later without changing the audit's contract. |
+| 4 (sitemap-valid) | Following redirects for a sitemap URL (Google does; this reports them and says to declare the final URL) | Needs a new redirect-following mode in `safe-fetch.js` that re-validates every hop: a real change to the security-reviewed fetch path, not worth it for a recommendation. |
+| 4/7 (sitemap formats) | Validating the image/video/news/`xhtml:link` extensions, text/RSS/Atom sitemaps, an index nested more than one level | Tolerated but not validated, so they are never reported as invalid; each is its own feature. |
+| 8 (sitemap-robots-crossref) | The "sitemap's own path is disallowed" check is worded as "verify", not as fact | Google's sitemap documentation does not say whether robots.txt applies to sitemap files (checked 2026-09-30). Drop that check if it proves wrong. |
+| 9 (sitemap-indexability) | HTTP `Link: <...>; rel="canonical"` headers, canonical chains, and whether a canonical's target is itself indexable | Rare / needs further requests per URL; the target check belongs with the Phase 6 decision tree. |
 
 ## To do later
 
 | Item | Basic version built | Advanced alternative, not built | Why not built now |
 |---|---|---|---|
 | 3 (robots-txt-rule-conflicts) | Identical path strings only | Wildcard/`$` overlap detection (`/a*` vs `/ab`) | Needs a pattern-intersection routine; the exact-match case is the common real mistake |
+| 5 (sitemap-url-status) | A bounded evenly spread sample, default 10 (max 25) | Check every listed URL | Needs the multi-page crawler (Phases 5 and 8); a full check would hammer the audited site. Also pinned, not fixed: the audit scores 1 when the time budget leaves most sampled URLs "not checked" (with a note). |
+| 7 (sitemap-limits) | The first 10 sitemap files of a run, truncation reported | Every child sitemap | The cap and the 40 s budget are the security bounds; the crawler could lift them safely. |
+| 9 (sitemap-indexability) | Signals from the raw HTML head of a plain request | A noindex or canonical injected by client-side JavaScript | Needs a browser render per sampled URL (Phase 12, JavaScript rendering parity); the audit's own description says this plainly. |
 
 ## Not possible / permanently out of scope
 
-*(none yet)*
+*(none: everything not built is a choice or waits on infrastructure that does not exist yet, listed above)*
+
+## Closing record (2026-10-01)
+
+- **Shipped (10 audits, all QA'd live with real `lhci collect`/`assert`)**: `robots-txt-sitemap-declared`,
+  `robots-txt-crawler-access`, `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`,
+  `sitemap-limits`, `sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`,
+  `llms-txt-structure`. The fork now has 31 audits in the `seo-extended` category. QA record:
+  `docs/qa/robots-txt-sitemap.md` (items 1-3), `docs/qa/sitemap-fetch-and-parse.md` (sitemap work, items
+  5, 8, 10, the private-network opt-in and the time budget), `docs/qa/sitemap-indexability.md`.
+- **Real defects the audits found in real sites' own files during QA**: nodejs.org's sitemap lists URLs
+  with the dots stripped (404); MDN's sitemap lists a duplicate URL and a `noindex` page.
+- **Pipeline used**: `sitemap-fetch-and-parse` (the shared gatherer) and `sitemap-indexability` (the shared
+  page sample and the refactor of a merged audit) ran the full 9-stage pipeline; the rest were lightweight
+  or design-conversation-then-lightweight, per `.ai-agents/prompts/build-mode-selection.md`.
+- **Security**: no `critical`/`high`/`medium`/`low` finding is open. Findings 1-6 and the follow-ups are
+  in `.ai-agents/state/security-findings.md` with their resolving commits. Parser and fetch limits are
+  documented in `packages/seo-audits/README.md`.
+- **Tests**: 816 seo-audits tests pass, also under Node 18.20.8 (what CI pins); repo-wide typecheck and
+  lint are clean. **Not confirmed**: the 12 failing suites in a full `npm run test` (mostly Storybook/
+  Puppeteer image tests in `packages/server`) have never been compared with the base branch; it is the
+  one open item in `.ai-agents/state/ci-backlog.md`. This phase changed nothing outside
+  `packages/seo-audits` apart from docs and pipeline state.
+- **Branch**: `phase-4-robots-sitemap`, 63 commits ahead of `main` (before this closing record). Per `AGENTS.md` it merges into
+  `main` with `--ff-only` and is then deleted, once the developer decides to.

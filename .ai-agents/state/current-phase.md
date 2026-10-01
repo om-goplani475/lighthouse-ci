@@ -1,9 +1,7 @@
 # Current phase
 
-- phase: 4 (robots-sitemap)
-- branch: phase-4-robots-sitemap
-- roadmap: docs/phases/phase-4-robots-sitemap.md
-- status: in-progress
+- phase: none active — see below
+- status: n/a
 
 <!-- Phase 1 (page-metadata) closed 2026-09-30: every item (0-6) done or closed-no-build-needed,
 ff-merged into main (a1e8313), branch phase-1-page-metadata deleted. See
@@ -25,6 +23,16 @@ and fixed a real pre-existing bug in safe-fetch.js's safeLookup (broke every rea
 a non-literal-IP hostname) during item 3's live QA. ff-merged into main, branch
 phase-3-social-metadata deleted. See docs/phases/phase-3-social-metadata.md for the full
 breakdown. -->
+
+<!-- Phase 4 (robots.txt & sitemap) closed 2026-10-01: all ten tracker rows (the roadmap's twelve
+bullets) done, ten audits shipped (31 in the fork), no security finding open. ff-merged into main,
+branch phase-4-robots-sitemap deleted. Notable: the first gatherer with outbound requests
+(SitemapDocuments, with a shared page sample), two high-severity security findings found by running
+attacks and fixed (an IPv6 SSRF bypass in safe-fetch.js dating from Phase 1, and a quadratic-time XML
+parser), a private-network opt-in for CI (LHCI_SEO_ALLOW_PRIVATE_NETWORK), and a 40 s gatherer time
+budget. See docs/phases/phase-4-robots-sitemap.md, including its "How the plan changed" section and
+"Closing record". One open item outside this phase: the 12 failing suites in a full `npm run test` were
+never compared with the base branch (.ai-agents/state/ci-backlog.md). -->
 
 <!-- When the next phase starts: if it gets a phase branch, update this file the same way
 phase-1-page-metadata's/phase-3-social-metadata's entries looked (phase/branch/roadmap/status:
