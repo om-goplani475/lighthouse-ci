@@ -138,6 +138,29 @@
   set `ignoreStatusCode: true` under `ci.collect.settings`; Lighthouse otherwise stops with no results.
 - status: done (documented in the README)
 
+## 2026-10-01 — site-crawler
+
+- item: no gap found in the workflow files. One dependency was added, `htmlparser2@^6.1.0`, whose range is already in `yarn.lock`:
+  `yarn install --frozen-lockfile` passes and `yarn.lock` is byte-identical. The new suites and the safe-fetch and config suites
+  (345 tests) were run under Node 18.20.8, the version `ci.yml` pins, and pass. No Docker config exists. No CI changes made.
+- status: done (nothing to do)
+
+- item: things worth knowing about the new tests on a shared CI runner: the cache tests create and delete directories under
+  `os.tmpdir()`; one test spawns three Node child processes (`--input-type=module`) to prove atomic cache writes; the integration
+  test binds three local ports (ephemeral) and one of its cases waits for a real 10 s crawl time budget, so that suite takes about
+  10 s. All run inside the existing `jest --maxWorkers=2`.
+- status: done (documented here)
+
+- item: for a CI job that runs the fork config: the crawl sends up to about 100 requests to the audited site on a cold cache and can
+  take up to `LHCI_SEO_CRAWL_TIME_BUDGET_SECONDS` (default 120 s) inside the first run that needs it; `LHCI_SEO_CRAWL=0` switches
+  it off, and a run limited to Lighthouse's own categories does not crawl. The default cache directory is under the runner's temp
+  directory, so a fresh runner per job means no reuse across jobs (reuse across the URLs and runs of one `lhci collect` works).
+- status: done (documented in the README)
+
+- item: follow-up from the security review (Finding 8, low): give `safeFetchBytes` the same validated `userAgent` option so the
+  crawler's robots.txt and sitemap requests identify themselves.
+- status: open
+
 <!-- Appended by Agent 08. Advisory only — does not block merges or new features. Format per entry:
 
 ## {date} — {slug}

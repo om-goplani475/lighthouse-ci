@@ -6,8 +6,7 @@ deferred, to-do-later, or marked not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
-**Status: planned (2026-10-01).** Scoped with the developer. Item 0 (the crawler) is the prerequisite for every
-other row and goes through the full 9-stage pipeline; the audits on top of it are built after it.
+**Status: in progress (2026-10-01).** Item 0 (the crawler core) is done, merged into this branch and QA'd live (`docs/qa/site-crawler.md`); the four audits on top of it are next.
 
 ## Planning decisions (2026-10-01)
 
@@ -33,11 +32,21 @@ repo has no crawler, so three decisions were confirmed with the developer:
 
 | # | Feature | Status | Slug / notes |
 |---|---------|--------|--------------|
-| 0 | Multi-page crawler core (prerequisite) | planned | `site-crawler`, full 9-stage pipeline: bounded same-origin fetch at depth 1, versioned snapshot, on-disk cache, `SiteCrawl` gatherer. Spec: `docs/feature-specs/site-crawler.md`. |
+| 0 | Multi-page crawler core (prerequisite) | **done** | `site-crawler`, full 9-stage pipeline: bounded same-origin fetch at depth 1, versioned snapshot, on-disk cache, `SiteCrawl` gatherer. Spec: `docs/feature-specs/site-crawler.md`. |
 | 1 | Duplicate titles and duplicate meta descriptions across crawled pages | planned | reads the snapshot |
 | 2 | Text-to-HTML ratio / thin-content flagging | planned | reads the snapshot (and the audited page) |
 | 3 | Duplicate or conflicting canonical declarations across pages | planned | reads the snapshot |
 | 4 | Exact duplicate visible content (hash of normalised text) | planned | reads the snapshot; needs full-body reads, so it sets the crawler's body-size cap |
+
+## How the plan changed while building
+
+- **`htmlparser2`, not `parse5`, reads page bodies.** The design's open question (can full-body parsing be made safe?) was settled by
+  measurement: `parse5` took 109 s on one 512 KiB nested page, `htmlparser2` 53 ms. It is already in the dependency tree, so
+  `yarn.lock` is unchanged.
+- **A new `userAgent` option on `safeFetchPrefix`** so the crawler identifies itself; `safeFetchBytes` (robots.txt, sitemaps) does not have
+  it yet (security Finding 8, low, open).
+- **Found while building**: Node's recursive `mkdir` hangs on an uncreatable path (the cache now creates one directory level only).
+- **A QA note was reworded**: a static site that serves a browser a bigger page than a bot is not "built by script".
 
 ## Deferred
 

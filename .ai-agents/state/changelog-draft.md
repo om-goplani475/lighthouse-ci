@@ -435,5 +435,38 @@ No new dependency, config key or environment variable.
 
 No `.lighthouserc.js` migration note needed: no new config keys.
 
+## site-crawler (Phase 7 item 0, 2026-10-01)
+
+### A bounded site crawler for the cross-page audits
+
+**User-facing**: a new gatherer, `SiteCrawl`, crawls the audited site inside the normal Lighthouse run so the Phase 7 duplicate
+audits (coming next) can compare pages. It reads the audited page, **its own internal links** and **the sitemap's URLs** (one
+level: it does not follow the links of those pages), same origin only, from server HTML, up to 50 pages, honouring robots.txt, and
+keeps per page the title, description, canonicals, robots signals, the first `<h1>` texts, a hash of the visible text and the page's
+links (never raw HTML). A new informational audit, **`crawl-coverage`** (41 audits in the fork), shows what was crawled, blocked and
+skipped. `lhci collect` runs every Lighthouse run as its own process, so a snapshot cache on disk makes several URLs and runs of one
+collect crawl the site **once** (verified: a collect with 2 URLs x 2 runs requested each crawled page exactly once). The cache is used
+only from a directory owned by you with no group or other access.
+
+It is **on by default** and costs up to about 100 requests and up to 120 s on a cold cache, inside whichever run first needs it;
+Lighthouse skips it when no selected audit needs it (a run limited to core categories does not crawl). Environment variables (no
+`.lighthouserc.js` keys): `LHCI_SEO_CRAWL` (`0` or `false` switches it off), `LHCI_SEO_CRAWL_MAX_PAGES` (default 50, 1 to 200),
+`LHCI_SEO_CRAWL_TIME_BUDGET_SECONDS` (120, 10 to 600), `LHCI_SEO_CRAWL_RESPECT_ROBOTS` (`0` or `false` ignores robots.txt, for your
+own staging), `LHCI_SEO_CRAWL_CACHE_DIR`, `LHCI_SEO_CRAWL_CACHE_TTL_SECONDS` (600, `0` disables). Auditing `localhost` needs
+`LHCI_SEO_ALLOW_PRIVATE_NETWORK=1`, as everywhere. Limit: it reads server HTML, so a script-built site (or a server that answers
+non-browser requests differently, as `example.com` does) can look like empty shells; `crawl-coverage` says so. Do not assert on
+`crawl-coverage`: it is informational.
+
+**Internal/dev**: new modules `crawl-snapshot.js`, `crawl-extract.js`, `crawl-cache.js`, `crawler.js`, `crawl-coverage.js`, the gatherer
+and the audit; one new dependency, `htmlparser2@^6.1.0` (already in `yarn.lock`); an additive, validated `userAgent` option on
+`safeFetchPrefix`. **Why `htmlparser2`**: `parse5` took 109 s for one 512 KiB page of nested `<div>`; `htmlparser2` takes 53 ms (every
+hostile shape is asserted under 2 s). Built through the full 9-stage pipeline.
+
+**Security**: no `critical`, `high` or `medium` finding. One `low`, open (Finding 8): the crawler's robots.txt and sitemap requests
+do not send its user-agent. Found and fixed while building: Node's recursive `mkdir` hangs forever on an uncreatable cache path, and a
+quadratic loop on repeated `<body>` tags. Live attacks (hostile servers, planted and symlinked cache files) are in `security-findings.md`.
+
+No `.lighthouserc.js` migration note needed: no new config keys.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->

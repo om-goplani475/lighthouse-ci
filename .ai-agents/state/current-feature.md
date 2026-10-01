@@ -1,7 +1,7 @@
 # Current feature
 
 - slug: site-crawler
-- stage: 05-merged (into phase-7-duplicates; no PR, ff-only merge; /write-qa, /security-review, /ci-integration pending)
+- stage: 06-post-merge-complete (QA, security review, CI check and changelog done; merged into phase-7-duplicates)
 - merged_head: cebec83
 - spec: docs/feature-specs/site-crawler.md
 - audit_spec: docs/audit-specs/site-crawler.md

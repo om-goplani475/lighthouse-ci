@@ -631,3 +631,56 @@ and a spy server**. New surface: one request, to a URL the audited page chooses 
   function (selects `link[rel~=canonical]` in the head and measures `innerText` length), isolated world.
 - Finding: none. `critical`/`high`/`medium`/`low`: 0.
 - Not verified: a target that answers slowly but inside 5 s many times (one request only, so not applicable).
+
+## 2026-10-01 — site-crawler (Phase 7 item 0, full pipeline)
+
+Reviewed `git diff d53c327..cebec83` (11 commits: the snapshot types, the `htmlparser2` extractor, the `userAgent` option on
+`safeFetchPrefix`, the cache, the crawl orchestration, the gatherer, the audit). This is the largest new surface in the fork:
+it makes up to about 100 requests per cold crawl to URLs the audited page influences, parses attacker-influenced HTML at 512 KiB,
+and keeps a cache on disk. Every attack below was **run against the real code** (hostile servers, real filesystem).
+
+### Finding 8
+
+- severity: low
+- finding: **The crawler's robots.txt and sitemap requests do not carry its user-agent.** Page requests send
+  `lhci-seo-audits-crawler/1.0` (a new validated option on `safeFetchPrefix`), but `safeFetchBytes`, which fetches robots.txt and the
+  sitemap files, has no such option, so those requests identify as nothing at all in the audited site's logs. A politeness and
+  attribution gap, not an exposure: the requests are bounded and SSRF-protected like the rest.
+- status: open, accepted for now (a follow-up: the same additive, validated `userAgent` option on `safeFetchBytes`, which would also
+  identify Phase 4's sitemap requests). Recorded in `.ai-agents/state/ci-backlog.md`.
+
+### Checked, no finding
+
+- **Parsing denial of service (the open question of the design, measured).** `parse5` at 512 KiB: **108.8 s** for 200,000 nested
+  `<div>` and **113.9 s** for nested lists, for one page. The crawler uses `htmlparser2`, a streaming tokenizer: worst case
+  **53 ms** (232 ms under Jest) across 17 hostile shapes, each asserted under 2 s in the tests (nested block elements, misnested
+  formatting, tables, 100k links, 170k `<p>`, entity and comment floods, huge attributes, repeated `<body>`/`<head>`, NUL bytes).
+  A quadratic loop over the element stack on repeated `<body>` tags was found and fixed while writing it.
+- **SSRF**: every request is built from the audited origin; a candidate URL is requested only if it is **on that origin**
+  (scheme, host, port); redirects are followed only within the origin, for at most 3 rounds. The spy server on another origin
+  received **zero** requests from page links, sitemap URLs and redirects; lookalike hosts, other ports, `169.254.169.254`, credentialed
+  URLs, `javascript:`, `mailto:` and `file:` are all rejected (unit tests assert the exact list of requested URLs; a mutation test
+  removing the origin check failed 3 tests). All requests go through `safe-fetch.js`, so the address policy and
+  `LHCI_SEO_ALLOW_PRIVATE_NETWORK` apply.
+- **Header injection through the new `userAgent` option**: CR, LF, NUL, tab, DEL, non-ASCII, empty, over-200 and non-string values
+  all reject **before any DNS lookup or connection** (19 tests; disabling the validation fails 15 of them).
+- **The cache**: a symlinked cache directory is never written to; a forged snapshot in a directory open to other users is ignored;
+  a cache file symlinked to `/etc/passwd` is not followed; a hostile key cannot leave the directory (always a 64-character hex
+  name); a corrupt, wrong-version, future-dated or oversized file is ignored; writes are atomic (three parallel crawls, one valid
+  file; real concurrent processes in a test). Found and fixed while testing: **Node's recursive `mkdir` hangs forever on an
+  uncreatable path** (for example under `/proc`), which would have frozen a Lighthouse run for a bad `LHCI_SEO_CRAWL_CACHE_DIR`;
+  the cache now creates one level only.
+- **Resource bounds**: a 100,000-link page is an 11 KB snapshot; 200 pages of 400 KB with 200 links each took 2.6 s and made 201
+  requests; an endless body, a trickling body and an endless redirect chain ended in 5 s. Peak memory for that 200-page worst case is
+  about 370 MB resident, and the live heap afterwards is 13 to 15 MB (measured with a forced GC; not retention).
+- **Data exposure**: no cookies or auth headers are sent; the snapshot holds extracted fields only (never raw HTML), a hash of the
+  visible text (not reversible to it), URLs and short strings, each capped.
+- **Sandbox**: no new CDP session or Chromium flag; the in-page read is one fixed function in an isolated world.
+
+### Not verified
+
+- `htmlparser2@6.1.0` (2021) was not checked against a vulnerability database from here (no lookup was available); the risk is bounded by
+  the body cap, the timing tests on hostile input, and its use for extraction only.
+- The `lhci` run under a real GitHub Actions job (the cache directory under `os.tmpdir()` on a shared runner).
+
+No `critical`, `high` or `medium` findings. Finding 8 is `low` and open (accepted).
