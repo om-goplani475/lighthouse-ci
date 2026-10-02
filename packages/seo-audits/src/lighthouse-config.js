@@ -90,6 +90,7 @@ const config = {
     './audits/duplicate-descriptions.js',
     './audits/thin-content.js',
     './audits/canonical-conflicts.js',
+    './audits/duplicate-content.js',
   ],
   categories: {
     'seo-extended': {
@@ -140,6 +141,7 @@ const config = {
         {id: 'duplicate-descriptions', weight: 1},
         {id: 'thin-content', weight: 1},
         {id: 'canonical-conflicts', weight: 1},
+        {id: 'duplicate-content', weight: 1},
       ],
     },
   },
