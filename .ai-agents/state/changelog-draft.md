@@ -468,5 +468,22 @@ quadratic loop on repeated `<body>` tags. Live attacks (hostile servers, planted
 
 No `.lighthouserc.js` migration note needed: no new config keys.
 
+## 2026-10-02 — Phase 7 cross-page audits
+
+Five new audits (46 in the fork) that compare the pages the site crawl reached. They make no extra requests and read server HTML.
+
+- **`duplicate-titles`, `duplicate-descriptions`** (scored): fail when another crawled page has the same title or meta description
+  as the audited page (equal after trimming and ignoring case; empty values never count).
+- **`thin-content`** (scored): fails when the audited page has under 200 words of visible text; the text-to-HTML ratio is shown, not
+  judged; other thin pages are listed. Not applicable for script-built or oversized pages.
+- **`canonical-conflicts`** (scored): fails when the audited page is a bad canonical target for other pages (error, redirect, noindex,
+  chain, loop, or the shared target of pages with different content). Its own canonical target stays with `indexability-conflicts`.
+- **`duplicate-content`** (scored): fails when another crawled page has exactly the same visible text (and neither declares a canonical
+  to the other); pages under 50 words are not compared; trailing-slash and query duplicates are noted.
+
+Add the ones you want to your `assertions` yourself, e.g. `'duplicate-titles': ['error', {minScore: 1}]`; none is in the shared presets.
+Limit: they judge only the pages the crawl reached (the audited page, its links and the sitemap URLs), so read `crawl-coverage` first.
+**Security**: one `low` finding (a quadratic slash regex in `duplicate-content`, 0.87 s worst case), fixed. No `.lighthouserc.js` migration.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->

@@ -686,3 +686,28 @@ and keeps a cache on disk. Every attack below was **run against the real code** 
 - The `lhci` run under a real GitHub Actions job (the cache directory under `os.tmpdir()` on a shared runner).
 
 No `critical`, `high` or `medium` findings. Finding 8 (`low`) is fixed; none open.
+
+## 2026-10-02 — phase-7 cross-page audits (duplicate-titles, duplicate-descriptions, thin-content, canonical-conflicts, duplicate-content; lightweight)
+
+No new request, gatherer, file or dependency: the five audits read the crawl snapshot. The risks left are time and output size
+on a hostile crawl, so each builder was run on worst-case snapshots (200 pages, 1,000-character titles and descriptions, URLs of
+2,000 characters, 512 KiB bodies, a 200-page canonical chain, a 200-page canonical cycle, 200 pages all identical, slash-only paths).
+
+### Finding 9
+
+- severity: low
+- finding: **`duplicate-content` took about 0.87 s on a hostile crawl.** `baseKey` stripped trailing slashes with `/\/+$/`, which is
+  quadratic on a path made of many slashes. Bounded by the 2,000-character URL cap and the 200-page cap, so a second at worst, not a hang.
+- status: **fixed** (2026-10-02): a linear loop replaces the regex (worst case 6 ms); a test with a 200,000-slash path asserts it stays
+  fast (the regex took many seconds there).
+
+### Checked, no finding
+
+- **Time**: the worst case for the other four builders is 86 ms (`canonical-conflicts` on a 200-page chain: each walk is capped at 10 hops).
+- **Output size**: at most 25 KiB per audit (rows capped at 50, every cell clipped to 100 to 200 characters), so a hostile site cannot
+  inflate the report.
+- **Injection into the report**: page-controlled text (titles, descriptions, URLs) is put in table cells only, clipped, never in a
+  title, a score or an id.
+- **No panics on odd input**: every builder is unit-tested with a missing, disabled and malformed crawl and returns "not applicable".
+
+No `critical`, `high` or `medium` findings; Finding 9 is `low` and fixed; none open.

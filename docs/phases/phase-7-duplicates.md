@@ -6,7 +6,7 @@ deferred, to-do-later, or marked not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
-**Status: in progress (2026-10-01).** Item 0 (the crawler core) is done, merged into this branch and QA'd live (`docs/qa/site-crawler.md`); the four audits on top of it are next.
+**Status: complete (2026-10-02).** All four audits and the crawler core are done, QA'd live and security-reviewed (`docs/qa/site-crawler.md`, `docs/qa/phase-7-cross-page-audits.md`); see "Closing record" at the bottom.
 
 ## Planning decisions (2026-10-01)
 
@@ -66,3 +66,20 @@ repo has no crawler, so three decisions were confirmed with the developer:
 ## Not possible / permanently out of scope
 
 None identified yet.
+
+## Closing record (2026-10-02)
+
+- **Shipped (1 gatherer, 6 audits)**: the crawler core (`SiteCrawl`, informational `crawl-coverage`), then `duplicate-titles`,
+  `duplicate-descriptions`, `thin-content`, `canonical-conflicts` and `duplicate-content`. The fork has **46 audits** in `seo-extended`.
+- **Pipeline used**: the crawler core ran the full 9-stage pipeline; each audit on top was lightweight after a short design conversation
+  (thresholds and rules confirmed with the developer: exact match after trim and case-fold, 200 words is thin, 50 words minimum to compare).
+- **Real findings worth keeping**: (1) the crawler is bounded and cache-secure (hostile servers and cache attacks all defeated); (2) a
+  note claiming "built by script" was false for a server that answers bots differently, now worded accurately; (3) a quadratic slash regex
+  in `duplicate-content` (Finding 9, fixed); (4) a typecheck error I missed by reading only the end of the output (caught later, fixed).
+  Security Finding 8 (no user-agent on robots.txt and sitemap requests) was fixed too; **no finding is open**.
+- **Tests**: 1,308 `seo-audits` tests pass; typecheck and lint are clean. The full `npm run test:quick` shows 11 failing suites (92 tests),
+  all in `cli`, `server`, `viewer` and `utils` (CLI, server e2e/Storybook, viewer e2e, utils build-context): the same families recorded as
+  failing before Phase 4 (see `.ai-agents/state/ci-backlog.md`), none in `seo-audits`.
+- **Not verified**: `packages/viewer` rendering of the new audits, `npm run start:seed-database` and a real GitHub Actions run (the
+  developer deferred these until after Phase 7), and the audits on real public sites.
+- **Deferred**: near-duplicate content, inconsistent URL representations site-wide, link-following beyond depth 1 (Phase 8).
