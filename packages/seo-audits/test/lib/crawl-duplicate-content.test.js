@@ -52,6 +52,15 @@ describe('baseKey', () => {
     expect(baseKey('https://example.com/b')).not.toBe(baseKey('https://example.com/a'));
     expect(baseKey('not a url')).toBe('not a url');
   });
+
+  it('stays linear on a path made of many slashes', () => {
+    const hostile = `https://example.com/${'/'.repeat(200000)}x`;
+    const start = Date.now();
+    expect(baseKey(hostile)).toBe(`https://example.com/${'/'.repeat(200000)}x`);
+    expect(baseKey(`https://example.com/a${'/'.repeat(200000)}`)).toBe('https://example.com/a');
+    // The quadratic regex took many seconds here.
+    expect(Date.now() - start).toBeLessThan(1000);
+  });
 });
 
 describe('buildDuplicateContentProduct', () => {

@@ -50,7 +50,10 @@ function clip(text) {
 function baseKey(url) {
   try {
     const u = new URL(url);
-    return `${u.origin}${u.pathname.replace(/\/+$/, '')}`;
+    // A loop, not `/\/+$/`: that regex is quadratic on a path of many slashes (a hostile URL).
+    let end = u.pathname.length;
+    while (end > 0 && u.pathname.charCodeAt(end - 1) === 47) end--;
+    return `${u.origin}${u.pathname.slice(0, end)}`;
   } catch {
     return url;
   }
