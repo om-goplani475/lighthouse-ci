@@ -59,6 +59,11 @@ const DEFAULT_PAGES = 50;
 const MAX_PAGES = 200;
 const DEFAULT_DEPTH = 3;
 const MAX_DEPTH = 5;
+const DEFAULT_LINK_CHECKS = 100;
+const MAX_LINK_CHECKS = 200;
+// A status-only check reads only the start of a body: the answer is the status and the redirect, not the page.
+const LINK_CHECK_MAX_BYTES = 2 * 1024;
+const LINK_CHECK_BUDGET_MS = 30_000;
 // URLs that are plainly files, not pages: not worth a page slot (an image, a script, an archive).
 const FILE_EXTENSION =
   /\.(?:jpe?g|png|gif|webp|avif|svg|ico|bmp|tiff?|css|js|mjs|map|json|xml|txt|pdf|zip|gz|tgz|tar|rar|7z|mp[34]|m4a|wav|ogg|webm|avi|mov|woff2?|ttf|otf|eot|docx?|xlsx?|pptx?|csv|exe|dmg|apk)$/i;
@@ -91,13 +96,19 @@ function clampedInt(raw, fallback, min, max) {
 
 /**
  * @param {NodeJS.ProcessEnv} env
- * @return {{enabled: boolean, pages: number, depth: number, budgetMs: number, robots: 'honour' | 'ignore'}}
+ * @return {{enabled: boolean, pages: number, depth: number, linkChecks: number, budgetMs: number, robots: 'honour' | 'ignore'}}
  */
 function parseConfig(env) {
   return {
     enabled: !isOff(env.LHCI_SEO_CRAWL),
     pages: clampedInt(env.LHCI_SEO_CRAWL_MAX_PAGES, DEFAULT_PAGES, 1, MAX_PAGES),
     depth: clampedInt(env.LHCI_SEO_CRAWL_MAX_DEPTH, DEFAULT_DEPTH, 1, MAX_DEPTH),
+    linkChecks: clampedInt(
+      env.LHCI_SEO_CRAWL_MAX_LINK_CHECKS,
+      DEFAULT_LINK_CHECKS,
+      0,
+      MAX_LINK_CHECKS
+    ),
     budgetMs:
       clampedInt(env.LHCI_SEO_CRAWL_TIME_BUDGET_SECONDS, DEFAULT_BUDGET_SECONDS, 10, 600) * 1000,
     robots: isOff(env.LHCI_SEO_CRAWL_RESPECT_ROBOTS) ? 'ignore' : 'honour',
@@ -224,6 +235,8 @@ async function loadSitemapUrls({auditedUrl, collectSitemap, fetchBytes, env, now
  *   fetchPage: typeof safeFetchPrefix,
  *   skips: ReturnType<typeof createSkips>,
  *   now: () => number,
+ *   maxBytes?: number,
+ *   followVisited?: boolean,
  * }} input
  * @return {Promise<{pages: CrawlPage[], requests: number, truncatedByBudget: boolean, firstError: string | null}>}
  */
@@ -237,6 +250,8 @@ async function fetchPages({
   fetchPage,
   skips,
   now,
+  maxBytes = MAX_BODY_BYTES,
+  followVisited = false,
 }) {
   /** @type {Array<{source: CrawlPage['source'], url: string, depth: number, current: string, hops: CrawlHop[], check: UrlCheck | null}>} */
   const entries = seeds.map(seed => ({
@@ -277,7 +292,7 @@ async function fetchPages({
         fetchStatus: url =>
           fetchPage(url, {
             timeoutMs: REQUEST_TIMEOUT_MS,
-            maxBytes: MAX_BODY_BYTES,
+            maxBytes,
             userAgent: USER_AGENT,
           }),
         budgetMs: remaining,
@@ -292,7 +307,9 @@ async function fetchPages({
       entry.check = check;
       if (check.error && firstError === null) firstError = clip(check.error);
       if (check.notChecked) {
+        // Never requested: not a page, and not an unanswered one. Recorded as not checked.
         truncatedByBudget = true;
+        skips.add(entry.current, 'not-checked', 'the crawl time budget ran out');
         return;
       }
       if (
@@ -318,7 +335,7 @@ async function fetchPages({
         skips.add(target, 'cross-origin', `a redirect from ${entry.current}, not requested`);
       } else if (!allowed(target)) {
         skips.add(target, 'blocked-by-robots', `a redirect from ${entry.current}`);
-      } else if (visited.has(target)) {
+      } else if (visited.has(target) && !followVisited) {
         skips.add(
           target,
           'not-checked',
@@ -338,7 +355,7 @@ async function fetchPages({
   /** @type {CrawlPage[]} */
   const out = [];
   for (const entry of entries) {
-    if (!entry.check) continue;
+    if (!entry.check || entry.check.notChecked) continue;
     out.push(toPage(entry));
   }
   return {pages: out, requests, truncatedByBudget, firstError};
@@ -630,7 +647,7 @@ function attempt(fn) {
 }
 
 /**
- * @param {{
+ * @typedef {{
  *   auditedUrl: string,
  *   pageLinks: string[],
  *   env?: NodeJS.ProcessEnv,
@@ -639,10 +656,147 @@ function attempt(fn) {
  *   collectSitemap?: typeof collectSitemapDocuments,
  *   cache?: {read: typeof readSnapshot, write: typeof writeSnapshot},
  *   now?: () => number,
- * }} rawInput
+ * }} CrawlInput
+ */
+
+/**
+ * The crawl: the shared snapshot (from the cache or a fresh crawl) plus, for this audited page only, status
+ * checks of its own links that the snapshot did not reach.
+ * @param {CrawlInput} rawInput
  * @return {Promise<SiteCrawlArtifact>} Never rejects.
  */
 async function crawlSite(rawInput) {
+  const artifact = await crawlSnapshot(rawInput);
+  if ((artifact.state !== 'crawled' && artifact.state !== 'cached') || !artifact.snapshot) {
+    return artifact;
+  }
+  try {
+    const input =
+      rawInput && typeof rawInput === 'object' ? rawInput : /** @type {CrawlInput} */ ({});
+    const env = input.env || process.env;
+    const config = parseConfig(env);
+    if (config.linkChecks > 0) {
+      const fetchBytesRaw = input.fetchBytes || safeFetchBytes;
+      artifact.linkChecks = await checkAuditedLinks({
+        snapshot: artifact.snapshot,
+        auditedUrl: artifact.auditedUrl,
+        pageLinks: Array.isArray(input.pageLinks) ? input.pageLinks : [],
+        limit: config.linkChecks,
+        robotsMode: config.robots,
+        fetchPage: input.fetchPage || safeFetchPrefix,
+        fetchBytes: (url, options) => fetchBytesRaw(url, {...options, userAgent: USER_AGENT}),
+        now: input.now || Date.now,
+      });
+    }
+  } catch {
+    artifact.linkChecks = null;
+  }
+  return artifact;
+}
+
+/**
+ * Status checks of the audited page's own links that the shared snapshot did not reach (the page cap, the depth
+ * bound or a file link), so "a broken link on this page" is judged on all of its links, up to `limit`. Same origin
+ * only (every link here came from the page and was already kept to the origin), robots.txt honoured, no bodies
+ * read, redirects followed for the crawler's few rounds. Per run, not part of the shared cache, because which
+ * page is audited differs from run to run.
+ * @param {{
+ *   snapshot: CrawlSnapshot, auditedUrl: string, pageLinks: string[], limit: number,
+ *   robotsMode: 'honour' | 'ignore', fetchPage: typeof safeFetchPrefix,
+ *   fetchBytes: typeof safeFetchBytes, now: () => number,
+ * }} input
+ * @return {Promise<{checked: import('./crawl-snapshot.js').LinkCheck[], notChecked: number}>}
+ */
+async function checkAuditedLinks({
+  snapshot,
+  auditedUrl,
+  pageLinks,
+  limit,
+  robotsMode,
+  fetchPage,
+  fetchBytes,
+  now,
+}) {
+  const audited = normalizeUrl(auditedUrl);
+  const page = snapshot.pages.find(
+    p =>
+      p.extraction === 'ok' &&
+      (normalizeUrl(p.url) === audited || normalizeUrl(p.finalUrl) === audited)
+  );
+  if (!audited || !page) return {checked: [], notChecked: 0};
+
+  // Everything the snapshot already knows a status for, by every URL it was requested or ended on.
+  const known = new Set([audited]);
+  for (const p of snapshot.pages) {
+    for (const url of [p.url, p.finalUrl, ...p.redirects.map(hop => hop.url)]) {
+      const normal = normalizeUrl(url);
+      if (normal) known.add(normal);
+    }
+  }
+  const own = new Set([normalizeUrl(page.url), normalizeUrl(page.finalUrl)]);
+  /** @type {string[]} */
+  const targets = [];
+  const seen = new Set();
+  for (const raw of [...page.links.map(link => link.url), ...pageLinks]) {
+    const url = normalizeUrl(raw, audited);
+    if (!url || seen.has(url) || known.has(url) || own.has(url)) continue;
+    if (!sameOrigin(url, snapshot.origin)) continue;
+    seen.add(url);
+    targets.push(url);
+  }
+  if (targets.length === 0) return {checked: [], notChecked: 0};
+
+  const robots = await loadRobots({origin: snapshot.origin, mode: robotsMode, fetchBytes});
+  // robots.txt that cannot be read: nothing is requested (the crawler does not guess), nothing is claimed.
+  if (robots.state === 'unavailable') return {checked: [], notChecked: targets.length};
+
+  /** @type {import('./crawl-snapshot.js').LinkCheck[]} */
+  const checked = [];
+  /** @type {string[]} */
+  const allowedTargets = [];
+  for (const url of targets) {
+    if (robots.allowed(url)) {
+      allowedTargets.push(url);
+    } else {
+      checked.push({url, finalUrl: url, status: null, redirects: [], state: 'blocked-by-robots'});
+    }
+  }
+  const selected = allowedTargets.slice(0, limit);
+  let notChecked = allowedTargets.length - selected.length;
+  const fetched = await fetchPages({
+    seeds: selected.map(url => ({url, source: /** @type {const} */ ('link'), depth: 1})),
+    origin: snapshot.origin,
+    allowed: robots.allowed,
+    requestCap: Math.max(1, selected.length) * REQUEST_CAP_FACTOR,
+    visited: new Set(),
+    deadline: now() + LINK_CHECK_BUDGET_MS,
+    fetchPage,
+    skips: createSkips(),
+    now,
+    maxBytes: LINK_CHECK_MAX_BYTES,
+    // Two checked links may redirect to the same place: each is followed to its end (the redirect rounds and the
+    // request cap still bound it, and a loop shows up as a repeated URL in the hops).
+    followVisited: true,
+  });
+  for (const result of fetched.pages) {
+    checked.push({
+      url: result.url,
+      finalUrl: result.finalUrl,
+      status: result.status,
+      redirects: result.redirects,
+      state: 'checked',
+    });
+  }
+  notChecked += selected.length - fetched.pages.length;
+  return {checked, notChecked};
+}
+
+/**
+ * The shared snapshot, from the cache or a fresh crawl.
+ * @param {CrawlInput} rawInput
+ * @return {Promise<SiteCrawlArtifact>} Never rejects.
+ */
+async function crawlSnapshot(rawInput) {
   const input =
     rawInput && typeof rawInput === 'object' ? rawInput : /** @type {typeof rawInput} */ ({});
   const {
@@ -665,6 +819,7 @@ async function crawlSite(rawInput) {
     reason: null,
     snapshot: null,
     auditedRenderedTextLength: null,
+    linkChecks: null,
     ...over,
   });
 

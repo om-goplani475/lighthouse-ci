@@ -44,6 +44,7 @@ const url = (/** @type {string} */ p) => `${origin()}${p}`;
 const env = (/** @type {Record<string, string>} */ over = {}) => ({
   [ALLOW_PRIVATE_NETWORK_ENV]: '1',
   LHCI_SEO_CRAWL_CACHE_DIR: cacheDir,
+  LHCI_SEO_CRAWL_MAX_LINK_CHECKS: '0',
   ...over,
 });
 const pageHits = () => hits.filter(h => h.url !== '/robots.txt' && h.url !== '/sitemap.xml');

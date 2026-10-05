@@ -321,6 +321,39 @@ describe('the notes', () => {
     expect(n).not.toMatch(/page cap|hops?|query-string/);
   });
 
+  it('say how many of the audited page’s own links were status-checked, blocked or left unchecked', () => {
+    const check = (/** @type {string} */ p, /** @type {string} */ state) => ({
+      url: `https://example.com/${p}`,
+      finalUrl: `https://example.com/${p}`,
+      status: state === 'checked' ? 200 : null,
+      redirects: [],
+      state,
+    });
+    const n = notes(
+      buildCoverageProduct(
+        artifact({
+          linkChecks: {
+            checked: [
+              check('a', 'checked'),
+              check('b', 'checked'),
+              check('c', 'blocked-by-robots'),
+            ],
+            notChecked: 4,
+          },
+        })
+      )
+    ).join('\n');
+    expect(n).toMatch(
+      /2 internal links of the audited page that the crawl did not read were status-checked/
+    );
+    expect(n).toMatch(/1 disallowed by robots\.txt, not requested/);
+    expect(n).toMatch(/4 more not checked.*LHCI_SEO_CRAWL_MAX_LINK_CHECKS/);
+    expect(
+      notes(buildCoverageProduct(artifact({linkChecks: {checked: [], notChecked: 0}}))).join('\n')
+    ).not.toMatch(/status-checked/);
+    expect(notes(buildCoverageProduct(artifact())).join('\n')).not.toMatch(/status-checked/);
+  });
+
   it('count the URLs left out by the query-variant guard', () => {
     const skipped = [1, 2, 3].map(i => ({
       url: `https://example.com/list?page=${i}`,

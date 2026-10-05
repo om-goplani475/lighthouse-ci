@@ -100,6 +100,22 @@ function notesFor(artifact) {
       } from its starting pages and stopped there: pages further away were not requested. Raise LHCI_SEO_CRAWL_MAX_DEPTH to follow further.`
     );
   }
+  const linkChecks = artifact.linkChecks;
+  if (linkChecks && (linkChecks.checked.length > 0 || linkChecks.notChecked > 0)) {
+    const blocked = linkChecks.checked.filter(c => c.state === 'blocked-by-robots').length;
+    const requested = linkChecks.checked.length - blocked;
+    notes.push(
+      `${count(requested, 'internal link')} of the audited page that the crawl did not read ${
+        requested === 1 ? 'was' : 'were'
+      } status-checked (no page body read)${
+        blocked ? `; ${blocked} disallowed by robots.txt, not requested` : ''
+      }${
+        linkChecks.notChecked
+          ? `; ${linkChecks.notChecked} more not checked (the limit, the time budget or an unreadable robots.txt: LHCI_SEO_CRAWL_MAX_LINK_CHECKS)`
+          : ''
+      }.`
+    );
+  }
   const variants = snapshot.skipped.filter(s => s.reason === 'query-variants').length;
   if (variants > 0) {
     notes.push(

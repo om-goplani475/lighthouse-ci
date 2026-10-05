@@ -64,11 +64,19 @@ import {pickEvenly} from './sitemap-url-sample.js';
  *   stats: {requests: number, elapsedMs: number, truncatedByBudget: boolean, overPageCap: boolean, cutByDepth: boolean},
  * }} CrawlSnapshot
  * @typedef {{
+ *   url: string,
+ *   finalUrl: string,
+ *   status: number | null,
+ *   redirects: CrawlHop[],
+ *   state: 'checked' | 'blocked-by-robots',
+ * }} LinkCheck
+ * @typedef {{
  *   state: 'crawled' | 'cached' | 'disabled' | 'unavailable',
  *   auditedUrl: string,
  *   reason: string | null,
  *   snapshot: CrawlSnapshot | null,
  *   auditedRenderedTextLength: number | null,
+ *   linkChecks: {checked: LinkCheck[], notChecked: number} | null,
  * }} SiteCrawlArtifact
  */
 

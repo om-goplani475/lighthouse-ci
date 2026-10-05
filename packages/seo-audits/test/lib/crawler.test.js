@@ -90,13 +90,14 @@ const crawl = (site, over = {}) =>
   crawlSite({
     auditedUrl: AUDITED,
     pageLinks: [],
-    env: {},
     fetchPage: site.fetchPage,
     fetchBytes: robots(404),
     collectSitemap: noSitemap,
     cache: fakeCache(),
     now: site.now,
     ...over,
+    // The audited page's own link checks are tested on their own (below); the others count requests exactly.
+    env: {LHCI_SEO_CRAWL_MAX_LINK_CHECKS: '0', ...(over.env || {})},
   });
 const requested = (/** @type {any} */ site) => site.requests.map((/** @type {any} */ r) => r.url);
 
@@ -106,9 +107,18 @@ describe('parseConfig', () => {
       enabled: true,
       pages: 50,
       depth: 3,
+      linkChecks: 100,
       budgetMs: 120_000,
       robots: 'honour',
     });
+  });
+
+  it('clamps the number of link checks to 0 to 200 and ignores garbage', () => {
+    expect(parseConfig({LHCI_SEO_CRAWL_MAX_LINK_CHECKS: '0'}).linkChecks).toBe(0);
+    expect(parseConfig({LHCI_SEO_CRAWL_MAX_LINK_CHECKS: '-4'}).linkChecks).toBe(0);
+    expect(parseConfig({LHCI_SEO_CRAWL_MAX_LINK_CHECKS: '5000'}).linkChecks).toBe(200);
+    expect(parseConfig({LHCI_SEO_CRAWL_MAX_LINK_CHECKS: '25'}).linkChecks).toBe(25);
+    expect(parseConfig({LHCI_SEO_CRAWL_MAX_LINK_CHECKS: 'many'}).linkChecks).toBe(100);
   });
 
   it('clamps the depth to 1 to 5 and ignores garbage', () => {
@@ -333,6 +343,11 @@ describe('crawlSite: bounds', () => {
     expect(site.requests[0].url).toBe(AUDITED);
     expect(
       result.snapshot.pages.filter((/** @type {any} */ p) => p.status !== null).length
+    ).toBeGreaterThan(0);
+    // A URL that was never requested is a skip, not a page that "did not answer".
+    expect(result.snapshot.pages.every((/** @type {any} */ p) => p.status !== null)).toBe(true);
+    expect(
+      result.snapshot.skipped.filter((/** @type {any} */ s) => s.reason === 'not-checked').length
     ).toBeGreaterThan(0);
   });
 
@@ -842,6 +857,193 @@ describe('crawlSite: link-following', () => {
     });
     const keys = cache.read.mock.calls.map(([, key]) => key);
     expect(keys[0]).not.toBe(keys[1]);
+  });
+});
+
+describe('crawlSite: status checks of the audited page’s own links', () => {
+  const withChecks = (/** @type {any} */ extra = {}) => ({
+    ...extra,
+    env: {
+      LHCI_SEO_CRAWL_MAX_PAGES: '2',
+      LHCI_SEO_CRAWL_MAX_LINK_CHECKS: '100',
+      ...(extra.env || {}),
+    },
+  });
+  /** A home page that links to eight pages, crawled with a cap that leaves most of them unread. */
+  const site = (/** @type {any} */ routes = {}) =>
+    makeSite({
+      [AUDITED]: {body: page('Home', linksTo(Array.from({length: 8}, (_, i) => `/l${i}`)))},
+      ...routes,
+    });
+  const checked = (/** @type {any} */ result) =>
+    Object.fromEntries(result.linkChecks.checked.map((/** @type {any} */ c) => [c.url, c]));
+
+  it('checks the links of the audited page that the crawl did not read, status only', async () => {
+    const s = site({[u('/l5')]: {status: 404}, [u('/l6')]: {status: 500}});
+    const result = await crawl(s, withChecks({fetchBytes: robots(404)}));
+    const crawledUrls = result.snapshot.pages.map((/** @type {any} */ p) => p.url);
+    const byUrl = checked(result);
+    // Every link is either in the snapshot or checked, and none twice.
+    const all = [...crawledUrls, ...Object.keys(byUrl)];
+    for (let i = 0; i < 8; i++) expect(all.filter(url => url === u(`/l${i}`))).toHaveLength(1);
+    expect(byUrl[u('/l5')] ? byUrl[u('/l5')].status : 404).toBe(404);
+    expect(result.linkChecks.notChecked).toBe(0);
+    for (const request of s.requests.filter((/** @type {any} */ r) => byUrl[r.url])) {
+      expect(request.options.maxBytes).toBe(2048);
+      expect(request.options.userAgent).toBe(USER_AGENT);
+    }
+  });
+
+  it('records a redirect and follows a chain, with the hops', async () => {
+    const s = site({
+      [u('/l0')]: {status: 301, location: '/l1x'},
+      [u('/l1x')]: {status: 302, location: '/l2x'},
+      [u('/l2x')]: {body: page('End')},
+    });
+    const result = await crawl(s, withChecks({env: {LHCI_SEO_CRAWL_MAX_PAGES: '1'}}));
+    const c = checked(result)[u('/l0')];
+    expect(c.status).toBe(200);
+    expect(c.finalUrl).toBe(u('/l2x'));
+    expect(c.redirects.map((/** @type {any} */ hop) => [hop.status, hop.location])).toEqual([
+      [301, u('/l1x')],
+      [302, u('/l2x')],
+    ]);
+  });
+
+  it('follows two checked links that redirect to the same place each to its end', async () => {
+    const s = makeSite({
+      [AUDITED]: {body: page('Home', linksTo(['/a', '/b']))},
+      [u('/a')]: {status: 301, location: '/dest'},
+      [u('/b')]: {status: 302, location: '/dest'},
+      [u('/dest')]: {body: page('Dest')},
+    });
+    const result = await crawl(s, withChecks({env: {LHCI_SEO_CRAWL_MAX_PAGES: '1'}}));
+    expect(checked(result)[u('/a')]).toMatchObject({status: 200, finalUrl: u('/dest')});
+    expect(checked(result)[u('/b')]).toMatchObject({status: 200, finalUrl: u('/dest')});
+  });
+
+  it('shows a redirect loop among checked links as a repeated URL, within the redirect rounds', async () => {
+    const s = makeSite({
+      [AUDITED]: {body: page('Home', linksTo(['/a']))},
+      [u('/a')]: {status: 301, location: '/b'},
+      [u('/b')]: {status: 301, location: '/a'},
+    });
+    const result = await crawl(s, withChecks({env: {LHCI_SEO_CRAWL_MAX_PAGES: '1'}}));
+    const hops = checked(result)[u('/a')].redirects.map((/** @type {any} */ h) => h.location);
+    expect(hops.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(hops).size).toBeLessThan(hops.length + 1);
+    expect(s.requests.length).toBeLessThanOrEqual(1 + 3 + 3);
+  });
+
+  it('does not report a link it never got to request as unanswered when the time budget runs out', async () => {
+    const s = site();
+    s.perRequestMs = 12_000;
+    const result = await crawl(
+      s,
+      withChecks({env: {LHCI_SEO_CRAWL_MAX_PAGES: '1', LHCI_SEO_CRAWL_MAX_LINK_CHECKS: '8'}})
+    );
+    const asked = new Set(s.requests.map((/** @type {any} */ r) => r.url));
+    // Every recorded check is a URL that was really requested; the rest are counted as not checked.
+    for (const c of result.linkChecks.checked) expect(asked.has(c.url)).toBe(true);
+    expect(result.linkChecks.checked.length + result.linkChecks.notChecked).toBe(8);
+    expect(result.linkChecks.notChecked).toBeGreaterThan(0);
+  });
+
+  it('also checks links that only the rendered page has (the live DOM), once', async () => {
+    const s = makeSite({[AUDITED]: {body: page('Home', '<p>no links in the server HTML</p>')}});
+    const result = await crawl(s, withChecks({pageLinks: [u('/js1'), u('/js1'), u('/js2')]}));
+    const all = [
+      ...result.snapshot.pages.map((/** @type {any} */ p) => p.url),
+      ...result.linkChecks.checked.map((/** @type {any} */ c) => c.url),
+    ];
+    expect(all.filter(url => url === u('/js1'))).toHaveLength(1);
+    expect(all).toContain(u('/js2'));
+  });
+
+  it('stops at the configured number and says how many it left unchecked', async () => {
+    const s = site();
+    const result = await crawl(
+      s,
+      withChecks({env: {LHCI_SEO_CRAWL_MAX_PAGES: '1', LHCI_SEO_CRAWL_MAX_LINK_CHECKS: '3'}})
+    );
+    expect(result.linkChecks.checked).toHaveLength(3);
+    expect(result.linkChecks.notChecked).toBe(5);
+  });
+
+  it('records a link robots.txt disallows instead of requesting it', async () => {
+    const s = makeSite({
+      [AUDITED]: {body: page('Home', linksTo(['/private/x', '/ok']))},
+    });
+    const result = await crawl(
+      s,
+      withChecks({
+        fetchBytes: robots(200, 'User-agent: *\nDisallow: /private/'),
+        env: {LHCI_SEO_CRAWL_MAX_PAGES: '1'},
+      })
+    );
+    expect(requested(s)).not.toContain(u('/private/x'));
+    expect(checked(result)[u('/private/x')]).toMatchObject({
+      status: null,
+      state: 'blocked-by-robots',
+    });
+    expect(checked(result)[u('/ok')]).toMatchObject({status: 200, state: 'checked'});
+  });
+
+  it('claims nothing, and requests nothing, when robots.txt cannot be read', async () => {
+    const s = site();
+    const result = await crawl(s, withChecks({fetchBytes: robots(503)}));
+    expect(requested(s)).toEqual([AUDITED]);
+    expect(result.linkChecks).toEqual({checked: [], notChecked: 8});
+  });
+
+  it('does not request a link the snapshot already knows, the page itself, or another origin', async () => {
+    const s = makeSite({
+      [AUDITED]: {
+        body: page('Home', linksTo(['/', '/known', '/new', 'https://evil.test/x', 'mailto:a@b.c'])),
+      },
+    });
+    await crawl(s, withChecks({env: {LHCI_SEO_CRAWL_MAX_PAGES: '2'}, pageLinks: [u('/known')]}));
+    expect(requested(s).filter(url => url === AUDITED)).toHaveLength(1);
+    expect(requested(s).some(url => url.includes('evil.test'))).toBe(false);
+    expect(
+      requested(s).filter(url => url === u('/known')).length +
+        requested(s).filter(url => url === u('/new')).length
+    ).toBe(2);
+  });
+
+  it('is off when set to 0: no field, no extra requests', async () => {
+    const s = site();
+    const result = await crawl(s, {
+      env: {LHCI_SEO_CRAWL_MAX_PAGES: '2', LHCI_SEO_CRAWL_MAX_LINK_CHECKS: '0'},
+    });
+    expect(result.linkChecks).toBeNull();
+    expect(s.requests).toHaveLength(2);
+  });
+
+  it('still checks the audited page’s links when the snapshot came from the cache', async () => {
+    const s = site();
+    const first = await crawl(s, {
+      env: {LHCI_SEO_CRAWL_MAX_PAGES: '2', LHCI_SEO_CRAWL_MAX_LINK_CHECKS: '0'},
+    });
+    const cache = fakeCache(first.snapshot);
+    const second = await crawl(
+      s,
+      withChecks({cache, env: {LHCI_SEO_CRAWL_CACHE_DIR: '/c', LHCI_SEO_CRAWL_MAX_PAGES: '2'}})
+    );
+    expect(second.state).toBe('cached');
+    expect(second.linkChecks.checked.length).toBeGreaterThan(0);
+  });
+
+  it('has no checks when the crawl is disabled or unavailable', async () => {
+    const s = site();
+    expect((await crawl(s, {env: {LHCI_SEO_CRAWL: '0'}})).linkChecks).toBeNull();
+    expect((await crawl(s, {auditedUrl: 'ftp://x/y'})).linkChecks).toBeNull();
+  });
+
+  it('records a target that cannot be reached as unanswered, and never throws', async () => {
+    const s = site({[u('/l5')]: new Error('socket hang up')});
+    const result = await crawl(s, withChecks({env: {LHCI_SEO_CRAWL_MAX_PAGES: '1'}}));
+    expect(checked(result)[u('/l5')].status).toBeNull();
   });
 });
 
