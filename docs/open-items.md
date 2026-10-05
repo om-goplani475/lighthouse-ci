@@ -1,0 +1,145 @@
+# Open items after Phase 7
+
+Written 2026-10-02, at `main` = `28939f1` (Phases 1-7 merged, 46 audits in `seo-extended`). This is the one place that lists what is
+**deferred**, what is **not yet verified**, and the **tests and steps to close each open item**. The per-phase detail stays in
+`docs/phases/`, `docs/qa/` and `.ai-agents/state/`.
+
+## 1. Where things stand
+
+| Area | State |
+|------|-------|
+| Security findings (`.ai-agents/state/security-findings.md`) | **None open.** Findings 1-9 are all fixed (8 on 2026-10-01, 9 on 2026-10-02). One risk is *accepted*, not fixed: `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control (the README says so). |
+| `seo-audits` tests | 75 suites / 1,308 tests pass on the dev machine (Node 24), typecheck and lint clean. Last run on Node 18.20.8 (what CI pins) covered the crawler suites; the five audits built after it were **not** run there (see A5). |
+| Failing suites outside `seo-audits` | 11 suites / 92 tests fail in `cli`, `server`, `viewer`, `utils`. Same families failed before Phase 4. Not caused by this work (see C). |
+| Not verified at all | Items A1-A5 below. You deferred A1-A3 until after Phase 7, so they are now due. |
+
+## 2. Checks still to do (these close the "Not verified" lines)
+
+Do them in this order. Each says what to run and what "passed" means. When one passes, tick it here and delete the matching "Not
+verified" line from `docs/qa/*.md` and `.ai-agents/state/security-findings.md`.
+
+### A1. `packages/viewer` renders the new audits  (deferred by you)
+
+The viewer shows reports stored by an LHCI server. The 46 fork audits use table details, `notApplicable`, informational and binary
+score modes, so each shape should be seen once.
+
+1. `yarn install --frozen-lockfile && yarn build` (builds `@lhci/server` and `@lhci/viewer`).
+2. Make a report with the fork config against a page that triggers findings, for example the planted-site server used in QA:
+   `LHCI_SEO_ALLOW_PRIVATE_NETWORK=1 npx lhci collect --url=http://localhost:<port>/ --settings.configPath=packages/seo-audits/src/lighthouse-config.js`
+3. Start a server: `npm run start:server` (listens on `http://localhost:9009`, config `packages/cli/test/fixtures/lighthouserc.js`).
+4. Upload: `npx lhci upload --target=lhci --serverBaseUrl=http://localhost:9009 --token=<project token>` (create the project with
+   `npx lhci wizard`).
+5. Open the build in the dashboard and the viewer. **Pass when**: the "Extended SEO (fork)" category appears, every fork audit has a
+   readable row (a failing one shows its table, an informational one such as `crawl-coverage` shows its table, a not-applicable one
+   shows its reason), and no row is blank or throws in the browser console.
+6. Record any audit that renders badly in `.ai-agents/state/ci-backlog.md`; a rendering bug is a `fix(seo-audits)` commit.
+
+### A2. `npm run start:seed-database`
+
+1. In one terminal: `npm run start:server`.
+2. In another: `npm run start:seed-database` (writes the default dataset to the server at `http://localhost:9009`).
+3. **Pass when**: it exits 0 and the dashboard lists the seeded project and builds. This checks that the fork's additions did not
+   break the stock server and database path. (Add `--load` for the larger load-test dataset if you want the stress case.)
+
+### A3. A real GitHub Actions run with the fork config  (deferred by you)
+
+Three open points from earlier: the global `@lhci/cli@0.15.x`, `npm install` against this repo's `yarn.lock`, and a possible
+two-Lighthouse-copies problem.
+
+1. Pick a throwaway branch and a small public site, or a local site served inside the job.
+2. In the job, install the way you would for real: either the global `npm i -g @lhci/cli@0.15.x`, or a checkout of this fork followed
+   by `yarn install --frozen-lockfile`. Run it **both ways** and compare.
+3. Point `.lighthouserc.js` at the fork config: `collect.settings.configPath: require.resolve('@lhci/seo-audits/lighthouse-config.js')`.
+   Add the assertions you want (none of the 46 are in the shared presets).
+4. Run `lhci autorun` (it fails on a collect error; a separate `lhci assert` after a failed `collect` passes silently, see
+   `.ai-agents/state/ci-backlog.md`).
+5. **Check each of these**, they are the actual risks:
+   - **Two Lighthouse copies**: in the job, `npm ls lighthouse` (or `yarn why lighthouse`). The fork pins `lighthouse@12.6.1`; a global
+     `@lhci/cli` brings its own. Two versions in one run is the thing to rule out: the fork's audits extend one copy's `Audit` class.
+     **Pass when** the fork audits appear in the report (the "Extended SEO (fork)" category exists) with no "audit not found" error.
+   - **`yarn.lock`**: `yarn install --frozen-lockfile` must succeed unchanged (it did locally for Phase 7: `htmlparser2` is already in the lock).
+   - **Environment variables** reach the child Lighthouse processes: set `LHCI_SEO_ALLOW_PRIVATE_NETWORK=1` for a localhost target and
+     confirm `crawl-coverage` is not "not applicable".
+   - **Crawl cost and time**: the first run crawls (up to ~100 requests, up to 120 s). With several URLs in one `collect`, check the
+     site's log shows each crawled page requested **once** (the cache is under the runner's temp dir, `lhci-seo-crawl-<uid>`).
+   - **Shared runner**: the cache directory must be created with mode 0700 on a shared runner; if the run warns that the cache is
+     unusable, the crawl still works but each run crawls again.
+   - **Node 18**: the workflow pins Node 18 (`.github/workflows/ci.yml`). The job must be green there, not only on Node 24.
+6. **Pass when** the run is green, the report shows the fork's audits and each crawled page was requested once.
+
+### A4. Look up `htmlparser2@6.1.0` in a vulnerability database
+
+I could not do this from the session (no lookup available). Run `yarn audit --groups dependencies` (or `npm audit`) and check
+`htmlparser2` and its dependencies. The exposure is already bounded (512 KiB body cap, measured 53 ms worst case, extraction only), so
+a finding here would most likely be informational. **Pass when** nothing high or critical is reported for the packages the crawler uses
+(`htmlparser2`, `saxes`, `parse5`, `robots-parser`); anything else goes into `security-findings.md`.
+
+### A5. Re-run the Phase 7 suites under Node 18.20.8
+
+CI pins Node 18; The Phase 5, Phase 6 and crawler suites were run there; the five audits built after the crawler (and the `safeFetchBytes` change) were not. `nvm use 18 && npx jest packages/seo-audits`. **Pass when** all
+75 suites pass. The risky spots are `server.closeAllConnections()` (Node 18.2+) and the crawler's integration test, which waits for a
+real 10 s budget.
+
+### A6. Spot-check the five new audits on a few real sites (optional)
+
+They were run against planted local pages only. Run `lhci collect` with the fork config on two or three real sites and read the
+tables once. Look for false positives: a script-built site that is wrongly judged thin or duplicate (it should say "not applicable"),
+or a site that serves bots a different page. Anything wrong is a `fix(seo-audits)` commit with a test.
+
+## 3. Deferred features (choices, not bugs)
+
+Grouped by what unblocks them. Phase numbers are the fork's own phases (`docs/phases/`).
+
+### Unblocked by Phase 8 (link-following beyond depth 1, the link graph)
+
+| Item | From | Note |
+|------|------|------|
+| Internal URLs returning 4xx/5xx | Phase 5 | needs each page's links requested; the snapshot already stores them |
+| Internal links that redirect instead of resolving | Phase 5 | same |
+| Redirect chains and loops on internal links | Phase 5 | Phase 5 covers only the audited URL's host variants |
+| Soft-404 content heuristics ("not found" wording on a 200 page) | Phase 5 | needs many pages |
+| Per-URL indexability decision tree across the whole site | Phase 6 | Phase 6 judges the audited page and its canonical target |
+| Canonical target on a different origin | Phase 6 | recorded, never requested (one request per audited page is the bound) |
+| Check every sitemap URL, every child sitemap | Phase 4 | currently a bounded sample (10, max 25) and the first 10 sitemap files |
+
+### Needs new infrastructure or a bigger decision
+
+| Item | From | Note |
+|------|------|------|
+| Near-duplicate content (similarity / shingling) | Phase 7 | exact hashes only today; similarity is its own false-positive decision |
+| Inconsistent URL representations resolving to one page, site-wide | Phase 7 | `url-variant-consistency` covers one URL |
+| A separate `seo-crawl` command writing the snapshot ahead of `lhci collect` | Phase 7 | only if the in-run crawl time becomes a problem |
+| Noindex or canonical injected by JavaScript | Phases 4, 6 | needs a browser render per URL (JavaScript rendering parity) |
+| Following redirects for a sitemap URL | Phase 4 | needs a re-validating redirect mode in `safe-fetch.js` (a security-reviewed path) |
+| Sitemap image/video/news/`xhtml:link` extensions, text/RSS/Atom sitemaps, nested indexes | Phase 4 | tolerated, never reported invalid |
+| `llms.txt` link reachability, `llms-full.txt`, `llms.txt` at a subpath | Phase 4 | |
+| HTTP `Link` header canonicals | Phases 4, 6 | core's `canonical` audit covers headers |
+| Microdata / RDFa; cross-checking structured data against visible content | Phase 2 | |
+| Auto-detecting Google doc changes; LLM rule extraction | Phase 2 | intended, sequenced after real usage |
+| `robots.txt` wildcard/`$` overlap detection | Phase 4 | exact-match only today |
+| Fuzzy / semantic matching (title similarity, H1 relevance, generic titles) | Phase 1 | heuristics are literal today |
+| Fetching the canonical to confirm it resolves; numeric `og:image` thresholds | Phases 1, 3 | |
+
+### Not possible, by policy or physics
+
+Exact parity with Google's Rich Results Test; a true visual social-card render inside Lighthouse's report; autonomous publishing of
+ruleset changes without human review. Details in `docs/phases/phase-2-structured-data.md` and `phase-3-social-metadata.md`.
+
+## 4. Housekeeping found while writing this
+
+- **`docs/phases/phase-1-page-metadata.md` is stale.** Its "Not possible without new infrastructure" table still lists duplicate
+  titles and duplicate meta descriptions as impossible; Phase 7 built them (`duplicate-titles`, `duplicate-descriptions`). Move those rows
+  to done. The same file calls roadmap Phase 16 "Site Intelligence & Multi-page Crawler", while `docs/master-roadmap.md` titles it
+  "Site Intelligence / Product Layer": align the two, and drop the "Phase 16/31" reference now that the crawler exists.
+- **A pinned behaviour to remember**: `sitemap-url-status` scores 1 when its time budget runs out before the sample finishes.
+- **Failing suites outside `seo-audits`** (11 now): run the same suites on a clean checkout of upstream `main` once; they are Storybook,
+  Puppeteer and e2e suites in `server` and `viewer`, plus `cli/test/autorun-github.test.js`, `cli/test/upload.test.js`,
+  `cli/test/wizard.test.js` and `utils/test/build-context.test.js` (the causes were not investigated). Not caused by this work (compared against the pre-Phase-4 base, 2026-10-01) but never fixed; they only matter if
+  you want a fully green local `npm run test`.
+
+## 5. How to close an item
+
+1. Do the steps; if it passes, tick it above and delete its "Not verified" line elsewhere.
+2. If it finds a problem, add an entry to `.ai-agents/state/security-findings.md` (a risk) or `.ai-agents/state/ci-backlog.md` (a gap),
+   fix it on its own `fix/...` branch with a test, and mark the entry fixed or done.
+3. Re-run `npm run test:quick`, and keep the `seo-audits` suites green.
