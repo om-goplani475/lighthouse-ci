@@ -5,6 +5,8 @@
 - roadmap: docs/master-roadmap.md (no next phase fixed: see its "What is genuinely remaining") and docs/open-items.md (the verification checks still to do)
 - status: idle
 
+<!-- Phase 14 (content quality) closed 2026-10-05: five audits and one gatherer, ff-merged into main. See docs/phases/phase-14-content-quality.md. -->
+
 <!-- Phase 13 (performance and field data) closed 2026-10-05: three audits and one gatherer, ff-merged into main. See docs/phases/phase-13-performance.md. -->
 
 <!-- Phase 11 (hreflang) closed 2026-10-05 after a pause: seven audits and one gatherer, ff-merged into main, branch deleted. See docs/phases/phase-11-hreflang.md. -->

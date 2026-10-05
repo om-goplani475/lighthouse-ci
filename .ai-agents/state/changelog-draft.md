@@ -603,3 +603,7 @@ Seven new audits in `seo-extended` for pages that declare `hreflang` (all not ap
 
 **New requests: up to 10 alternate versions named by the page are requested per run** (the first 128 KiB, one request at a time per host; alternates on another host use the strict public-only fetch, so a private address is never requested). `LHCI_SEO_HREFLANG_MAX_CHECKS` sets the number (default 10, at most 25); `0` switches the requests off and the audits that need them become not applicable. Bot protection (401/403/429), server errors and timeouts on an alternate are notes, never failures. No `.lighthouserc.js` migration; add the audits to your `assertions` yourself.
 
+## 2026-10-05 — content-audits (Phase 14)
+
+Five new audits in `seo-extended`, all reading the page's own text with **no request**: `placeholder-content` (fails on lorem ipsum, a template prompt such as "your text here", or an unfilled template tag), `content-dates` (fails when the declared published and modified dates contradict each other, are in the future, or disagree between meta tags and JSON-LD), and three informational audits: `readability-score` (Flesch reading ease and grade, English pages only), `hidden-text` (words hidden by a tiny font, off-screen positioning or matching colours; accordions, `display:none` and screen-reader text are not counted) and `keyword-alignment` (the words the title, first h1 and URL share). One new gatherer (`PageContent`). No new environment variable, no `.lighthouserc.js` migration; add the audits to your `assertions` yourself.
+

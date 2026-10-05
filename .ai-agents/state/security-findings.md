@@ -892,3 +892,15 @@ A new request surface: up to 10 **alternate versions named by the audited page**
 
 No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 remains open and accepted.
 
+## 2026-10-05 — content-audits (Phase 14, lightweight)
+
+One new gatherer (`PageContent`, in the page's isolated context) and five audits. **No request and no new environment variable.**
+
+- **Page-controlled text.** The page's visible text, title and dates are chosen by the page. The gatherer caps the text at 200,000 characters and reads at most 4,000 elements, 5 hidden-text samples, 20 `<time>` elements and 5 headings. Every regular expression that runs on the text is bounded or linear: the template-tag patterns use bounded negated classes (`\{\{[^{}\n]{1,80}\}\}`) rather than `\s*[...]\s*` (which has overlapping alternatives), and the text scanned is capped. Tests run hostile inputs (190,000 spaces after `{{`, 190,000 `=` after `<%`, 30,000 `{{ x `, one 190,000-letter word) in well under a second.
+- **Cost in the browser.** The hidden-text scan calls `getComputedStyle` on at most 4,000 elements and walks ancestor backgrounds; it is bounded and ran in the live collect without a measurable delay.
+- **Output.** Page text appears in table cells only, clipped (80 to 200 characters), at most 50 rows; hidden-text samples are at most 80 characters.
+- **No information leaves the machine**: nothing is fetched or sent; JSON-LD is parsed with `JSON.parse` and the existing typed-entity helper (no code evaluation).
+- **False-positive note, not a risk:** a page about lorem ipsum or a template tool is reported by `placeholder-content`; stated in the audit description.
+
+No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 remains open and accepted.
+
