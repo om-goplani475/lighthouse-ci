@@ -122,6 +122,13 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('paginated-canonical');
     expect(auditIds).toContain('pagination-trap');
     expect(auditIds).toContain('broken-external-links');
+    expect(auditIds).toContain('url-length');
+    expect(auditIds).toContain('url-query-parameters');
+    expect(auditIds).toContain('url-session-tracking');
+    expect(auditIds).toContain('url-encoding');
+    expect(auditIds).toContain('url-case-variants');
+    expect(auditIds).toContain('url-trailing-slash-variants');
+    expect(auditIds).toContain('url-normalization');
   }, 30000);
 
   it('has no audit id with a hyphen followed by a digit', async () => {
@@ -196,6 +203,13 @@ describe('seo-audits lighthouse-config', () => {
       'structured-data-type-conflicts',
       'thin-content',
       'twitter-card-completeness',
+      'url-case-variants',
+      'url-encoding',
+      'url-length',
+      'url-normalization',
+      'url-query-parameters',
+      'url-session-tracking',
+      'url-trailing-slash-variants',
       'url-variant-consistency',
     ]);
     expect(categories['seo']).toBeDefined();
