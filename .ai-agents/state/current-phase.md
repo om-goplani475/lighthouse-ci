@@ -1,5 +1,12 @@
 # Current phase
 
+- phase: none in progress
+- branch: main
+- roadmap: docs/master-roadmap.md (next: Phase 9, URL Quality) and docs/open-items.md (the verification checks still to do)
+- status: idle
+
+<!-- Phase 8 (internal linking & site graph) closed 2026-10-05: all seven items done (crawler to depth 3, link-graph, link-check, anchor-text, pagination and external-link audits), ff-merged into main, branch phase-8-internal-linking deleted. See docs/phases/phase-8-internal-linking.md. -->
+
 - phase: 8 (internal linking & site graph)
 - branch: phase-8-internal-linking
 - roadmap: docs/phases/phase-8-internal-linking.md
