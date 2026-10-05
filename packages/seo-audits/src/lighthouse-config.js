@@ -98,6 +98,8 @@ const config = {
     './audits/broken-internal-links.js',
     './audits/redirecting-internal-links.js',
     './audits/internal-redirect-chains.js',
+    './audits/anchor-text-diversity.js',
+    './audits/descriptive-anchor-text.js',
   ],
   categories: {
     'seo-extended': {
@@ -156,6 +158,8 @@ const config = {
         {id: 'broken-internal-links', weight: 1},
         {id: 'redirecting-internal-links', weight: 1},
         {id: 'internal-redirect-chains', weight: 1},
+        {id: 'anchor-text-diversity', weight: 1},
+        {id: 'descriptive-anchor-text', weight: 1},
       ],
     },
   },
