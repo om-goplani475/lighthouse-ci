@@ -875,3 +875,20 @@ The first audit that sends a **secret** and the audited page's address to a **th
 
 No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 remains open and accepted.
 
+## 2026-10-05 — hreflang-audits (Phase 11, lightweight with a careful review)
+
+A new request surface: up to 10 **alternate versions named by the audited page** are requested on every run. The page chooses these URLs, so the SSRF controls are the central point.
+
+- **SSRF.** An alternate on the page's own origin uses the normal safe fetch (address policy, honours `LHCI_SEO_ALLOW_PRIVATE_NETWORK`). An alternate on **any other origin** uses the strict public-only fetch (`safeFetchPublicPrefix`), which refuses private and reserved addresses **whatever the environment says**, at the literal-IP check, at DNS resolution and for every hop. Run: with the opt-in on, a page naming `localhost:9523` as an alternate caused **zero** requests (a spy server's log stayed empty); the audit reported a note ("a private address, not requested"). No redirect is followed, so a redirect cannot aim a request elsewhere.
+- **Cost to third parties and the site.** At most 10 distinct alternates (default; `LHCI_SEO_HREFLANG_MAX_CHECKS`, hard cap 25, `0` off), never the page itself, one request at a time per host and at most 5 hosts in parallel, the first 128 KiB, about 5 s each and 20 s in all, the crawler's user-agent, no cookies. Unreached alternates are counted, not guessed.
+- **Page-controlled parsing.** The alternates' HTML is read with the linear streaming tokenizer over the part before `<body>`, at most 100 alternates and 5 canonicals per page; a half-written last tag of a truncated body is dropped; a 40,000-meta head and a 100,000-nested-div head parse in well under a second (tested). URL comparison uses `looseKey`, which strips trailing slashes with a loop (a `/\/+$/` pattern would be quadratic; tested at 200,000 slashes). Table cells show clipped values only, at most 50 rows.
+- **Sitemap capture.** `<xhtml:link>` entries are recorded only for the audited URL's own `<url>` (at most 100), so a huge sitemap never grows the artifact; the existing XML limits (depth, size, entry count) are unchanged.
+- **Report integrity.** Bot protection (401/403/429), server errors, timeouts and TLS errors on an alternate are notes, never failures; a return link is judged only when the alternate has hreflang tags in its HTML.
+- **A model-output lesson, not a code risk:** the first two attempts to write the library were rejected by the API's content filter while emitting long literal ISO code lists; the lists are now not typed at all (the locale data of the runtime answers).
+
+### Not verified
+
+- Behaviour against many real multi-domain sites and CDNs that treat bots differently.
+
+No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 remains open and accepted.
+

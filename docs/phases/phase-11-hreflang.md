@@ -2,7 +2,7 @@
 
 Live tracker for this phase's work in `packages/seo-audits`. Branch: `phase-11-hreflang` (off `main` at the Phase 12 merge, `7704251`). The ninth phase branch to be started after Phase 8; Phase 11 was first skipped (the developer started Phase 12 instead), then started on 2026-10-05.
 
-**Status: PAUSED on 2026-10-05, about 30% built.** The developer chose to leave it here and move to the next phase. Nothing is merged into `main`. The branch holds the finished foundation (tested, green) and this document is the plan for the rest, so it can be resumed without re-deriving anything.
+**Status: done (2026-10-05).** It was paused at about 30% (the sitemap capture, `looseKey` and the head extractor) while Phase 13 was built, then resumed and finished on the same day. The sections below that describe "still to build" are kept as the record of the plan; all of it is now built.
 
 ## Planning decisions (2026-10-05, lightweight with a short design conversation, all four confirmed)
 
@@ -19,7 +19,7 @@ Live tracker for this phase's work in `packages/seo-audits`. Branch: `phase-11-h
 | Loose URL key (trailing slash and fragment ignored, path case kept) | `src/lib/url-key.js`, `test/lib/url-key.test.js` | Linear on a 200,000-slash path. Used to compare "same page". |
 | Head extractor for hreflang, canonical and robots meta | `src/lib/hreflang-extract.js`, `test/lib/hreflang-extract.test.js` | Streaming `htmlparser2` over the part before `<body>`; dedupes, caps at 100; does not read HTTP `Link` headers. |
 
-## Still to build (in this order; each item is one commit with its tests)
+## Built after the resume (the plan, as executed)
 
 1. **`src/lib/hreflang.js`, the pure library.**
    - `parseHreflang(value)`: `x-default`, or `language[-script][-region]`. Language must be an ISO 639-1 two-letter code (also accept the retired `iw`, `in`, `ji`); a three-letter code (ISO 639-2) fails with the two-letter suggestion (`eng` to `en`); a script is any 4-letter subtag; a region is an ISO 3166-1 alpha-2 code or a 3-digit UN M.49 code (`es-419`); an underscore (`en_US`) fails with the hyphen suggestion; a bare region (`GB`) fails with "needs a language first"; common mistakes get a suggestion (`en-UK` to `en-GB`). Case is not significant.
@@ -42,3 +42,16 @@ Live tracker for this phase's work in `packages/seo-audits`. Branch: `phase-11-h
 
 - Whether to read hreflang from the audited page's HTTP `Link` header too (Lighthouse's `LinkElements` has it with `source: 'headers'`); today's plan reads the head only.
 - Whether `hreflang-return-links` and `hreflang-alternate-status` should become one audit with two failure kinds (the developer chose "Reciprocity + alternate status" as one group).
+
+
+## Closing record (2026-10-05)
+
+Built after the resume, with the files as they landed:
+
+- `src/lib/hreflang-codes.js`: `parseHreflang`. **Deviation from the plan:** no list of ISO language and region codes is typed in; whether a code exists is answered by `Intl.DisplayNames` (the runtime's locale data), which also removed the suspected trigger of the two API content-filter rejections that interrupted the first attempt. A reserved region (`ZZ`) is refused; `UK` is refused with `GB`.
+- `src/lib/hreflang-checks.js` (the bounded requests), `src/gatherers/hreflang-data.js` (the page's links, canonical, `lang`, `content-language`, `og:locale`, and the checks; `LHCI_SEO_HREFLANG_MAX_CHECKS`).
+- The builders were split by topic: `hreflang-common.js`, `hreflang-static.js` (codes, x-default, locale meta), `hreflang-network.js` (return links, alternate status, canonical), `hreflang-sitemap.js`.
+- Seven thin audits: `hreflang-codes`, `hreflang-return-links`, `hreflang-alternate-status`, `hreflang-canonical` (scored) and `hreflang-x-default`, `hreflang-sitemap-consistency`, `hreflang-locale-meta` (informational).
+- The open question about HTTP `Link` headers was settled as: not read (the alternates are fetched as a prefix that does not keep that header); stated in the README. The question about one audit versus two for return links and status was settled as two (separate assert keys, different failure kinds).
+
+Live QA against a planted site: the good page passed everything; the broken page failed codes (`en-UK`, with the `en-GB` fix), return links (one alternate does not link back; two with no tags only noted), alternate status (404, redirect, noindex failed; a cross-origin alternate to a private address was only noted), and canonical (the canonical pointed at the French version). A spy server on the other origin saw **zero** requests with the private-network opt-in on. Details in `docs/qa/hreflang-audits.md`.

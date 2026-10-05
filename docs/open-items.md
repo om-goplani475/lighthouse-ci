@@ -101,7 +101,7 @@ Phase 8 (so far the crawler extension) were not. `nvm use 18 && npx jest package
 ### A6. Spot-check the new audits (Phases 7 and 9) on a few real sites (optional)
 
 They were run against planted local pages only. Run `lhci collect` with the fork config on two or three real sites and read the
-tables once. Also look at the Phase 12 rendering audits (a real Next.js/React/Angular site for `rendering-mode` and `hydration-errors`; a site that serves mobile differently for `device-content-parity`), the Phase 10 image audits (alt heuristics, `image-oversized`) and the Phase 9 URL audits (`url-length` at 115 characters on long-slug blogs; `url-normalization` groups). Look for false positives: a script-built site that is wrongly judged thin or duplicate (it should say "not applicable"),
+tables once. Also look at the Phase 11 hreflang audits (a real multi-domain site, and one whose hreflang is only in the sitemap), the Phase 12 rendering audits (a real Next.js/React/Angular site for `rendering-mode` and `hydration-errors`; a site that serves mobile differently for `device-content-parity`), the Phase 10 image audits (alt heuristics, `image-oversized`) and the Phase 9 URL audits (`url-length` at 115 characters on long-slug blogs; `url-normalization` groups). Look for false positives: a script-built site that is wrongly judged thin or duplicate (it should say "not applicable"),
 or a site that serves bots a different page. Anything wrong is a `fix(seo-audits)` commit with a test.
 
 ### B. Opened by Phase 8 (updated as the phase proceeds)
@@ -198,10 +198,6 @@ ruleset changes without human review. Details in `docs/phases/phase-2-structured
   Puppeteer and e2e suites in `server` and `viewer`, plus `cli/test/autorun-github.test.js`, `cli/test/upload.test.js`,
   `cli/test/wizard.test.js` and `utils/test/build-context.test.js` (the causes were not investigated). Not caused by this work (compared against the pre-Phase-4 base, 2026-10-01) but never fixed; they only matter if
   you want a fully green local `npm run test`.
-
-### D. Phase 11 (hreflang) is paused, not finished (2026-10-05)
-
-The developer chose to leave Phase 11 about 30% built and move on. The branch `phase-11-hreflang` holds the tested foundation (the sitemap `xhtml:link` capture, `looseKey`, the head extractor); the library, the `HreflangData` gatherer, the seven audits, the live QA and the docs are not built. **To resume:** check out the branch and follow "Still to build" in `docs/phases/phase-11-hreflang.md` (it lists the order, the calibration rules and the pitfalls, including the API content-filter rejection of one very large file). Until then the roadmap row stays open and no hreflang audit beyond Lighthouse core's syntax check exists.
 
 ### E. Phase 13: verify `core-web-vitals-field` with a real key (needs you)
 

@@ -1,13 +1,15 @@
 # Current phase
 
-- phase: phase-13-performance (built and QA'd, awaiting the merge into main; Phase 11 hreflang is PAUSED on its own branch)
-- branch: phase-13-performance
-- roadmap: docs/master-roadmap.md (next: Phase 9, URL Quality) and docs/open-items.md (the verification checks still to do)
-- status: in-progress (docs/phases/phase-13-performance.md)
+- phase: none in progress
+- branch: main
+- roadmap: docs/master-roadmap.md (no next phase fixed: see its "What is genuinely remaining") and docs/open-items.md (the verification checks still to do)
+- status: idle
+
+<!-- Phase 13 (performance and field data) closed 2026-10-05: three audits and one gatherer, ff-merged into main. See docs/phases/phase-13-performance.md. -->
+
+<!-- Phase 11 (hreflang) closed 2026-10-05 after a pause: seven audits and one gatherer, ff-merged into main, branch deleted. See docs/phases/phase-11-hreflang.md. -->
 
 <!-- Phase 12 (JavaScript rendering) closed 2026-10-05: seven audits and two gatherers, ff-merged into main, branch deleted. See docs/phases/phase-12-js-rendering.md. -->
-
-<!-- Phase 11 (hreflang) PAUSED 2026-10-05 on branch phase-11-hreflang: foundation built and tested (sitemap xhtml:link capture, looseKey, head extractor), library, gatherer and audits not built. See docs/phases/phase-11-hreflang.md. -->
 
 <!-- Phase 10 (images) closed 2026-10-05: seven audits and one gatherer, ff-merged into main, branch deleted. See docs/phases/phase-10-images.md. -->
 
