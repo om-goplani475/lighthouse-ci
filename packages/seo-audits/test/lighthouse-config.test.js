@@ -122,6 +122,13 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('paginated-canonical');
     expect(auditIds).toContain('pagination-trap');
     expect(auditIds).toContain('broken-external-links');
+    expect(auditIds).toContain('js-head-signals');
+    expect(auditIds).toContain('js-internal-links');
+    expect(auditIds).toContain('js-visible-content');
+    expect(auditIds).toContain('raw-rendered-diff');
+    expect(auditIds).toContain('rendering-mode');
+    expect(auditIds).toContain('hydration-errors');
+    expect(auditIds).toContain('device-content-parity');
     expect(auditIds).toContain('image-alt-quality');
     expect(auditIds).toContain('image-filename-quality');
     expect(auditIds).toContain('image-lazy-above-fold');
@@ -162,6 +169,7 @@ describe('seo-audits lighthouse-config', () => {
       'crawl-depth',
       'dead-end-pages',
       'descriptive-anchor-text',
+      'device-content-parity',
       'document-h1-count',
       'document-title-quality',
       'duplicate-content',
@@ -171,6 +179,7 @@ describe('seo-audits lighthouse-config', () => {
       'favicon-quality',
       'h1-title-relevance',
       'hsts-quality',
+      'hydration-errors',
       'image-alt-quality',
       'image-dimensions-attributes',
       'image-filename-quality',
@@ -181,6 +190,9 @@ describe('seo-audits lighthouse-config', () => {
       'indexability-verdict',
       'internal-link-counts',
       'internal-redirect-chains',
+      'js-head-signals',
+      'js-internal-links',
+      'js-visible-content',
       'llms-txt-structure',
       'manifest-icons',
       'meta-description-identical-to-title',
@@ -193,9 +205,11 @@ describe('seo-audits lighthouse-config', () => {
       'pagination-links',
       'pagination-trap',
       'pixel-width-truncation',
+      'raw-rendered-diff',
       'redirect-chain-length',
       'redirect-loop',
       'redirecting-internal-links',
+      'rendering-mode',
       'robots-directives-conflict',
       'robots-directives-report',
       'robots-txt-crawler-access',
