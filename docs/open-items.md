@@ -11,14 +11,18 @@ Written 2026-10-02 at `main` = `28939f1` (Phases 1-7 merged, 46 audits in `seo-e
 | Security findings (`.ai-agents/state/security-findings.md`) | **One open, low, accepted: Finding 10** (Phase 8: a hostile site with very long link URLs can make the crawl snapshot exceed the 16 MiB cache cap; see B1). Findings 1-9 are all fixed (8 on 2026-10-01, 9 on 2026-10-02). One risk is *accepted*, not fixed: `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control (the README says so). |
 | `seo-audits` tests | 82 suites / 1,670 tests pass on the dev machine (Node 24), typecheck and lint clean (Phase 8 complete). Also run on Node 18.20.8 (what CI pins) on 2026-10-05: all 82 suites / 1,670 tests pass (A5 done). |
 | Failing suites outside `seo-audits` | 9 suites / 84 tests fail in `cli`, `server`, `viewer`, `utils` (11 / 92 after Phase 7: a few fail only intermittently under load). Same families failed before Phase 4. Not caused by this work (see C). |
-| Not verified at all | Items A1-A3 below (A4 and A5 passed on 2026-10-05). You deferred A1-A3 until after Phase 7, so they are now due. |
+| Not verified at all | Only the real-runner part of A3 (A1, A2, A4 and A5 passed on 2026-10-05; A3 was simulated locally). |
 
 ## 2. Checks still to do (these close the "Not verified" lines)
 
 Do them in this order. Each says what to run and what "passed" means. When one passes, tick it here and delete the matching "Not
 verified" line from `docs/qa/*.md` and `.ai-agents/state/security-findings.md`.
 
-### A1. `packages/viewer` renders the new audits  (deferred by you)
+### A1. `packages/viewer` renders the new audits  (DONE 2026-10-05, passed)
+
+**Result (run by Claude on this machine, headless Chrome):** `yarn build` passed; a full fork-config `lhci collect` of two planted pages was uploaded with `lhci upload` to a local server (`npm run start:server`); the viewer (`packages/viewer/dist`, a two-report comparison UI) and the server dashboard were driven with puppeteer. The viewer shows the "Extended SEO (fork)" category with all **73** audits (21 changed rows plus a collapsed "Unchanged (52)" group), table rows open and show their columns (`crawl-coverage`, `url-case-variants`, the image audits), and **no browser console error**. The dashboard compare page shows the same category score (its one 404 was the missing base build, as expected). Limits: the viewer only lists audits that differ between two reports, so a not-applicable row's reason text was not read in the browser; the dashboard's link to a single full report goes to Google's hosted Lighthouse viewer, which was not tested.
+
+(Original steps, for repeating it:)
 
 The viewer shows reports stored by an LHCI server. The 46 fork audits use table details, `notApplicable`, informational and binary
 score modes, so each shape should be seen once.
@@ -34,14 +38,24 @@ score modes, so each shape should be seen once.
    shows its reason), and no row is blank or throws in the browser console.
 6. Record any audit that renders badly in `.ai-agents/state/ci-backlog.md`; a rendering bug is a `fix(seo-audits)` commit.
 
-### A2. `npm run start:seed-database`
+### A2. `npm run start:seed-database`  (DONE 2026-10-05, passed)
+
+**Result:** with `npm run start:server` running, `npm run start:seed-database` exited 0 and `/v1/projects` listed the seeded projects ("Lighthouse Dashboard", "Lighthouse Viewer"). The `--load` stress dataset was not run.
+
+(Original steps:)
 
 1. In one terminal: `npm run start:server`.
 2. In another: `npm run start:seed-database` (writes the default dataset to the server at `http://localhost:9009`).
 3. **Pass when**: it exits 0 and the dashboard lists the seeded project and builds. This checks that the fork's additions did not
    break the stock server and database path. (Add `--load` for the larger load-test dataset if you want the stress case.)
 
-### A3. A real GitHub Actions run with the fork config  (deferred by you)
+### A3. A real GitHub Actions run with the fork config  (PARTLY DONE 2026-10-05: simulated locally; the real run is still yours)
+
+**Simulated by Claude on this machine** (not a GitHub runner, so the real run is still open): `yarn install --frozen-lockfile` succeeded and left `yarn.lock` byte-identical; `npm i -g @lhci/cli@0.15` gave 0.15.1 with **its own `lighthouse` 12.6.1 copy, separate from the repo's**, and `lhci collect` from it with the fork config worked: all 73 fork audits present, no "audit not found", on three URLs; `LHCI_SEO_ALLOW_PRIVATE_NETWORK=1` reached the child Lighthouse processes (`crawl-coverage` "Crawled 7 of 50 pages"); a request-logging site saw each crawled page **once** across 3 URLs (robots.txt twice: crawler and sitemap gatherer); the cache directory is mode 700; and the same collect under Node 18.20.8 with a cold cache worked on the fork's own CLI. Note: `lhci autorun` with no `assert` block falls back to the stock `lighthouse:recommended` preset and fails on its performance assertions, so a real workflow needs its own `assert` section.
+
+**Still needs a real run:** the runner's egress/DNS, a real shared runner's temp directory, the actual `.github/workflows` of your project, and the cost and time of a cold crawl on a real site.
+
+(Original steps:)
 
 Three open points from earlier: the global `@lhci/cli@0.15.x`, `npm install` against this repo's `yarn.lock`, and a possible
 two-Lighthouse-copies problem.
