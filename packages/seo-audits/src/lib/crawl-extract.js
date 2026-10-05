@@ -187,6 +187,20 @@ function parse(html, pageUrl) {
    * @type {{url: string, internal: boolean, rel: string[], text: string, alt: string} | null}
    */
   let anchor = null;
+  // The same href is read again and again (navigation, footers): parse each distinct one once per page. Capped so a
+  // page of unique hrefs cannot grow it without bound.
+  /** @type {Map<string, {url: string, internal: boolean} | null>} */
+  const hrefCache = new Map();
+  /** @param {string} href @return {{url: string, internal: boolean} | null} */
+  const resolveHref = href => {
+    const known = hrefCache.get(href);
+    if (known !== undefined) return known;
+    const url = normalizeUrl(href.trim(), pageUrl);
+    const resolved =
+      url && url.length <= MAX_URL_CHARS ? {url, internal: sameOrigin(url, pageUrl)} : null;
+    if (hrefCache.size < 2_000) hrefCache.set(href, resolved);
+    return resolved;
+  };
   /** @type {string[]} */
   const textParts = [];
   let textChars = 0;
@@ -296,10 +310,10 @@ function parse(html, pageUrl) {
           // An `<a>` inside an unclosed `<a>` ends the first one, as in HTML.
           finishAnchor();
           if (attrs.href && attrs.href.length <= MAX_URL_CHARS) {
-            const url = normalizeUrl(attrs.href.trim(), pageUrl);
-            if (url && url.length <= MAX_URL_CHARS) {
+            const resolved = resolveHref(attrs.href);
+            if (resolved) {
               const rel = (attrs.rel || '').toLowerCase().split(/\s+/);
-              anchor = {url, internal: sameOrigin(url, pageUrl), rel, text: '', alt: ''};
+              anchor = {url: resolved.url, internal: resolved.internal, rel, text: '', alt: ''};
               addPagination(rel, attrs.href);
             }
           }
