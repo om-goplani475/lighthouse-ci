@@ -122,6 +122,9 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('paginated-canonical');
     expect(auditIds).toContain('pagination-trap');
     expect(auditIds).toContain('broken-external-links');
+    expect(auditIds).toContain('core-web-vitals-field');
+    expect(auditIds).toContain('render-blocking-report');
+    expect(auditIds).toContain('request-weight-report');
     expect(auditIds).toContain('js-head-signals');
     expect(auditIds).toContain('js-internal-links');
     expect(auditIds).toContain('js-visible-content');
@@ -165,6 +168,7 @@ describe('seo-audits lighthouse-config', () => {
       'broken-internal-links',
       'canonical-conflicts',
       'canonical-https',
+      'core-web-vitals-field',
       'crawl-coverage',
       'crawl-depth',
       'dead-end-pages',
@@ -209,7 +213,9 @@ describe('seo-audits lighthouse-config', () => {
       'redirect-chain-length',
       'redirect-loop',
       'redirecting-internal-links',
+      'render-blocking-report',
       'rendering-mode',
+      'request-weight-report',
       'robots-directives-conflict',
       'robots-directives-report',
       'robots-txt-crawler-access',
