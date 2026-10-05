@@ -559,5 +559,20 @@ a page with no pagination links is not applicable.
 
 Add the ones you want to your `assertions` yourself; none is in the shared presets. **Security**: no new finding. No `.lighthouserc.js` migration.
 
+## 2026-10-05 — Phase 8 item 6: broken external links (Phase 8 complete)
+
+One new scored audit (59 in the fork): **`broken-external-links`** fails when an external link on the audited page points at a page that is gone (404 or 410) or a host that does not exist or
+refuses connections. A 5xx, a timeout or a TLS error is listed but never fails; a 401, 403, 429 or 999 is not judged (many sites block link checkers).
+
+**This is the first audit that sends requests to other people's sites, and it is on by default.** Each run checks up to **20** of the audited page's external links: at most 2 per host, status only (no body read),
+the crawler user-agent, 3 redirect hops, a 15 s budget; third-party robots.txt files are not fetched. **A link to a private or reserved address is never requested**, even with `LHCI_SEO_ALLOW_PRIVATE_NETWORK=1` (a new
+strict fetch: that opt-in is for your own site only). Set `LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS=0` to switch it off (the audit is then not applicable); `crawl-coverage` says how many links were checked.
+**Security**: no new finding; the new request surface was reviewed with attacks run against the real fetch path (see `security-findings.md`). Add the audit to your `assertions` yourself; it is not in the
+shared presets. No `.lighthouserc.js` migration; one new environment variable.
+
+**Phase 8 as a whole** (see its entries above): the crawler follows links to depth 3 from the homepage; link-graph audits (`dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`); internal link checks
+(`broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`); anchor text (`anchor-text-diversity`, `descriptive-anchor-text`); pagination (`pagination-links`, `paginated-canonical`,
+`pagination-trap`); and this one. 17 audits' worth of new reading of the site, 13 new audits.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->

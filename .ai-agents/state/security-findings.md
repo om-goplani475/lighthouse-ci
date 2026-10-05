@@ -796,3 +796,30 @@ No new request pattern: the audited page's `rel=next` / `rel=prev` targets join 
 
 No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 (item 0) remains open and accepted.
 
+## 2026-10-05 — external-link-audit (Phase 8 item 6, lightweight with a careful review)
+
+The first request surface of the fork that goes to **other people's sites**: up to 20 external links of the audited page, chosen by the page, requested on every run. Reviewed with the security checklist while
+building; every attack below was **run**: some against the real fetch path, the rest as unit tests that fail if the protection is removed.
+
+- **SSRF, the central risk.** The page chooses the URL, so a link can point at loopback, a private network or the cloud metadata address. The audit needs `LHCI_SEO_ALLOW_PRIVATE_NETWORK=1` to audit a site on
+  localhost, and that opt-in would have unblocked loopback and private ranges for these links too. A new strict fetch (`safeFetchPublicPrefix`, `publicOnlyLookup`, built from the same lookup factory as the
+  existing one, so there is one implementation) refuses every private or reserved address **whatever the environment says**, at the literal-IP check, at DNS resolution (a host name that resolves to loopback is
+  refused) and for every redirect hop. Run: with the opt-in on, a page linking to `127.0.0.1`, `localhost`, `[::1]`, `169.254.169.254` and `10.0.0.5` made **zero** requests (a spy server saw none); 14 unit
+  tests and an integration test over real local servers cover the address kinds and fail if the opt-in leaks in.
+- **Cost to third parties**: at most 20 URLs, 2 per host, one at a time per host, 5 in flight overall, 5 s per request, 3 redirect hops, a 15 s total budget, 1 KiB of body, the crawler user-agent, no cookies,
+  credentials or custom headers, no third-party robots.txt (a decision with the developer: a status check of a link the audited site publishes is what a browser prefetch does). It can be switched off
+  (`LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS=0`) and is counted in `crawl-coverage`.
+- **Amplification and hangs**: hosts are checked in parallel but a host's links one after another; redirects are followed manually for 3 hops and a loop or an endless chain ends with `TOO_MANY_REDIRECTS`
+  (tested); a response that never comes ends at the 5 s request timeout; the total budget stops new requests, and unreached links are counted, not guessed.
+- **Information leaked to third parties**: only the URL requested and the crawler's user-agent. Nothing from the audited site (cookies, headers, referrer) is sent; the link a page publishes already tells
+  that host where it points.
+- **Report integrity**: a link refused for pointing at a private address, or blocked (401, 403, 429, 999), or flaky (5xx, timeout) is never reported as broken; only a 404, a 410, a host that does not exist or a refused
+  connection fails. Page-controlled text (URLs, anchors) appears in table cells only, clipped to 200 characters, at most 50 rows.
+
+### Not verified
+
+- Behaviour against a wide range of real third-party sites (rate-limiting, tarpits, odd redirects); only `example.com` and made-up hosts were used.
+- A real GitHub Actions run (runner egress and DNS).
+
+No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 (item 0) remains open and accepted.
+

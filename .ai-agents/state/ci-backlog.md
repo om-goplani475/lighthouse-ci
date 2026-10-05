@@ -205,6 +205,17 @@
   re-run is still to do (`docs/open-items.md`, A5).
 - status: done (nothing to do)
 
+## 2026-10-05 — external-link-audit
+
+- item: no gap found in the workflow files. No dependency, workflow or Docker change; `package.json`, `yarn.lock` and `.github/` are unchanged by the feature's diff. The Node 18.20.8 re-run is still to do
+  (`docs/open-items.md`, A5).
+- status: done (nothing to do)
+
+- item: for any CI job: every Lighthouse run now sends up to 20 status-only requests (2 per host, 15 s) to **other people's sites**, the external links of the audited page. A runner that cannot reach the internet, or a
+  corporate proxy, will see them fail (DNS or connection errors count as "broken" only for DNS failure and refused connections; others are listed and never fail). `LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS=0` switches
+  the checks (and the audit) off. A job that audits a private site behind a firewall will see the page's external links time out: those are "unreliable", not failures.
+- status: done (documented in the README)
+
 <!-- Appended by Agent 08. Advisory only — does not block merges or new features. Format per entry:
 
 ## {date} — {slug}

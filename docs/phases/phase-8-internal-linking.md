@@ -38,7 +38,7 @@ files are simply ignored).
 | 3 | Broken internal links (404/500), and the Phase 5 deferred checks: links that redirect, redirect chains and loops on internal links | **done** | three audits, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, lib `crawl-link-checks.js`; every crawled page's links judged, plus up to 100 status-only checks of the audited page's own unread links (`linkChecks` on the crawl artifact). Lightweight after a design conversation. QA'd live. |
 | 4 | Anchor-text diversity / over-optimisation signal | **done** | `anchor-text-diversity` (60% of at least 5 editorial links, site-wide navigation excluded) and `descriptive-anchor-text` (generic or empty anchors, added at the developer's choice beyond the roadmap row); lib `crawl-anchors.js`. Lightweight after a design conversation. QA'd live. |
 | 5 | Pagination (`rel=next/prev`, view-all pattern) and infinite-pagination trap detection | **done** | `pagination-links`, `paginated-canonical` (a canonical outside the series, a view-all page, passes with a note) and `pagination-trap` (evidence from the crawl, no extra request); lib `crawl-pagination.js`. Lightweight after a design conversation. QA'd live. |
-| 6 | Broken external links | planned | new outbound surface: own security design, on by default but bounded |
+| 6 | Broken external links | **done** | `broken-external-links`: the audited page's own external links (up to 20), status only, at most 2 per host, 15 s budget, a strict fetch that refuses private addresses whatever the opt-in says, no third-party robots.txt. Lightweight with a design conversation and a careful security review. QA'd live. |
 
 Build order: 0 first (everything reads it), then 1 and 2 together, 3, 4, 5, and 6 last.
 
@@ -81,6 +81,12 @@ Build order: 0 first (everything reads it), then 1 and 2 together, 3, 4, 5, and 
   next-only chain is reported as "too few to call it a trap", and with `LHCI_SEO_CRAWL_MAX_DEPTH=5` the same site fails. A limit of the rule the developer chose (evidence only, no extra
   requests), stated in the README.
 - **A performance fix found by the hostile timing run**: 3.9 s for `pagination-links` on 200 pages with 1,900-character URLs (a scan per lookup); pages are now indexed by URL once: 175 ms.
+- **Item 6 added a strict fetch to `safe-fetch.js`** (`safeFetchPublicPrefix`, `publicOnlyLookup`, one shared lookup factory): the private-network opt-in that lets the audit reach the audited site on
+  localhost must not apply to a link on its page, or a page could aim a request at loopback or an internal address. A test with the opt-in on proves a link to a local server is refused and the server
+  receives nothing. The decisions with the developer: the audited page's own links only (up to 20), 404/410/unreachable host fails (5xx and timeouts listed, 401/403/429/999 not judged), no third-party
+  robots.txt, 2 requests per host and 15 s.
+- **Found in QA of item 6**: status 999 (LinkedIn's way of blocking checkers) was classed as a server error because it is above 500; it is now "not judged". The summary text lumped private-address
+  refusals under "answered 401, 403, 429"; they are counted separately.
 - **Item 0 was first set up for the full 9-stage pipeline, then switched to lightweight** (2026-10-05) after the developer asked why: it extends
   existing code rather than adding a new capability, so `build-mode-selection.md` points to lightweight. Items 1 to 5 are lightweight; item 6
   (external links, a new outbound surface) gets a short design conversation and a careful security review, not the full pipeline.
@@ -97,9 +103,23 @@ Build order: 0 first (everything reads it), then 1 and 2 together, 3, 4, 5, and 
 |------|------|-------|
 | Everything in the "To do later" table of `docs/phases/phase-7-duplicates.md` that is not built here | after this phase | e.g. a separate `seo-crawl` command if the in-run crawl time becomes a problem |
 
-## Closing record
+## Closing record (2026-10-05)
 
-*(written when the phase closes)*
+- **Shipped (1 crawler extension, 2 per-run check kinds, 17 audits)**: the crawler now follows links to depth 3 from the homepage and stores a version 2 snapshot (anchors, external links, pagination, depth, completeness flags);
+  per-run status checks of the audited page's own internal links (up to 100) and external links (up to 20). Audits: `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`,
+  `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, `anchor-text-diversity`, `descriptive-anchor-text`, `pagination-links`, `paginated-canonical`, `pagination-trap`,
+  `broken-external-links` (13). The fork has **59 audits** in `seo-extended`. QA records: `docs/qa/link-graph-crawler.md`, `link-graph-audits.md`, `link-check-audits.md`, `anchor-text-audits.md`,
+  `pagination-audits.md`, `external-link-audit.md`.
+- **Pipeline used**: every item lightweight, each after a short design conversation (thresholds and rules chosen with the developer); the first set-up of item 0 for the full pipeline was reversed at the developer's
+  request, and the per-item mode table is in the "How the plan changed" section.
+- **Real findings from QA worth keeping** (each fixed with a test): (1) the seed split filled the page cap and left no room to follow links; (2) a time-budget bug since Phase 7 recorded never-requested URLs as
+  pages that "did not answer", which would have made the broken-link audit lie; (3) four wrong first rules found by live runs (navigation threshold, redirect destinations, the trap rule, status 999); (4) three
+  quadratic scans found by hostile timing runs (slash regex, link normalising, pagination lookups); (5) a strict fetch was needed so the localhost opt-in could never reach a link's target.
+- **Security**: one `low` finding, open and accepted (Finding 10: a hostile site with very long link URLs can make the snapshot exceed the 16 MiB cache cap). The new third-party request surface (item 6) was reviewed
+  with attacks run against the real fetch path; see `.ai-agents/state/security-findings.md`.
+- **Tests**: 82 suites / 1,670 `seo-audits` tests pass, typecheck and lint clean. **Not verified**: the audits on real public sites, `packages/viewer` rendering, `npm run start:seed-database`, a real GitHub
+  Actions run, and the Node 18.20.8 re-run (all listed, with steps, in `docs/open-items.md`).
+- **Deferred**: see the "Deferred" and "To do later" tables above (near-duplicate content is Phase 7's; everything else this phase planned was built).
 
 ## Not possible / permanently out of scope
 

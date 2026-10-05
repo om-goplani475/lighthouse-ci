@@ -1,6 +1,6 @@
 # Open items after Phase 7
 
-Written 2026-10-02 at `main` = `28939f1` (Phases 1-7 merged, 46 audits in `seo-extended`); **updated 2026-10-05** for Phase 8 (in progress, branch `phase-8-internal-linking`; items 0 to 5 built; only item 6, broken external links, is left). This is the one place that lists what is
+Written 2026-10-02 at `main` = `28939f1` (Phases 1-7 merged, 46 audits in `seo-extended`); **updated 2026-10-05** for Phase 8 (in progress, branch `phase-8-internal-linking`; all seven items built; the phase is complete and waits for the merge into `main`). This is the one place that lists what is
 **deferred**, what is **not yet verified**, and the **tests and steps to close each open item**. The per-phase detail stays in
 `docs/phases/`, `docs/qa/` and `.ai-agents/state/`.
 
@@ -9,7 +9,7 @@ Written 2026-10-02 at `main` = `28939f1` (Phases 1-7 merged, 46 audits in `seo-e
 | Area | State |
 |------|-------|
 | Security findings (`.ai-agents/state/security-findings.md`) | **One open, low, accepted: Finding 10** (Phase 8: a hostile site with very long link URLs can make the crawl snapshot exceed the 16 MiB cache cap; see B1). Findings 1-9 are all fixed (8 on 2026-10-01, 9 on 2026-10-02). One risk is *accepted*, not fixed: `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control (the README says so). |
-| `seo-audits` tests | 80 suites / about 1,600 tests pass on the dev machine (Node 24), typecheck and lint clean (Phase 8 item 5 built, uncommitted at the time of writing). Last run on Node 18.20.8 (what CI pins) covered the Phase 7 crawler suites; the five Phase 7 audits and everything in Phase 8 were **not** run there (see A5). |
+| `seo-audits` tests | 82 suites / 1,670 tests pass on the dev machine (Node 24), typecheck and lint clean (Phase 8 complete). Last run on Node 18.20.8 (what CI pins) covered the Phase 7 crawler suites; the five Phase 7 audits and everything in Phase 8 were **not** run there (see A5). |
 | Failing suites outside `seo-audits` | 11 suites / 92 tests fail in `cli`, `server`, `viewer`, `utils`. Same families failed before Phase 4. Not caused by this work (see C). |
 | Not verified at all | Items A1-A5 below. You deferred A1-A3 until after Phase 7, so they are now due. |
 
@@ -115,6 +115,13 @@ crawl read and say how many targets they could not check). A possible follow-up,
 `LHCI_SEO_CRAWL_MAX_DEPTH=5` the same series fails. Decide whether to raise the depth for sites with long listings (a longer crawl), or accept the limit. A site that shows many page
 numbers at once is caught at the default depth. A `rel=next` loop longer than 50 pages is also not detected.
 
+**B7. The external link checks send requests to other people's sites: verify them in the real GitHub Actions run (A3), and decide the defaults.** Every run checks up to 20 of the audited page's external
+links (2 per host, 15 s, status only, no third-party robots.txt). Steps: (1) in the real run, check how long the audit adds and that a runner without outbound access degrades to "unreliable" and
+never to false "broken" links (only a 404, 410, a missing host or a refused connection fails); (2) look at the audited site's own logs and a third party's if you have one, for the
+`lhci-seo-audits-crawler/1.0` user-agent; (3) decide whether on-by-default is right for your team: `LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS=0` switches it off, `5` makes it very light. **Pass when**
+a run on a site with a known dead external link fails the audit and a run with the setting at 0 reports the audit as not applicable. Not verified: behaviour against many real third-party sites
+(rate limiters, tarpits, odd redirects); only `example.com` and made-up hosts were used.
+
 **B4. `orphan-pages` is usually not applicable with the default crawl limits.** It is only judged when the crawl saw the whole site (no page cap, depth bound or
 time budget cut it), so on a site of more than about 50 pages it says "not applicable" and names the limit. To use it on a bigger site, raise
 `LHCI_SEO_CRAWL_MAX_PAGES` (up to 200) and `LHCI_SEO_CRAWL_MAX_DEPTH` (up to 5) and accept the longer crawl; check in the real GitHub Actions run (A3) whether that is affordable.
@@ -127,8 +134,7 @@ Grouped by what unblocks them. Phase numbers are the fork's own phases (`docs/ph
 
 ### Unblocked by Phase 8 (link-following beyond depth 1, the link graph)
 
-The crawler now follows links to depth 3 (Phase 8 item 0, built); the audits that use it are Phase 8 items 1 to 6 and are not built yet. Each row below is
-closed by one of them (see `docs/phases/phase-8-internal-linking.md`). **Built in item 3**: internal URLs returning 4xx/5xx, internal links that redirect, redirect chains and loops on internal links (the three Phase 5 deferrals).
+Phase 8 is built: the crawler follows links to depth 3 and the audits that use it exist (see `docs/phases/phase-8-internal-linking.md`). **Closed by item 3**: internal URLs returning 4xx/5xx, internal links that redirect, redirect chains and loops on internal links (the three Phase 5 deferrals). The rows below are what is **still** deferred; none was needed by Phase 8.
 
 | Item | From | Note |
 |------|------|------|

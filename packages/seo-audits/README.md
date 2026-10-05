@@ -700,6 +700,14 @@ Lighthouse run** as the `SiteCrawl` gatherer; `lhci autorun` needs no extra step
   - `pagination-trap` fails when the audited page's path has **more than 5** numbered query-string variants known to the crawl (requested, left out by the crawler's limit of 5 variants
     of a path, or only pointed at by a `rel=next`) and the series was **still going**. No extra request is made, so a long but finite series looks the same, and a chain that only
     offers "next" is followed only as far as the crawl's depth reaches: it is usually reported as "too few to call it a trap" until you raise `LHCI_SEO_CRAWL_MAX_DEPTH` to 5.
+- **`broken-external-links`** (scored) fails when an external link on the audited page points at a page that is **gone (404 or 410)** or at a **host that does not exist or refuses
+  connections**. **This is the one audit that sends requests to other people's sites**, on by default and kept small: up to **20** of the page's external links per run
+  (`LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS`, `0` switches it off), **at most 2 per host** (hosts in parallel, each host's links one at a time, 5 in flight overall), status only (no
+  body is read, at most 1 KiB), the crawler's user-agent, redirects followed for 3 hops (each hop validated like the first request), 5 s per request and a **15 s total budget**; what is not
+  reached is counted as "not checked". Third-party robots.txt files are **not** fetched. **A private or reserved address is refused whatever the environment says**, including
+  with `LHCI_SEO_ALLOW_PRIVATE_NETWORK=1` (that opt-in is for the audited site only): a link to loopback, `localhost`, a `10.x` or `192.168.x` address or the cloud metadata address is not requested
+  and is counted as such. A 5xx, a timeout, a reset or a TLS error is **listed but never fails** (other sites have bad moments); a 401, 403, 429, 999 or other 4xx is **not judged**
+  (many sites block link checkers). Only the audited page's own external links (the first 20 the extractor keeps) are judged, from server HTML.
 
 **Environment variables** (read per run, clamped; a page can never change them):
 
@@ -708,6 +716,7 @@ Lighthouse run** as the `SiteCrawl` gatherer; `lhci autorun` needs no extra step
 | `LHCI_SEO_CRAWL` | on | `0` or `false` switches the crawl off entirely (no requests; the audits that read it are not applicable) |
 | `LHCI_SEO_CRAWL_MAX_PAGES` | 50 (1 to 200) | page cap, the audited page included |
 | `LHCI_SEO_CRAWL_MAX_DEPTH` | 3 (1 to 5) | how many hops of links to follow from the starting pages |
+| `LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS` | 20 (0 to 50) | status-only checks of the external links on the audited page, to other sites (`broken-external-links`); `0` switches them off and that audit is then not applicable |
 | `LHCI_SEO_CRAWL_MAX_LINK_CHECKS` | 100 (0 to 200) | status-only checks of the audited page's own links the crawl did not read; `0` switches them off (the link-check audits then judge only links to pages the crawl read) |
 | `LHCI_SEO_CRAWL_TIME_BUDGET_SECONDS` | 120 (10 to 600) | total crawl time |
 | `LHCI_SEO_CRAWL_RESPECT_ROBOTS` | on | `0` or `false` requests URLs robots.txt disallows (for auditing your own staging site) |
@@ -809,7 +818,7 @@ module.exports = {
 };
 ```
 
-This adds all fifty-eight audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all fifty-nine audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
@@ -820,16 +829,16 @@ This adds all fifty-eight audits (`structured-data-json-ld`, `structured-data-sc
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
 `sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`, `mixed-content`, `hsts-quality`,
 `ssl-certificate-expiry`, `soft-not-found`, `url-variant-consistency`, `redirect-chain-length`,
-`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, `anchor-text-diversity`, `descriptive-anchor-text`, `pagination-links`, `paginated-canonical`, `pagination-trap`) on top of
+`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, `anchor-text-diversity`, `descriptive-anchor-text`, `pagination-links`, `paginated-canonical`, `pagination-trap`, `broken-external-links`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the fifty-eight audits are part of this fork's shared `all`/`recommended` presets
+None of the fifty-nine audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all fifty-eight here are opt-in via `configPath`, so they can't be part of that
+default, and all fifty-nine here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
