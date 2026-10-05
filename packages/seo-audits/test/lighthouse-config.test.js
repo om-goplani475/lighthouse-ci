@@ -122,6 +122,13 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('paginated-canonical');
     expect(auditIds).toContain('pagination-trap');
     expect(auditIds).toContain('broken-external-links');
+    expect(auditIds).toContain('image-alt-quality');
+    expect(auditIds).toContain('image-filename-quality');
+    expect(auditIds).toContain('image-lazy-above-fold');
+    expect(auditIds).toContain('image-dimensions-attributes');
+    expect(auditIds).toContain('image-oversized');
+    expect(auditIds).toContain('image-legacy-formats');
+    expect(auditIds).toContain('broken-images');
     expect(auditIds).toContain('url-length');
     expect(auditIds).toContain('url-query-parameters');
     expect(auditIds).toContain('url-session-tracking');
@@ -147,6 +154,7 @@ describe('seo-audits lighthouse-config', () => {
     expect(categories['seo-extended'].auditRefs.map(ref => ref.id).sort()).toEqual([
       'anchor-text-diversity',
       'broken-external-links',
+      'broken-images',
       'broken-internal-links',
       'canonical-conflicts',
       'canonical-https',
@@ -163,6 +171,12 @@ describe('seo-audits lighthouse-config', () => {
       'favicon-quality',
       'h1-title-relevance',
       'hsts-quality',
+      'image-alt-quality',
+      'image-dimensions-attributes',
+      'image-filename-quality',
+      'image-lazy-above-fold',
+      'image-legacy-formats',
+      'image-oversized',
       'indexability-conflicts',
       'indexability-verdict',
       'internal-link-counts',
