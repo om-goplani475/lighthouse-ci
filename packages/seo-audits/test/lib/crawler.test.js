@@ -910,6 +910,23 @@ describe('crawlSite: status checks of the audited page’s own links', () => {
     ]);
   });
 
+  it('also checks the rel=next and rel=prev targets of the audited page, which are not in its link list', async () => {
+    const s = makeSite({
+      [AUDITED]: {
+        body: page(
+          'Home',
+          '<p>listing</p>',
+          '<link rel="next" href="/list?page=2"><link rel="prev" href="/list?page=0">'
+        ),
+      },
+      [u('/list?page=0')]: {status: 404},
+    });
+    const result = await crawl(s, withChecks({env: {LHCI_SEO_CRAWL_MAX_PAGES: '1'}}));
+    const byUrl = checked(result);
+    expect(byUrl[u('/list?page=2')]).toMatchObject({status: 200});
+    expect(byUrl[u('/list?page=0')]).toMatchObject({status: 404});
+  });
+
   it('follows two checked links that redirect to the same place each to its end', async () => {
     const s = makeSite({
       [AUDITED]: {body: page('Home', linksTo(['/a', '/b']))},

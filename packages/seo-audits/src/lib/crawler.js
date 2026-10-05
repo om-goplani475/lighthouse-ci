@@ -737,7 +737,14 @@ async function checkAuditedLinks({
   /** @type {string[]} */
   const targets = [];
   const seen = new Set();
-  for (const raw of [...page.links.map(link => link.url), ...pageLinks]) {
+  // The page's rel=next/prev targets are not in its link list (a <link> in the head), but a broken one matters as much.
+  const pagination = page.pagination || {next: [], prev: []};
+  for (const raw of [
+    ...page.links.map(link => link.url),
+    ...pageLinks,
+    ...pagination.next,
+    ...pagination.prev,
+  ]) {
     const url = normalizeUrl(raw, audited);
     if (!url || seen.has(url) || known.has(url) || own.has(url)) continue;
     if (!sameOrigin(url, snapshot.origin)) continue;
