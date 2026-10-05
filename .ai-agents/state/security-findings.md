@@ -787,3 +787,12 @@ linking to every other: worst **246 ms**, output at most **6 KiB** (rows capped 
 
 No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 (item 0) remains open and accepted.
 
+## 2026-10-05 — pagination-audits (Phase 8 item 5, lightweight)
+
+No new request pattern: the audited page's `rel=next` / `rel=prev` targets join its own links in the existing status checks (same-origin only, robots.txt honoured, no body read, 100 at most,
+30 s budget; see the link-check-audits entry). The three audits read the crawl snapshot. Risks left are time and output size on a hostile snapshot (200 pages, each with 5 `next` and 5
+`prev` targets, 1,900-character URLs): `pagination-links` took **3.9 s** (a scan per lookup) and now takes **175 ms** after indexing pages by URL; the other two under 60 ms. Output at most 51 KiB
+(rows capped at 100, cells clipped to 200 characters). Page-controlled URLs appear in table cells only, never in a title, score or id.
+
+No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 (item 0) remains open and accepted.
+

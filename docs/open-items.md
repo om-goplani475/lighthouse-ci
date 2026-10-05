@@ -1,6 +1,6 @@
 # Open items after Phase 7
 
-Written 2026-10-02 at `main` = `28939f1` (Phases 1-7 merged, 46 audits in `seo-extended`); **updated 2026-10-05** for Phase 8 (in progress, branch `phase-8-internal-linking`; items 0 to 4 built). This is the one place that lists what is
+Written 2026-10-02 at `main` = `28939f1` (Phases 1-7 merged, 46 audits in `seo-extended`); **updated 2026-10-05** for Phase 8 (in progress, branch `phase-8-internal-linking`; items 0 to 5 built; only item 6, broken external links, is left). This is the one place that lists what is
 **deferred**, what is **not yet verified**, and the **tests and steps to close each open item**. The per-phase detail stays in
 `docs/phases/`, `docs/qa/` and `.ai-agents/state/`.
 
@@ -9,7 +9,7 @@ Written 2026-10-02 at `main` = `28939f1` (Phases 1-7 merged, 46 audits in `seo-e
 | Area | State |
 |------|-------|
 | Security findings (`.ai-agents/state/security-findings.md`) | **One open, low, accepted: Finding 10** (Phase 8: a hostile site with very long link URLs can make the crawl snapshot exceed the 16 MiB cache cap; see B1). Findings 1-9 are all fixed (8 on 2026-10-01, 9 on 2026-10-02). One risk is *accepted*, not fixed: `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control (the README says so). |
-| `seo-audits` tests | 79 suites / about 1,540 tests pass on the dev machine (Node 24), typecheck and lint clean (Phase 8 item 4 built, uncommitted at the time of writing). Last run on Node 18.20.8 (what CI pins) covered the Phase 7 crawler suites; the five Phase 7 audits and everything in Phase 8 were **not** run there (see A5). |
+| `seo-audits` tests | 80 suites / about 1,600 tests pass on the dev machine (Node 24), typecheck and lint clean (Phase 8 item 5 built, uncommitted at the time of writing). Last run on Node 18.20.8 (what CI pins) covered the Phase 7 crawler suites; the five Phase 7 audits and everything in Phase 8 were **not** run there (see A5). |
 | Failing suites outside `seo-audits` | 11 suites / 92 tests fail in `cli`, `server`, `viewer`, `utils`. Same families failed before Phase 4. Not caused by this work (see C). |
 | Not verified at all | Items A1-A5 below. You deferred A1-A3 until after Phase 7, so they are now due. |
 
@@ -110,6 +110,10 @@ notes). No action beyond A1.
 links that the crawl did not read (up to about 300 requests, up to 30 s). With `numberOfRuns` of 3 that repeats three times, because it is per run and not cached. In the real run, check
 how much time and how many requests that adds and whether the audited site's logs tolerate it. If not: `LHCI_SEO_CRAWL_MAX_LINK_CHECKS=25`, or `0` (the audits then judge only links to pages the
 crawl read and say how many targets they could not check). A possible follow-up, not built: cache the link checks per audited URL like the crawl.
+
+**B6. `pagination-trap` needs a deeper crawl to catch a next-only endless chain.** At the default depth (3) such a chain is reported as "too few to call it a trap". With
+`LHCI_SEO_CRAWL_MAX_DEPTH=5` the same series fails. Decide whether to raise the depth for sites with long listings (a longer crawl), or accept the limit. A site that shows many page
+numbers at once is caught at the default depth. A `rel=next` loop longer than 50 pages is also not detected.
 
 **B4. `orphan-pages` is usually not applicable with the default crawl limits.** It is only judged when the crawl saw the whole site (no page cap, depth bound or
 time budget cut it), so on a site of more than about 50 pages it says "not applicable" and names the limit. To use it on a bigger site, raise

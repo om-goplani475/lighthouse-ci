@@ -688,6 +688,18 @@ Lighthouse run** as the `SiteCrawl` gatherer; `lhci autorun` needs no extra step
   - `descriptive-anchor-text` fails when the audited page has an internal link whose anchor is **generic** ("click here", "read more", "here", "learn more", "this
     link", and similar, compared whole: "Read more about our returns policy" is fine) or **empty** (no text, no alt, no aria-label or title). Nofollow links count.
   Both read server HTML, so a page that looks script-built is not applicable.
+- **`pagination-links`**, **`paginated-canonical`** and **`pagination-trap`** (scored) read the `rel=next` / `rel=prev` links the crawl stores (a `<link>` in the head or an
+  `<a rel>` in the body). Each judges the audited page and lists other crawled pages, without failing on them; a page with no pagination links is not applicable. (Google no
+  longer uses `rel=next/prev`, but other search engines and tools do; these are consistency checks.)
+  - `pagination-links` fails when a `rel=next` or `rel=prev` target is **broken**, is **the page itself**, or **does not link back** (page 2's `next` is page 3, so page 3's `prev`
+    must be page 2), or when the `rel=next` chain **loops** (followed for up to 50 pages). A target that redirects is a note. The audited page's own targets are status-checked
+    even when the crawl did not read them (the same link checks as above); reciprocity is only checked for a target the crawl read.
+  - `paginated-canonical` fails when the page is part of a numbered series (joined by `rel=next` / `rel=prev` among the crawled pages) and its **canonical is another page of the
+    series**, page 1 included: that tells search engines the page is a duplicate and hides its items. A canonical to itself, none, or a page *outside* the series (a view-all page,
+    listed with a note) passes.
+  - `pagination-trap` fails when the audited page's path has **more than 5** numbered query-string variants known to the crawl (requested, left out by the crawler's limit of 5 variants
+    of a path, or only pointed at by a `rel=next`) and the series was **still going**. No extra request is made, so a long but finite series looks the same, and a chain that only
+    offers "next" is followed only as far as the crawl's depth reaches: it is usually reported as "too few to call it a trap" until you raise `LHCI_SEO_CRAWL_MAX_DEPTH` to 5.
 
 **Environment variables** (read per run, clamped; a page can never change them):
 
@@ -797,7 +809,7 @@ module.exports = {
 };
 ```
 
-This adds all fifty-five audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all fifty-eight audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
@@ -808,16 +820,16 @@ This adds all fifty-five audits (`structured-data-json-ld`, `structured-data-sch
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
 `sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`, `mixed-content`, `hsts-quality`,
 `ssl-certificate-expiry`, `soft-not-found`, `url-variant-consistency`, `redirect-chain-length`,
-`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, `anchor-text-diversity`, `descriptive-anchor-text`) on top of
+`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, `anchor-text-diversity`, `descriptive-anchor-text`, `pagination-links`, `paginated-canonical`, `pagination-trap`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the fifty-five audits are part of this fork's shared `all`/`recommended` presets
+None of the fifty-eight audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all fifty-five here are opt-in via `configPath`, so they can't be part of that
+default, and all fifty-eight here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js

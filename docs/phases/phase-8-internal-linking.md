@@ -6,7 +6,7 @@ not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
-**Status: in progress (2026-10-05).** Items 0 (the crawler extension), 1 and 2 (the link-graph audits) 3 (the internal link checks) and 4 (anchor text) are built and QA'd live; items 5 and 6 are next.
+**Status: in progress (2026-10-05).** Items 0 (the crawler extension), 1 and 2 (the link-graph audits) 3 (the internal link checks), 4 (anchor text) and 5 (pagination) are built and QA'd live; item 6 (broken external links) is the last.
 
 ## Planning decisions (2026-10-05)
 
@@ -37,7 +37,7 @@ files are simply ignored).
 | 2 | Orphan page detection and crawl depth from the homepage | **done** | `orphan-pages` (not applicable unless the crawl saw the whole site) and `crawl-depth` (more than 3 clicks from the homepage). Same feature as item 1. QA'd live. |
 | 3 | Broken internal links (404/500), and the Phase 5 deferred checks: links that redirect, redirect chains and loops on internal links | **done** | three audits, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, lib `crawl-link-checks.js`; every crawled page's links judged, plus up to 100 status-only checks of the audited page's own unread links (`linkChecks` on the crawl artifact). Lightweight after a design conversation. QA'd live. |
 | 4 | Anchor-text diversity / over-optimisation signal | **done** | `anchor-text-diversity` (60% of at least 5 editorial links, site-wide navigation excluded) and `descriptive-anchor-text` (generic or empty anchors, added at the developer's choice beyond the roadmap row); lib `crawl-anchors.js`. Lightweight after a design conversation. QA'd live. |
-| 5 | Pagination (`rel=next/prev`, view-all pattern) and infinite-pagination trap detection | planned | |
+| 5 | Pagination (`rel=next/prev`, view-all pattern) and infinite-pagination trap detection | **done** | `pagination-links`, `paginated-canonical` (a canonical outside the series, a view-all page, passes with a note) and `pagination-trap` (evidence from the crawl, no extra request); lib `crawl-pagination.js`. Lightweight after a design conversation. QA'd live. |
 | 6 | Broken external links | planned | new outbound surface: own security design, on by default but bounded |
 
 Build order: 0 first (everything reads it), then 1 and 2 together, 3, 4, 5, and 6 last.
@@ -75,6 +75,12 @@ Build order: 0 first (everything reads it), then 1 and 2 together, 3, 4, 5, and 
   called empty. This changes stored anchors for an already-cached version 2 snapshot (cache lifetime 10 minutes), which is harmless.
 - **Found in live QA of item 4**: the first rule for "site-wide navigation" (a link on at least half the pages) wrongly exempted an anchor repeated on half the
   site, which is the very pattern the audit is for; navigation is now a link on at least 80% of the crawled pages (with a regression test).
+- **Item 5 widened the audited page's status checks** to its `rel=next` / `rel=prev` targets (they are `<link>` elements, not in its link list).
+- **The trap rule had to be widened while building** (live QA): the crawl follows 3 hops, so a chain that only offers "next" never reached the 6 variants the first rule needed and an
+  endless series passed. Variants only *pointed at* by a `rel=next` now count too, and the trap needs more than 5 known variants and a series still going; at the default depth a
+  next-only chain is reported as "too few to call it a trap", and with `LHCI_SEO_CRAWL_MAX_DEPTH=5` the same site fails. A limit of the rule the developer chose (evidence only, no extra
+  requests), stated in the README.
+- **A performance fix found by the hostile timing run**: 3.9 s for `pagination-links` on 200 pages with 1,900-character URLs (a scan per lookup); pages are now indexed by URL once: 175 ms.
 - **Item 0 was first set up for the full 9-stage pipeline, then switched to lightweight** (2026-10-05) after the developer asked why: it extends
   existing code rather than adding a new capability, so `build-mode-selection.md` points to lightweight. Items 1 to 5 are lightweight; item 6
   (external links, a new outbound surface) gets a short design conversation and a careful security review, not the full pipeline.

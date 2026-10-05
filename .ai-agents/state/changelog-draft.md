@@ -546,5 +546,18 @@ Two new scored audits (55 in the fork) that read the anchor text the crawl store
 An icon link with an `aria-label` or `title`, or an image with alt text, is no longer called empty. Add the audits you want to your `assertions` yourself, e.g. `'descriptive-anchor-text': ['warn',
 {minScore: 1}]`; none is in the shared presets. **Security**: no new finding. No `.lighthouserc.js` migration.
 
+## 2026-10-05 — Phase 8 item 5: pagination audits
+
+Three new scored audits (58 in the fork) that read the `rel=next` / `rel=prev` links the crawl stores. Each judges the audited page and lists other crawled pages without failing on them;
+a page with no pagination links is not applicable.
+
+- **`pagination-links`**: fails when a `rel=next` or `rel=prev` target is broken, is the page itself, or does not link back, or the `rel=next` chain loops. The audited page's own targets are
+  status-checked even when the crawl did not read them.
+- **`paginated-canonical`**: fails when a paginated page's canonical is another page of its series (page 1 included). A canonical outside the series (a view-all page) passes with a note.
+- **`pagination-trap`**: fails when the page's path has more than 5 numbered query-string variants known to the crawl and the series was still going. It uses only what the crawl saw: a
+  chain that only offers "next" is followed as far as `LHCI_SEO_CRAWL_MAX_DEPTH` reaches (3 by default), so raise it to 5 to catch those, and a long but finite series looks the same.
+
+Add the ones you want to your `assertions` yourself; none is in the shared presets. **Security**: no new finding. No `.lighthouserc.js` migration.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->
