@@ -95,6 +95,9 @@ const config = {
     './audits/internal-link-counts.js',
     './audits/orphan-pages.js',
     './audits/crawl-depth.js',
+    './audits/broken-internal-links.js',
+    './audits/redirecting-internal-links.js',
+    './audits/internal-redirect-chains.js',
   ],
   categories: {
     'seo-extended': {
@@ -150,6 +153,9 @@ const config = {
         {id: 'internal-link-counts', weight: 1},
         {id: 'orphan-pages', weight: 1},
         {id: 'crawl-depth', weight: 1},
+        {id: 'broken-internal-links', weight: 1},
+        {id: 'redirecting-internal-links', weight: 1},
+        {id: 'internal-redirect-chains', weight: 1},
       ],
     },
   },

@@ -62,7 +62,7 @@ describe('seo-audits lighthouse-config', () => {
     expect(artifactIds).toContain('IndexabilitySignals');
     expect(artifactIds).toContain('SiteCrawl');
 
-    // And all fifty of this fork's audits are actually added, not just defaults preserved.
+    // And all fifty-three of this fork's audits are actually added, not just defaults preserved.
     expect(auditIds).toContain('structured-data-json-ld');
     expect(auditIds).toContain('structured-data-schema-properties');
     expect(auditIds).toContain('structured-data-rich-result-eligibility');
@@ -113,6 +113,9 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('internal-link-counts');
     expect(auditIds).toContain('orphan-pages');
     expect(auditIds).toContain('crawl-depth');
+    expect(auditIds).toContain('broken-internal-links');
+    expect(auditIds).toContain('redirecting-internal-links');
+    expect(auditIds).toContain('internal-redirect-chains');
   }, 30000);
 
   it('has no audit id with a hyphen followed by a digit', async () => {
@@ -124,11 +127,12 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds.filter(id => /-\d/.test(id))).toEqual([]);
   }, 30000);
 
-  it('adds the seo-extended category with all fifty audits, without touching the core seo category', async () => {
+  it('adds the seo-extended category with all fifty-three audits, without touching the core seo category', async () => {
     const {categories} = await resolveConfig();
 
     expect(categories['seo-extended']).toBeDefined();
     expect(categories['seo-extended'].auditRefs.map(ref => ref.id).sort()).toEqual([
+      'broken-internal-links',
       'canonical-conflicts',
       'canonical-https',
       'crawl-coverage',
@@ -146,6 +150,7 @@ describe('seo-audits lighthouse-config', () => {
       'indexability-conflicts',
       'indexability-verdict',
       'internal-link-counts',
+      'internal-redirect-chains',
       'llms-txt-structure',
       'manifest-icons',
       'meta-description-identical-to-title',
@@ -157,6 +162,7 @@ describe('seo-audits lighthouse-config', () => {
       'pixel-width-truncation',
       'redirect-chain-length',
       'redirect-loop',
+      'redirecting-internal-links',
       'robots-directives-conflict',
       'robots-directives-report',
       'robots-txt-crawler-access',
