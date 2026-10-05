@@ -100,6 +100,9 @@ const config = {
     './audits/internal-redirect-chains.js',
     './audits/anchor-text-diversity.js',
     './audits/descriptive-anchor-text.js',
+    './audits/pagination-links.js',
+    './audits/paginated-canonical.js',
+    './audits/pagination-trap.js',
   ],
   categories: {
     'seo-extended': {
@@ -160,6 +163,9 @@ const config = {
         {id: 'internal-redirect-chains', weight: 1},
         {id: 'anchor-text-diversity', weight: 1},
         {id: 'descriptive-anchor-text', weight: 1},
+        {id: 'pagination-links', weight: 1},
+        {id: 'paginated-canonical', weight: 1},
+        {id: 'pagination-trap', weight: 1},
       ],
     },
   },
