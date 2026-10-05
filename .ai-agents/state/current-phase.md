@@ -7,11 +7,6 @@
 
 <!-- Phase 8 (internal linking & site graph) closed 2026-10-05: all seven items done (crawler to depth 3, link-graph, link-check, anchor-text, pagination and external-link audits), ff-merged into main, branch phase-8-internal-linking deleted. See docs/phases/phase-8-internal-linking.md. -->
 
-- phase: 8 (internal linking & site graph)
-- branch: phase-8-internal-linking
-- roadmap: docs/phases/phase-8-internal-linking.md
-- status: in-progress
-
 <!-- Phase 7 (duplicate & consistency detection) closed 2026-10-02: the crawler core and four audits done, ff-merged into main (28939f1), branch phase-7-duplicates deleted. See docs/phases/phase-7-duplicates.md. -->
 
 <!-- Phase 1 (page-metadata) closed 2026-09-30: every item (0-6) done or closed-no-build-needed,
