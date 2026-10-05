@@ -1263,11 +1263,35 @@ describe('crawlSite: the cache', () => {
     const snap = cachedSnapshot([cachedPage(AUDITED), cachedPage(u('/a'))]);
     const cache = fakeCache(snap);
     const result = await crawl(site, {cache, fetchBytes, collectSitemap: sitemap});
-    expect(result).toMatchObject({state: 'cached', snapshot: snap});
+    expect(result.state).toBe('cached');
+    expect(result.snapshot.pages.map((/** @type {any} */ p) => p.url)).toEqual([AUDITED, u('/a')]);
     expect(site.requests).toEqual([]);
     expect(fetchBytes).not.toHaveBeenCalled();
     expect(sitemap).not.toHaveBeenCalled();
     expect(cache.write).not.toHaveBeenCalled();
+  });
+
+  it('moves the audited label to the page of this run when another URL made the snapshot', async () => {
+    const site = makeSite({});
+    const old = {...cachedPage(u('/old')), source: 'audited'};
+    const snap = cachedSnapshot([old, cachedPage(AUDITED), cachedPage(u('/a'))]);
+    const result = await crawl(site, {cache: fakeCache(snap)});
+    expect(site.requests).toEqual([]);
+    const labels = result.snapshot.pages.map((/** @type {any} */ p) => [p.url, p.source]);
+    expect(labels).toEqual([
+      [u('/old'), 'link'],
+      [AUDITED, 'audited'],
+      [u('/a'), 'link'],
+    ]);
+    expect(snap.pages[0].source).toBe('audited'); // the cached object is not modified
+  });
+
+  it('keeps one audited page when the new one is added to a snapshot made for another URL', async () => {
+    const site = makeSite({[u('/other')]: {body: page('Other', '<p>other page</p>')}});
+    const snap = cachedSnapshot([{...cachedPage(AUDITED), source: 'audited'}]);
+    const result = await crawl(site, {auditedUrl: u('/other'), cache: fakeCache(snap)});
+    const audited = result.snapshot.pages.filter((/** @type {any} */ p) => p.source === 'audited');
+    expect(audited.map((/** @type {any} */ p) => p.url)).toEqual([u('/other')]);
   });
 
   it('asks the cache for the key of this origin and these bounds, with the TTL', async () => {

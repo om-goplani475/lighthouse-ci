@@ -1046,6 +1046,31 @@ async function crawlSnapshot(rawInput) {
 }
 
 /**
+ * A cached snapshot was labelled for the URL that made it. Another URL of the same collect reuses it, so
+ * the audits that read the page marked `audited` would judge the wrong page: move the label to the page
+ * for this run's URL (or, with null, remove it because the page is being added).
+ * @param {CrawlPage[]} pages
+ * @param {string | null} audited
+ * @return {CrawlPage[]}
+ */
+function labelAudited(pages, audited) {
+  const index =
+    audited === null ? -1 : pages.findIndex(p => p.url === audited || p.finalUrl === audited);
+  return pages.map((page, i) => {
+    if (i === index) return page.source === 'audited' ? page : {...page, source: 'audited'};
+    if (page.source !== 'audited') return page;
+    let home = false;
+    try {
+      const url = new URL(page.finalUrl || page.url);
+      home = url.pathname === '/' && url.search === '';
+    } catch {
+      // keep it a link
+    }
+    return {...page, source: home ? 'home' : 'link'};
+  });
+}
+
+/**
  * A cache hit that does not contain the audited page (another URL of the same collect) gets that one page
  * requested and added, so every audit can rely on the audited page being present.
  * @param {{
@@ -1057,7 +1082,12 @@ async function crawlSnapshot(rawInput) {
  */
 async function topUpCached({cached, audited, origin, fetchPage, now, artifact}) {
   const has = cached.pages.some(page => page.url === audited || page.finalUrl === audited);
-  if (has) return artifact({state: 'cached', snapshot: cached});
+  if (has) {
+    return artifact({
+      state: 'cached',
+      snapshot: {...cached, pages: labelAudited(cached.pages, audited)},
+    });
+  }
 
   const skips = createSkips();
   const fetched = await fetchPages({
@@ -1073,7 +1103,7 @@ async function topUpCached({cached, audited, origin, fetchPage, now, artifact}) 
   });
   const snapshot = {
     ...cached,
-    pages: [...fetched.pages, ...cached.pages],
+    pages: [...fetched.pages, ...labelAudited(cached.pages, null)],
     stats: {...cached.stats, requests: cached.stats.requests + fetched.requests},
   };
   return artifact({state: 'cached', snapshot});
