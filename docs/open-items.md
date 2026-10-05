@@ -9,9 +9,9 @@ Written 2026-10-02 at `main` = `28939f1` (Phases 1-7 merged, 46 audits in `seo-e
 | Area | State |
 |------|-------|
 | Security findings (`.ai-agents/state/security-findings.md`) | **One open, low, accepted: Finding 10** (Phase 8: a hostile site with very long link URLs can make the crawl snapshot exceed the 16 MiB cache cap; see B1). Findings 1-9 are all fixed (8 on 2026-10-01, 9 on 2026-10-02). One risk is *accepted*, not fixed: `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control (the README says so). |
-| `seo-audits` tests | 82 suites / 1,670 tests pass on the dev machine (Node 24), typecheck and lint clean (Phase 8 complete). Last run on Node 18.20.8 (what CI pins) covered the Phase 7 crawler suites; the five Phase 7 audits and everything in Phase 8 were **not** run there (see A5). |
+| `seo-audits` tests | 82 suites / 1,670 tests pass on the dev machine (Node 24), typecheck and lint clean (Phase 8 complete). Also run on Node 18.20.8 (what CI pins) on 2026-10-05: all 82 suites / 1,670 tests pass (A5 done). |
 | Failing suites outside `seo-audits` | 9 suites / 84 tests fail in `cli`, `server`, `viewer`, `utils` (11 / 92 after Phase 7: a few fail only intermittently under load). Same families failed before Phase 4. Not caused by this work (see C). |
-| Not verified at all | Items A1-A5 below. You deferred A1-A3 until after Phase 7, so they are now due. |
+| Not verified at all | Items A1-A3 below (A4 and A5 passed on 2026-10-05). You deferred A1-A3 until after Phase 7, so they are now due. |
 
 ## 2. Checks still to do (these close the "Not verified" lines)
 
@@ -67,23 +67,27 @@ two-Lighthouse-copies problem.
    - **Node 18**: the workflow pins Node 18 (`.github/workflows/ci.yml`). The job must be green there, not only on Node 24.
 6. **Pass when** the run is green, the report shows the fork's audits and each crawled page was requested once.
 
-### A4. Look up `htmlparser2@6.1.0` in a vulnerability database
+### A4. Look up `htmlparser2@6.1.0` in a vulnerability database  (DONE 2026-10-05, passed)
+
+**Result:** `yarn audit --groups dependencies` reports no advisory for `htmlparser2` (only 6.1.0 is installed), `saxes`, `parse5`, `robots-parser` or their sub-dependencies (`domhandler`, `domutils`, `entities`, `domelementtype`). The 156 advisories it does report (4 critical: `sequelize` under `@lhci/server`, `basic-ftp` under `lighthouse`/`puppeteer-core` and `@lhci/cli` proxy-agent) are upstream packages the fork does not touch and the crawler does not use. Worth knowing, not part of this check.
 
 I could not do this from the session (no lookup available). Run `yarn audit --groups dependencies` (or `npm audit`) and check
 `htmlparser2` and its dependencies. The exposure is already bounded (512 KiB body cap, measured 53 ms worst case, extraction only), so
 a finding here would most likely be informational. **Pass when** nothing high or critical is reported for the packages the crawler uses
 (`htmlparser2`, `saxes`, `parse5`, `robots-parser`); anything else goes into `security-findings.md`.
 
-### A5. Re-run the Phase 7 and Phase 8 suites under Node 18.20.8
+### A5. Re-run the Phase 7 and Phase 8 suites under Node 18.20.8  (DONE 2026-10-05, passed)
+
+**Result:** `jest packages/seo-audits` under Node v18.20.8: 82 suites / 1,670 tests pass, including `closeAllConnections()` and the crawler integration test. (Typecheck and lint are Node-independent and were not re-run.)
 
 CI pins Node 18. The Phase 5, Phase 6 and Phase 7 crawler suites were run there; the five Phase 7 audits, the `safeFetchBytes` change and all of
 Phase 8 (so far the crawler extension) were not. `nvm use 18 && npx jest packages/seo-audits`. **Pass when** all 75 suites pass. The risky spots are
 `server.closeAllConnections()` (Node 18.2+) and the crawler's integration test, which waits for a real 10 s budget.
 
-### A6. Spot-check the five new audits on a few real sites (optional)
+### A6. Spot-check the new audits (Phases 7 and 9) on a few real sites (optional)
 
 They were run against planted local pages only. Run `lhci collect` with the fork config on two or three real sites and read the
-tables once. Look for false positives: a script-built site that is wrongly judged thin or duplicate (it should say "not applicable"),
+tables once. Also look at the Phase 9 URL audits (`url-length` at 115 characters on long-slug blogs; `url-normalization` groups). Look for false positives: a script-built site that is wrongly judged thin or duplicate (it should say "not applicable"),
 or a site that serves bots a different page. Anything wrong is a `fix(seo-audits)` commit with a test.
 
 ### B. Opened by Phase 8 (updated as the phase proceeds)
