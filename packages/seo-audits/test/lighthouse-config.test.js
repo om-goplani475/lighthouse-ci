@@ -122,6 +122,10 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('paginated-canonical');
     expect(auditIds).toContain('pagination-trap');
     expect(auditIds).toContain('broken-external-links');
+    expect(auditIds).toContain('ai-crawler-summary');
+    expect(auditIds).toContain('answer-structure');
+    expect(auditIds).toContain('author-entity-signals');
+    expect(auditIds).toContain('amp-check');
     expect(auditIds).toContain('placeholder-content');
     expect(auditIds).toContain('content-dates');
     expect(auditIds).toContain('readability-score');
@@ -174,7 +178,11 @@ describe('seo-audits lighthouse-config', () => {
 
     expect(categories['seo-extended']).toBeDefined();
     expect(categories['seo-extended'].auditRefs.map(ref => ref.id).sort()).toEqual([
+      'ai-crawler-summary',
+      'amp-check',
       'anchor-text-diversity',
+      'answer-structure',
+      'author-entity-signals',
       'broken-external-links',
       'broken-images',
       'broken-internal-links',
