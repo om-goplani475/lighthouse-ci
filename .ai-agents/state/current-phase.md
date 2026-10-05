@@ -5,6 +5,8 @@
 - roadmap: docs/master-roadmap.md (no next phase fixed: see its "What is genuinely remaining") and docs/open-items.md (the verification checks still to do)
 - status: idle
 
+<!-- Phase 15 (AI search reports) closed 2026-10-05: four informational audits and two gatherers, ff-merged into main. See docs/phases/phase-15-ai-search.md. -->
+
 <!-- Phase 14 (content quality) closed 2026-10-05: five audits and one gatherer, ff-merged into main. See docs/phases/phase-14-content-quality.md. -->
 
 <!-- Phase 13 (performance and field data) closed 2026-10-05: three audits and one gatherer, ff-merged into main. See docs/phases/phase-13-performance.md. -->

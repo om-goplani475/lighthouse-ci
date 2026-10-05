@@ -904,3 +904,18 @@ One new gatherer (`PageContent`, in the page's isolated context) and five audits
 
 No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 remains open and accepted.
 
+## 2026-10-05 — ai-search-audits (Phase 15, lightweight)
+
+Two new gatherers and four informational audits. One new request: **`amp-check` requests the AMP version a page links to, once**, with the same policy as the hreflang requests.
+
+- **SSRF.** The AMP URL is chosen by the page. It is requested through `checkAlternates` (Phase 11): on the page's own origin through the normal safe fetch, on any other host through the strict public-only fetch, which refuses private and reserved addresses whatever `LHCI_SEO_ALLOW_PRIVATE_NETWORK` says. No redirect is followed. At most one request, the first 128 KiB, about 5 s, the crawler's user-agent, no cookies. `LHCI_SEO_AMP_CHECK=0` switches it off (tested: no request made).
+- **Everything else reads data already collected**: robots.txt (the existing artifact, parsed with the existing parsers), the page's structure (counts and short strings from the live DOM: at most 80 headings, 30 question headings, texts clipped to 120 to 160 characters), JSON-LD (parsed with `JSON.parse` and the typed-entity helper, at most 20 blocks), the head's meta and link elements.
+- **Page-controlled output.** Names, headings and URLs appear in table cells only, clipped (30 to 100 characters), at most 40 to 50 rows. `sameAs` values are tested with a bounded pattern (`^https?://[^\s/]+`, anchored, no nested quantifiers).
+- **Report integrity.** Nothing fails or scores; "blocked" in the crawler summary is a statement about robots.txt only and carries a note that blocking is legitimate.
+
+### Not verified
+
+- The cross-origin private-address refusal for an AMP link specifically (the shared fetch policy was proven in Phase 11).
+
+No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 remains open and accepted.
+
