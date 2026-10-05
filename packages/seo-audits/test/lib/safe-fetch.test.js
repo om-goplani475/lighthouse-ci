@@ -10,6 +10,8 @@ const http = require('http');
 const {
   isPrivateOrReservedIp,
   safeLookup,
+  publicOnlyLookup,
+  safeFetchPublicPrefix,
   safeFetchJson,
   safeFetchStatus,
   safeFetchBytes,
@@ -1149,5 +1151,99 @@ describe('fetchBytesWithLookup and safeFetchBytes: the userAgent option', () => 
       ).rejects.toThrow(/userAgent must be/);
       expect(requests).toEqual([]);
     });
+  });
+});
+
+describe('safeFetchPublicPrefix and publicOnlyLookup: other people’s sites never reach a private address', () => {
+  /** @type {http.Server} */
+  let server;
+  let port = 0;
+  /** @type {string[]} */
+  let requests = [];
+  const original = process.env[ALLOW_PRIVATE_NETWORK_ENV];
+
+  beforeEach(async () => {
+    requests = [];
+    server = http.createServer((req, res) => {
+      requests.push(req.url || '');
+      res.writeHead(200, {'Content-Type': 'text/html'});
+      res.end('<html></html>');
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    port = /** @type {any} */ (server.address()).port;
+    // The opt-in for auditing your own site is ON: it must make no difference here.
+    process.env[ALLOW_PRIVATE_NETWORK_ENV] = '1';
+  });
+  afterEach(async () => {
+    if (original === undefined) delete process.env[ALLOW_PRIVATE_NETWORK_ENV];
+    else process.env[ALLOW_PRIVATE_NETWORK_ENV] = original;
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  });
+
+  it.each([
+    ['loopback', '127.0.0.1'],
+    ['a private 10.x address', '10.0.0.5'],
+    ['a private 192.168.x address', '192.168.1.1'],
+    ['a private 172.16.x address', '172.16.0.9'],
+    ['the cloud metadata address', '169.254.169.254'],
+    ['IPv6 loopback', '[::1]'],
+    ['an IPv4-mapped loopback', '[::ffff:127.0.0.1]'],
+    ['an IPv6 unique-local address', '[fd00::1]'],
+    ['0.0.0.0', '0.0.0.0'],
+  ])(
+    'refuses %s even with the private-network opt-in on, without connecting',
+    async (_name, host) => {
+      await expect(safeFetchPublicPrefix(`http://${host}:${port}/x`)).rejects.toThrow(
+        /private\/reserved/
+      );
+      expect(requests).toEqual([]);
+    }
+  );
+
+  it('does not suggest the opt-in in its refusal', async () => {
+    await expect(safeFetchPublicPrefix(`http://127.0.0.1:${port}/`)).rejects.not.toThrow(
+      /LHCI_SEO_ALLOW/
+    );
+  });
+
+  it('refuses a host name that resolves to a private address, even with the opt-in on', async () => {
+    // `localhost` resolves to loopback: allowed for the audited site by the opt-in, never for another site.
+    await expect(safeFetchPublicPrefix(`http://localhost:${port}/x`)).rejects.toThrow(
+      /private\/reserved/
+    );
+    expect(requests).toEqual([]);
+  });
+
+  it('is stricter than the audited-site fetch, which the same opt-in does allow', async () => {
+    const result = await safeFetchPrefix(`http://127.0.0.1:${port}/ok`);
+    expect(result.status).toBe(200);
+    expect(requests).toEqual(['/ok']);
+  });
+
+  it('rejects an invalid user-agent before any lookup or connection', async () => {
+    await expect(
+      safeFetchPublicPrefix('https://example.org/', {userAgent: 'bad\r\nHost: evil'})
+    ).rejects.toThrow(/userAgent must be/);
+  });
+
+  it('lets a public literal address through its lookup and still blocks private ones, in both reply shapes', async () => {
+    /** @param {string} host @param {boolean} all */
+    const resolve = (host, all) =>
+      new Promise(done => {
+        publicOnlyLookup(host, {all}, (/** @type {any} */ err, /** @type {any} */ address) =>
+          done({err, address})
+        );
+      });
+    const pub = /** @type {any} */ (await resolve('93.184.216.34', true));
+    expect(pub.err).toBeNull();
+    expect(pub.address).toEqual([{address: '93.184.216.34', family: 4}]);
+    const single = /** @type {any} */ (await resolve('93.184.216.34', false));
+    expect(single.address).toBe('93.184.216.34');
+    for (const host of ['127.0.0.1', '10.1.2.3', '169.254.169.254', '::1', 'fd12::1']) {
+      const refused = /** @type {any} */ (await resolve(host, true));
+      expect(refused.err).toBeInstanceOf(Error);
+      expect(String(refused.err.message)).toMatch(/private\/reserved/);
+    }
   });
 });

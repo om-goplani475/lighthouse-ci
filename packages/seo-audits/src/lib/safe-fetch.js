@@ -267,62 +267,73 @@ function literalIpOf(url) {
  * this broke `safeFetchStatus` against a real external URL during live QA for
  * `open-graph-image-reachable`, and would equally have broken `safeFetchJson`/`manifest-icons`
  * for any manifest on a normal domain — this was a real latent bug, not just a new one).
- * @param {string} hostname
- * @param {{all?: boolean}} options
- * @param {(err: Error | null, address?: string | Array<{address: string, family: number}>, family?: number) => void} callback
+ * Built by `createSafeLookup` so there is one implementation: `safeLookup` (the private-network opt-in applies) and
+ * `publicOnlyLookup` (it never does, used for links to other sites).
+ * @param {(ip: string) => boolean} isBlocked The one decision about an address.
+ * @param {(ip: string) => string} hint Text appended to a refusal.
+ * @return {(hostname: string, options: {all?: boolean}, callback: (err: Error | null, address?: string | Array<{address: string, family: number}>, family?: number) => void) => void}
  */
-function safeLookup(hostname, options, callback) {
-  const wantsAll = Boolean(options && options.all);
+function createSafeLookup(isBlocked, hint) {
+  return function lookup(hostname, options, callback) {
+    const wantsAll = Boolean(options && options.all);
 
-  // IPv4/IPv6 literal hostnames skip DNS resolution entirely in Node's dns.lookup — handle them
-  // directly so a literal private IP in the URL can't bypass this check.
-  if (net.isIP(hostname)) {
-    if (isBlockedAddress(hostname)) {
-      callback(
-        new Error(
-          `refusing to connect to "${hostname}": a private/reserved IP address.${optInHint(
-            hostname
-          )}`
-        )
-      );
+    // IPv4/IPv6 literal hostnames skip DNS resolution entirely in Node's dns.lookup — handle them
+    // directly so a literal private IP in the URL can't bypass this check.
+    if (net.isIP(hostname)) {
+      if (isBlocked(hostname)) {
+        callback(
+          new Error(
+            `refusing to connect to "${hostname}": a private/reserved IP address.${hint(hostname)}`
+          )
+        );
+        return;
+      }
+      const family = net.isIPv6(hostname) ? 6 : 4;
+      if (wantsAll) {
+        callback(null, [{address: hostname, family}]);
+      } else {
+        callback(null, hostname, family);
+      }
       return;
     }
-    const family = net.isIPv6(hostname) ? 6 : 4;
-    if (wantsAll) {
-      callback(null, [{address: hostname, family}]);
-    } else {
-      callback(null, hostname, family);
-    }
-    return;
-  }
 
-  dns.lookup(hostname, {all: true, verbatim: true}, (err, addresses) => {
-    if (err) {
-      callback(err);
-      return;
-    }
-    const blocked = addresses.find(a => isBlockedAddress(a.address));
-    if (blocked) {
-      callback(
-        new Error(
-          `refusing to connect to "${hostname}": resolves to a private/reserved address ` +
-            `(${blocked.address}).${optInHint(blocked.address)}`
-        )
-      );
-      return;
-    }
-    if (addresses.length === 0) {
-      callback(new Error(`"${hostname}" did not resolve to any address`));
-      return;
-    }
-    if (wantsAll) {
-      callback(null, addresses);
-      return;
-    }
-    const {address, family} = addresses[0];
-    callback(null, address, family);
-  });
+    dns.lookup(hostname, {all: true, verbatim: true}, (err, addresses) => {
+      if (err) {
+        callback(err);
+        return;
+      }
+      const blocked = addresses.find(a => isBlocked(a.address));
+      if (blocked) {
+        callback(
+          new Error(
+            `refusing to connect to "${hostname}": resolves to a private/reserved address ` +
+              `(${blocked.address}).${hint(blocked.address)}`
+          )
+        );
+        return;
+      }
+      if (addresses.length === 0) {
+        callback(new Error(`"${hostname}" did not resolve to any address`));
+        return;
+      }
+      if (wantsAll) {
+        callback(null, addresses);
+        return;
+      }
+      const {address, family} = addresses[0];
+      callback(null, address, family);
+    });
+  };
 }
+
+const safeLookup = createSafeLookup(isBlockedAddress, optInHint);
+
+/**
+ * Like `safeLookup` but refusing every private or reserved address whatever the environment says: for requests to
+ * other people's sites, which must never be steerable at a private address (not even with the private-network
+ * opt-in on, which is for the audited site only).
+ */
+const publicOnlyLookup = createSafeLookup(isPrivateOrReservedIp, () => '');
 
 /**
  * The actual request mechanics (timeout, size cap, JSON parsing), parameterized by which `lookup`
@@ -899,16 +910,43 @@ function safeFetchPrefix(urlString, options) {
   return fetchPrefixWithLookup(urlString, safeLookup, options);
 }
 
+/**
+ * `safeFetchPrefix` for a URL on someone else's site (a link from the audited page): the same protections (scheme
+ * allowlist, no redirects followed, a total deadline, a byte cap, a validated user-agent), but a private or
+ * reserved address is refused **whatever the environment says**: the private-network opt-in is for auditing your
+ * own site and must never let a page steer a request at loopback, a private network or a metadata address.
+ * @param {string} urlString
+ * @param {{timeoutMs?: number, maxBytes?: number, userAgent?: string}} [options]
+ * @return {Promise<PrefixResult>}
+ */
+function safeFetchPublicPrefix(urlString, options) {
+  let url;
+  try {
+    url = new URL(urlString);
+  } catch {
+    return Promise.reject(new Error(`"${urlString}" is not a valid URL`));
+  }
+  const literalIp = literalIpOf(url);
+  if (literalIp && isPrivateOrReservedIp(literalIp)) {
+    return Promise.reject(
+      new Error(`refusing to fetch "${urlString}": a private/reserved IP address (${literalIp}).`)
+    );
+  }
+  return fetchPrefixWithLookup(urlString, publicOnlyLookup, options);
+}
+
 export {
   ALLOW_PRIVATE_NETWORK_ENV,
   isBlockedAddress,
   isPermittedPrivateAddress,
   safeFetchBytes,
   safeFetchPrefix,
+  safeFetchPublicPrefix,
   safeFetchJson,
   safeFetchStatus,
   isPrivateOrReservedIp,
   safeLookup,
+  publicOnlyLookup,
   fetchJsonWithLookup,
   statusWithLookup,
   fetchBytesWithLookup,
