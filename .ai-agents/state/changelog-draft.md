@@ -576,3 +576,10 @@ shared presets. No `.lighthouserc.js` migration; one new environment variable.
 
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->
+
+## 2026-10-05 — url-quality-audits (Phase 9)
+
+Seven new audits in `seo-extended`: `url-length` (over 115 characters of path and query), `url-query-parameters` (over 3), `url-session-tracking` (a session ID fails; tracking parameters are a note), `url-encoding` (repeated slashes, broken or double percent-encoding), and `url-case-variants`, `url-trailing-slash-variants` and `url-normalization` (the crawl holds two live URLs that are one page, with no single canonical). The first four also work with the crawl switched off. No new request, no new environment variable, no `.lighthouserc.js` migration; add the audits to your `assertions` yourself.
+
+**Bug fix that affects Phases 7 and 8**: when one `lhci collect` audited several URLs of the same origin, the later URLs reused the first URL's cached crawl and the cross-page audits (duplicate titles, thin content, link counts, anchor text and the rest) could judge the *first* page instead of the one being audited. They now judge the right page.
+

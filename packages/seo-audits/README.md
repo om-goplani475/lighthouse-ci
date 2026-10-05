@@ -709,6 +709,17 @@ Lighthouse run** as the `SiteCrawl` gatherer; `lhci autorun` needs no extra step
   and is counted as such. A 5xx, a timeout, a reset or a TLS error is **listed but never fails** (other sites have bad moments); a 401, 403, 429, 999 or other 4xx is **not judged**
   (many sites block link checkers). Only the audited page's own external links (the first 20 the extractor keeps) are judged, from server HTML.
 
+#### URL quality audits
+
+Seven audits that read URLs, with no new request (they use the audited URL and the snapshot the crawl already holds). The first four judge the audited page's own URL and list other crawled URLs without failing on them; they also work when the crawl is switched off. The last three read the crawl, so they see only variants a crawled page links to or the sitemap lists.
+
+- **`url-length`** (scored) fails when the audited URL has more than **115** characters of path and query.
+- **`url-query-parameters`** (scored) fails when it has more than **3** query parameters.
+- **`url-session-tracking`** (scored) fails on a **session ID** (`PHPSESSID`, `jsessionid`, `;jsessionid=` in the path, a long `sid` or `session` value and similar). Tracking parameters (`utm_*`, `gclid`, `fbclid` and similar) are shown as a note and never fail.
+- **`url-encoding`** (scored) fails on repeated slashes (`//`) in the path, a `%` that is not valid percent-encoding, or double encoding (`%25xx`).
+- **`url-case-variants`** and **`url-trailing-slash-variants`** (scored) fail when the audited page and another crawled URL differ **only** in letter case (or only by a trailing slash), **both answered 200 as HTML**, and their canonicals do not all name one URL. A variant that redirects is one page to the crawl, so it is not reported.
+- **`url-normalization`** (scored) is the general form: the same resource in another form (case, trailing slash, repeated slashes, an index file name, tracking or session parameters, parameter order). It includes what the two audits above report. Other groups are listed, not judged.
+
 **Environment variables** (read per run, clamped; a page can never change them):
 
 | Variable | Default | Effect |
@@ -829,7 +840,7 @@ This adds all fifty-nine audits (`structured-data-json-ld`, `structured-data-sch
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
 `sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`, `mixed-content`, `hsts-quality`,
 `ssl-certificate-expiry`, `soft-not-found`, `url-variant-consistency`, `redirect-chain-length`,
-`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, `anchor-text-diversity`, `descriptive-anchor-text`, `pagination-links`, `paginated-canonical`, `pagination-trap`, `broken-external-links`) on top of
+`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, `anchor-text-diversity`, `descriptive-anchor-text`, `pagination-links`, `paginated-canonical`, `pagination-trap`, `broken-external-links`, `url-length`, `url-query-parameters`, `url-session-tracking`, `url-encoding`, `url-case-variants`, `url-trailing-slash-variants`, `url-normalization`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.

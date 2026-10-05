@@ -823,3 +823,14 @@ building; every attack below was **run**: some against the real fetch path, the 
 
 No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 (item 0) remains open and accepted.
 
+## 2026-10-05 — url-quality-audits (Phase 9, lightweight)
+
+Pure string checks on URLs; **no new request surface, no new gatherer, no new environment variable**. Reviewed with the security checklist.
+
+- **Page-controlled input**: URLs come from links and sitemap entries a hostile site chooses. Every pattern was read for backtracking: `/\/{2,}/`, `/%(?![0-9a-f]{2})/`, `/%25[0-9a-f]{2}/` and the anchored identifier test are linear. One was not: trailing-slash stripping with `/\/+$/` is quadratic on a long run of slashes (the Finding 9 shape); it was caught while writing and is a loop, with a 200,000-slash timing test (2 ms).
+- **Output**: URLs appear in table cells only, clipped to 200 characters, at most 50 rows and 15 groups; parameter names are clipped to 40 characters.
+- **Credentials**: a URL carrying credentials never reaches these audits as a crawled page (the crawler's normaliser rejects it).
+- **Related fix found by the live run (correctness, not a security risk)**: a cached crawl reused by another URL of the same collect kept the first URL's `audited` label, so cross-page audits judged the wrong page. Fixed with tests.
+
+No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 remains open and accepted.
+
