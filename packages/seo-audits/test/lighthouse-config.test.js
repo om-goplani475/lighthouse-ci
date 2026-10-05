@@ -122,6 +122,11 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('paginated-canonical');
     expect(auditIds).toContain('pagination-trap');
     expect(auditIds).toContain('broken-external-links');
+    expect(auditIds).toContain('placeholder-content');
+    expect(auditIds).toContain('content-dates');
+    expect(auditIds).toContain('readability-score');
+    expect(auditIds).toContain('hidden-text');
+    expect(auditIds).toContain('keyword-alignment');
     expect(auditIds).toContain('hreflang-codes');
     expect(auditIds).toContain('hreflang-return-links');
     expect(auditIds).toContain('hreflang-alternate-status');
@@ -175,6 +180,7 @@ describe('seo-audits lighthouse-config', () => {
       'broken-internal-links',
       'canonical-conflicts',
       'canonical-https',
+      'content-dates',
       'core-web-vitals-field',
       'crawl-coverage',
       'crawl-depth',
@@ -189,6 +195,7 @@ describe('seo-audits lighthouse-config', () => {
       'favicon-presence',
       'favicon-quality',
       'h1-title-relevance',
+      'hidden-text',
       'hreflang-alternate-status',
       'hreflang-canonical',
       'hreflang-codes',
@@ -211,6 +218,7 @@ describe('seo-audits lighthouse-config', () => {
       'js-head-signals',
       'js-internal-links',
       'js-visible-content',
+      'keyword-alignment',
       'llms-txt-structure',
       'manifest-icons',
       'meta-description-identical-to-title',
@@ -223,7 +231,9 @@ describe('seo-audits lighthouse-config', () => {
       'pagination-links',
       'pagination-trap',
       'pixel-width-truncation',
+      'placeholder-content',
       'raw-rendered-diff',
+      'readability-score',
       'redirect-chain-length',
       'redirect-loop',
       'redirecting-internal-links',
