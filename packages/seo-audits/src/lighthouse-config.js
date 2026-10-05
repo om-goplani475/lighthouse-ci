@@ -103,6 +103,7 @@ const config = {
     './audits/pagination-links.js',
     './audits/paginated-canonical.js',
     './audits/pagination-trap.js',
+    './audits/broken-external-links.js',
   ],
   categories: {
     'seo-extended': {
@@ -166,6 +167,7 @@ const config = {
         {id: 'pagination-links', weight: 1},
         {id: 'paginated-canonical', weight: 1},
         {id: 'pagination-trap', weight: 1},
+        {id: 'broken-external-links', weight: 1},
       ],
     },
   },
