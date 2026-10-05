@@ -844,3 +844,16 @@ One new gatherer (`ImageAltText`) and seven audits; **no new request surface and
 
 No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 remains open and accepted.
 
+## 2026-10-05 — js-rendering-audits (Phase 12, lightweight)
+
+Two new gatherers and seven audits. One new request surface: **`device-content-parity` requests the audited page twice** (a mobile and a desktop user-agent).
+
+- **Requests**: only the audited URL, the one Lighthouse already loaded; no URL taken from the page is ever requested. Through the SSRF-protected `safeFetchPrefix` (private addresses refused unless `LHCI_SEO_ALLOW_PRIVATE_NETWORK=1`), first 512 KiB, 10 s each, no redirect followed (a redirect makes the page "not comparable"), a non-http URL is refused before any request. Switch-off: `LHCI_SEO_DEVICE_PARITY=0` (tested: no request made).
+- **User-agent**: two constants in the source, not page-controlled, printable ASCII under 200 characters (the safe fetch re-validates), each ending in `lhci-seo-audits/1.0` so the site can see who asked; no impersonation of Googlebot.
+- **Page-controlled input and parsing**: the raw and rendered HTML go through the existing linear extractor (`crawl-extract.js`, the streaming tokenizer); the rendered DOM is capped at 2 MiB of characters in the gatherer. Framework-hint patterns run on the first 512 KiB and are linear.
+- **A quadratic pattern found by running it**: the hydration-error pattern (`hydrat\w*\s+...`) is **not linear** on a long run of repeated "hydrat" (a 3 MB console message hung the process while I measured the uncapped pattern). Console text is chosen by the page, so each message is now capped at 2,000 characters before the pattern runs, with a 500,000-repetition test (3 ms). Low severity: the console message list is bounded by Lighthouse, and the effect would have been a hung audit, not data exposure; fixed before merge.
+- **Output**: titles, descriptions, URLs and console text appear in table cells only, clipped (120 to 300 characters), at most 50 rows.
+- **Cost to the audited site**: two more requests per run to the audited URL (and the existing crawl is unchanged).
+
+No `critical`, `high` or `medium` findings, and no new `low` finding left open; Finding 10 remains open and accepted.
+

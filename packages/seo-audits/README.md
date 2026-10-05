@@ -732,6 +732,20 @@ Seven audits on the images of the audited page. No extra request: they read Ligh
 - **`image-legacy-formats`** (scored) fails on a loaded JPEG, PNG or GIF over 10 KiB; WebP, AVIF and SVG pass.
 - **`broken-images`** (scored) fails on an image request that answered 4xx or 5xx or got no response; cancelled and blocked requests are ignored.
 
+#### Rendering audits (JavaScript SEO)
+
+Seven audits on how the page a crawler reads (the raw HTML) compares with the page a browser builds (the DOM after JavaScript). Both sides are read with the same HTML extractor, so a difference is a difference in the HTML. The raw side is the HTML Chrome received (Lighthouse's `MainDocumentContent`); the rendered side is the DOM after load (the `RenderedHtml` gatherer, capped at 2 MiB). Only `device-content-parity` sends requests.
+
+- **`js-head-signals`** (scored) fails when the title, meta description, canonical or noindex is missing from the raw HTML or different after JavaScript.
+- **`js-internal-links`** (scored) fails when more than **20%** of the internal links (and at least 3) exist only after JavaScript; fewer are a note.
+- **`js-visible-content`** (scored) fails when more than **half** of the words exist only after JavaScript (pages under 50 words are not judged).
+- **`raw-rendered-diff`** (informational) puts the title, description, canonical, robots, first h1, word count and internal-link count side by side, and notes when the crawler's own copy of the page differs from the one Chrome received (the server may answer bots differently).
+- **`rendering-mode`** (informational) calls the page server-rendered (90% or more of the text is in the HTML), client-rendered (under 20%) or hybrid, with the framework signs found (Next.js, Nuxt, Angular, an empty root element...). A heuristic.
+- **`hydration-errors`** (scored) fails on a hydration mismatch in the console (React, Vue, Angular).
+- **`device-content-parity`** (scored) fetches the audited page with a mobile and a desktop user-agent (each ends in `lhci-seo-audits/1.0`, 512 KiB, 10 s, no redirect followed, the audited URL only, through the SSRF-protected fetch) and fails when the title, description, canonical or noindex differs, when more than 20% of the desktop links are missing on mobile, or when mobile has over half fewer words. Server HTML only: CSS or JavaScript differences between screen sizes are not seen. `LHCI_SEO_DEVICE_PARITY=0` switches it off (then not applicable).
+
+Excessive DOM size is left to Lighthouse core's `dom-size`.
+
 **Environment variables** (read per run, clamped; a page can never change them):
 
 | Variable | Default | Effect |
@@ -740,6 +754,7 @@ Seven audits on the images of the audited page. No extra request: they read Ligh
 | `LHCI_SEO_CRAWL_MAX_PAGES` | 50 (1 to 200) | page cap, the audited page included |
 | `LHCI_SEO_CRAWL_MAX_DEPTH` | 3 (1 to 5) | how many hops of links to follow from the starting pages |
 | `LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS` | 20 (0 to 50) | status-only checks of the external links on the audited page, to other sites (`broken-external-links`); `0` switches them off and that audit is then not applicable |
+| `LHCI_SEO_DEVICE_PARITY` | on (`0` switches it off) | two requests to the audited page, with a mobile and a desktop user-agent (`device-content-parity`); `0` makes that audit not applicable |
 | `LHCI_SEO_CRAWL_MAX_LINK_CHECKS` | 100 (0 to 200) | status-only checks of the audited page's own links the crawl did not read; `0` switches them off (the link-check audits then judge only links to pages the crawl read) |
 | `LHCI_SEO_CRAWL_TIME_BUDGET_SECONDS` | 120 (10 to 600) | total crawl time |
 | `LHCI_SEO_CRAWL_RESPECT_ROBOTS` | on | `0` or `false` requests URLs robots.txt disallows (for auditing your own staging site) |
@@ -852,7 +867,7 @@ This adds all fifty-nine audits (`structured-data-json-ld`, `structured-data-sch
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
 `sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`, `mixed-content`, `hsts-quality`,
 `ssl-certificate-expiry`, `soft-not-found`, `url-variant-consistency`, `redirect-chain-length`,
-`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, `anchor-text-diversity`, `descriptive-anchor-text`, `pagination-links`, `paginated-canonical`, `pagination-trap`, `broken-external-links`, `url-length`, `url-query-parameters`, `url-session-tracking`, `url-encoding`, `url-case-variants`, `url-trailing-slash-variants`, `url-normalization`, `image-alt-quality`, `image-filename-quality`, `image-lazy-above-fold`, `image-dimensions-attributes`, `image-oversized`, `image-legacy-formats`, `broken-images`) on top of
+`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, `anchor-text-diversity`, `descriptive-anchor-text`, `pagination-links`, `paginated-canonical`, `pagination-trap`, `broken-external-links`, `url-length`, `url-query-parameters`, `url-session-tracking`, `url-encoding`, `url-case-variants`, `url-trailing-slash-variants`, `url-normalization`, `image-alt-quality`, `image-filename-quality`, `image-lazy-above-fold`, `image-dimensions-attributes`, `image-oversized`, `image-legacy-formats`, `broken-images`, `js-head-signals`, `js-internal-links`, `js-visible-content`, `raw-rendered-diff`, `rendering-mode`, `hydration-errors`, `device-content-parity`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.

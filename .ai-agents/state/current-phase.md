@@ -1,9 +1,11 @@
 # Current phase
 
-- phase: phase-10-images (built and QA'd, awaiting the merge into main)
-- branch: phase-10-images
+- phase: phase-12-js-rendering (built and QA'd, awaiting the merge into main; Phase 11 hreflang skipped for now)
+- branch: phase-12-js-rendering
 - roadmap: docs/master-roadmap.md (next: Phase 9, URL Quality) and docs/open-items.md (the verification checks still to do)
-- status: in-progress (docs/phases/phase-10-images.md)
+- status: in-progress (docs/phases/phase-12-js-rendering.md)
+
+<!-- Phase 10 (images) closed 2026-10-05: seven audits and one gatherer, ff-merged into main, branch deleted. See docs/phases/phase-10-images.md. -->
 
 <!-- Phase 9 (URL quality) closed 2026-10-05: seven audits, ff-merged into main, branch deleted. See docs/phases/phase-9-url-quality.md. -->
 
