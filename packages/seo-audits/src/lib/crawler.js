@@ -28,7 +28,8 @@
  */
 
 import robotsParser from 'robots-parser';
-import {safeFetchPrefix, safeFetchBytes} from './safe-fetch.js';
+import {safeFetchPrefix, safeFetchBytes, safeFetchPublicPrefix} from './safe-fetch.js';
+import {checkExternalLinks} from './external-link-checker.js';
 import {checkUrls, pickEvenly, REQUEST_TIMEOUT_MS} from './sitemap-url-sample.js';
 import {collectSitemapDocuments} from '../gatherers/sitemap-documents.js';
 import {extractPage} from './crawl-extract.js';
@@ -61,6 +62,8 @@ const DEFAULT_DEPTH = 3;
 const MAX_DEPTH = 5;
 const DEFAULT_LINK_CHECKS = 100;
 const MAX_LINK_CHECKS = 200;
+const DEFAULT_EXTERNAL_CHECKS = 20;
+const MAX_EXTERNAL_CHECKS = 50;
 // A status-only check reads only the start of a body: the answer is the status and the redirect, not the page.
 const LINK_CHECK_MAX_BYTES = 2 * 1024;
 const LINK_CHECK_BUDGET_MS = 30_000;
@@ -96,7 +99,7 @@ function clampedInt(raw, fallback, min, max) {
 
 /**
  * @param {NodeJS.ProcessEnv} env
- * @return {{enabled: boolean, pages: number, depth: number, linkChecks: number, budgetMs: number, robots: 'honour' | 'ignore'}}
+ * @return {{enabled: boolean, pages: number, depth: number, linkChecks: number, externalChecks: number, budgetMs: number, robots: 'honour' | 'ignore'}}
  */
 function parseConfig(env) {
   return {
@@ -108,6 +111,12 @@ function parseConfig(env) {
       DEFAULT_LINK_CHECKS,
       0,
       MAX_LINK_CHECKS
+    ),
+    externalChecks: clampedInt(
+      env.LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS,
+      DEFAULT_EXTERNAL_CHECKS,
+      0,
+      MAX_EXTERNAL_CHECKS
     ),
     budgetMs:
       clampedInt(env.LHCI_SEO_CRAWL_TIME_BUDGET_SECONDS, DEFAULT_BUDGET_SECONDS, 10, 600) * 1000,
@@ -653,6 +662,7 @@ function attempt(fn) {
  *   env?: NodeJS.ProcessEnv,
  *   fetchPage?: typeof safeFetchPrefix,
  *   fetchBytes?: typeof safeFetchBytes,
+ *   fetchExternal?: typeof safeFetchPublicPrefix,
  *   collectSitemap?: typeof collectSitemapDocuments,
  *   cache?: {read: typeof readSnapshot, write: typeof writeSnapshot},
  *   now?: () => number,
@@ -675,23 +685,68 @@ async function crawlSite(rawInput) {
       rawInput && typeof rawInput === 'object' ? rawInput : /** @type {CrawlInput} */ ({});
     const env = input.env || process.env;
     const config = parseConfig(env);
-    if (config.linkChecks > 0) {
-      const fetchBytesRaw = input.fetchBytes || safeFetchBytes;
-      artifact.linkChecks = await checkAuditedLinks({
-        snapshot: artifact.snapshot,
-        auditedUrl: artifact.auditedUrl,
-        pageLinks: Array.isArray(input.pageLinks) ? input.pageLinks : [],
-        limit: config.linkChecks,
-        robotsMode: config.robots,
-        fetchPage: input.fetchPage || safeFetchPrefix,
-        fetchBytes: (url, options) => fetchBytesRaw(url, {...options, userAgent: USER_AGENT}),
-        now: input.now || Date.now,
-      });
-    }
+    const fetchBytesRaw = input.fetchBytes || safeFetchBytes;
+    const snapshot = artifact.snapshot;
+    // The two checks are independent (the audited site, other sites), so they run side by side.
+    const [linkChecks, externalChecks] = await Promise.all([
+      config.linkChecks > 0
+        ? checkAuditedLinks({
+            snapshot,
+            auditedUrl: artifact.auditedUrl,
+            pageLinks: Array.isArray(input.pageLinks) ? input.pageLinks : [],
+            limit: config.linkChecks,
+            robotsMode: config.robots,
+            fetchPage: input.fetchPage || safeFetchPrefix,
+            fetchBytes: (url, options) => fetchBytesRaw(url, {...options, userAgent: USER_AGENT}),
+            now: input.now || Date.now,
+          }).catch(() => null)
+        : null,
+      config.externalChecks > 0
+        ? checkAuditedExternalLinks({
+            snapshot,
+            auditedUrl: artifact.auditedUrl,
+            limit: config.externalChecks,
+            fetchPage: input.fetchExternal || safeFetchPublicPrefix,
+            now: input.now || Date.now,
+          }).catch(() => null)
+        : null,
+    ]);
+    artifact.linkChecks = linkChecks;
+    artifact.externalChecks = externalChecks;
   } catch {
     artifact.linkChecks = null;
+    artifact.externalChecks = null;
   }
   return artifact;
+}
+
+/**
+ * @param {CrawlSnapshot} snapshot
+ * @param {string} auditedUrl
+ * @return {CrawlPage | null} The audited page, when the crawl read it as HTML.
+ */
+function findAuditedPage(snapshot, auditedUrl) {
+  const audited = normalizeUrl(auditedUrl);
+  if (!audited) return null;
+  return (
+    snapshot.pages.find(
+      p =>
+        p.extraction === 'ok' &&
+        (normalizeUrl(p.url) === audited || normalizeUrl(p.finalUrl) === audited)
+    ) || null
+  );
+}
+
+/**
+ * Status checks of the external links on the audited page (other sites), through the strict fetch that refuses every
+ * private address. See `external-link-checker.js` for the limits.
+ * @param {{snapshot: CrawlSnapshot, auditedUrl: string, limit: number, fetchPage: typeof safeFetchPublicPrefix, now: () => number}} input
+ * @return {Promise<{checked: import('./external-link-checker.js').ExternalCheck[], notChecked: number}>}
+ */
+async function checkAuditedExternalLinks({snapshot, auditedUrl, limit, fetchPage, now}) {
+  const page = findAuditedPage(snapshot, auditedUrl);
+  if (!page || !Array.isArray(page.externalLinks)) return {checked: [], notChecked: 0};
+  return checkExternalLinks({links: page.externalLinks, limit, fetchPage, now});
 }
 
 /**
@@ -827,6 +882,7 @@ async function crawlSnapshot(rawInput) {
     snapshot: null,
     auditedRenderedTextLength: null,
     linkChecks: null,
+    externalChecks: null,
     ...over,
   });
 

@@ -45,6 +45,7 @@ const env = (/** @type {Record<string, string>} */ over = {}) => ({
   [ALLOW_PRIVATE_NETWORK_ENV]: '1',
   LHCI_SEO_CRAWL_CACHE_DIR: cacheDir,
   LHCI_SEO_CRAWL_MAX_LINK_CHECKS: '0',
+  LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS: '0',
   ...over,
 });
 const pageHits = () => hits.filter(h => h.url !== '/robots.txt' && h.url !== '/sitemap.xml');
@@ -235,6 +236,17 @@ describe('a real crawl of a local site', () => {
         `http://127.0.0.1:${spyPort}/from-sitemap`,
       ])
     );
+  });
+
+  it('refuses to check an external link that points at a private address, even with the private-network opt-in on', async () => {
+    // The audited page links to the "other site" spy server on 127.0.0.1. The opt-in (set by `env()`) lets the audit
+    // reach the audited site itself on loopback; it must never let a link on that page be requested.
+    const artifact = await crawl({LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS: '20'});
+    expect(spyHits).toEqual([]);
+    const outbound = artifact.externalChecks.checked.find(
+      (/** @type {any} */ c) => c.url === `http://127.0.0.1:${spyPort}/outbound`
+    );
+    expect(outbound).toMatchObject({status: null, error: 'PRIVATE'});
   });
 
   it('sends the crawler user-agent on every page request', async () => {

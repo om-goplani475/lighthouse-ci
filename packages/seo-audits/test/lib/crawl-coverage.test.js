@@ -354,6 +354,33 @@ describe('the notes', () => {
     expect(notes(buildCoverageProduct(artifact())).join('\n')).not.toMatch(/status-checked/);
   });
 
+  it('say how many external links were status-checked on other sites, refused or left unchecked', () => {
+    const check = (/** @type {string} */ error) => ({
+      url: 'https://x.test/',
+      finalUrl: 'https://x.test/',
+      status: error ? null : 200,
+      hops: [],
+      error: error || null,
+      state: 'checked',
+    });
+    const n = notes(
+      buildCoverageProduct(
+        artifact({
+          externalChecks: {checked: [check(''), check(''), check('PRIVATE')], notChecked: 3},
+        })
+      )
+    ).join('\n');
+    expect(n).toMatch(/2 external links of the audited page were status-checked on other sites/);
+    expect(n).toMatch(/1 pointing at a private address not requested/);
+    expect(n).toMatch(/3 more not checked.*LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS/);
+    expect(
+      notes(buildCoverageProduct(artifact({externalChecks: {checked: [], notChecked: 0}}))).join(
+        '\n'
+      )
+    ).not.toMatch(/other sites/);
+    expect(notes(buildCoverageProduct(artifact())).join('\n')).not.toMatch(/other sites/);
+  });
+
   it('count the URLs left out by the query-variant guard', () => {
     const skipped = [1, 2, 3].map(i => ({
       url: `https://example.com/list?page=${i}`,

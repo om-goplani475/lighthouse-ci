@@ -116,6 +116,22 @@ function notesFor(artifact) {
       }.`
     );
   }
+  const externalChecks = artifact.externalChecks;
+  if (externalChecks && (externalChecks.checked.length > 0 || externalChecks.notChecked > 0)) {
+    const refused = externalChecks.checked.filter(c => c.error === 'PRIVATE').length;
+    const requested = externalChecks.checked.length - refused;
+    notes.push(
+      `${count(requested, 'external link')} of the audited page ${
+        requested === 1 ? 'was' : 'were'
+      } status-checked on other sites (status only, no body read, at most 2 per host)${
+        refused ? `; ${refused} pointing at a private address not requested` : ''
+      }${
+        externalChecks.notChecked
+          ? `; ${externalChecks.notChecked} more not checked (the per-host limit, the limit or the time budget: LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS)`
+          : ''
+      }.`
+    );
+  }
   const variants = snapshot.skipped.filter(s => s.reason === 'query-variants').length;
   if (variants > 0) {
     notes.push(

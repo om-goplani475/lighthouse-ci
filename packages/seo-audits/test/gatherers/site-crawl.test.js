@@ -17,7 +17,11 @@ const AUDITED = 'https://example.com/';
 const html = '<html><head><title>T</title></head><body><p>hello world</p></body></html>';
 
 const deps = (/** @type {any} */ over = {}) => ({
-  env: {LHCI_SEO_CRAWL_CACHE_TTL_SECONDS: '0', LHCI_SEO_CRAWL_MAX_LINK_CHECKS: '0'},
+  env: {
+    LHCI_SEO_CRAWL_CACHE_TTL_SECONDS: '0',
+    LHCI_SEO_CRAWL_MAX_LINK_CHECKS: '0',
+    LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS: '0',
+  },
   fetchPage: jest.fn(async () => ({
     status: 200,
     redirectLocation: null,

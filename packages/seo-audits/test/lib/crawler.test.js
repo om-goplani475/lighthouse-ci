@@ -97,7 +97,11 @@ const crawl = (site, over = {}) =>
     now: site.now,
     ...over,
     // The audited page's own link checks are tested on their own (below); the others count requests exactly.
-    env: {LHCI_SEO_CRAWL_MAX_LINK_CHECKS: '0', ...(over.env || {})},
+    env: {
+      LHCI_SEO_CRAWL_MAX_LINK_CHECKS: '0',
+      LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS: '0',
+      ...(over.env || {}),
+    },
   });
 const requested = (/** @type {any} */ site) => site.requests.map((/** @type {any} */ r) => r.url);
 
@@ -108,9 +112,18 @@ describe('parseConfig', () => {
       pages: 50,
       depth: 3,
       linkChecks: 100,
+      externalChecks: 20,
       budgetMs: 120_000,
       robots: 'honour',
     });
+  });
+
+  it('clamps the number of external checks to 0 to 50 and ignores garbage', () => {
+    expect(parseConfig({LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS: '0'}).externalChecks).toBe(0);
+    expect(parseConfig({LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS: '-1'}).externalChecks).toBe(0);
+    expect(parseConfig({LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS: '900'}).externalChecks).toBe(50);
+    expect(parseConfig({LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS: '7'}).externalChecks).toBe(7);
+    expect(parseConfig({LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS: 'lots'}).externalChecks).toBe(20);
   });
 
   it('clamps the number of link checks to 0 to 200 and ignores garbage', () => {
@@ -1061,6 +1074,101 @@ describe('crawlSite: status checks of the audited page’s own links', () => {
     const s = site({[u('/l5')]: new Error('socket hang up')});
     const result = await crawl(s, withChecks({env: {LHCI_SEO_CRAWL_MAX_PAGES: '1'}}));
     expect(checked(result)[u('/l5')].status).toBeNull();
+  });
+});
+
+describe('crawlSite: status checks of the external links on the audited page', () => {
+  const externalPage = (/** @type {string[]} */ urls) =>
+    page('Home', urls.map(u2 => `<a href="${u2}">${u2}</a>`).join(' '));
+  /** @param {string[]} calls */
+  const fetchExternal = calls =>
+    jest.fn(async (/** @type {string} */ url) => {
+      calls.push(url);
+      return {
+        status: url.includes('gone') ? 404 : 200,
+        redirectLocation: null,
+        headers: {},
+        body: Buffer.alloc(0),
+        bodyRead: 'skipped-status',
+        truncated: false,
+      };
+    });
+  const withExternal = (/** @type {any} */ extra = {}) => ({
+    ...extra,
+    env: {LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS: '20', ...(extra.env || {})},
+  });
+
+  it('checks the external links of the audited page through the injected fetch, and nothing else', async () => {
+    const calls = /** @type {string[]} */ ([]);
+    const s = makeSite({
+      [AUDITED]: {body: externalPage(['https://a.test/ok', 'https://b.test/gone', '/inside'])},
+      [u('/inside')]: {body: externalPage(['https://never-checked.test/x'])},
+    });
+    const result = await crawl(s, withExternal({fetchExternal: fetchExternal(calls)}));
+    expect(calls.sort()).toEqual(['https://a.test/ok', 'https://b.test/gone']);
+    expect(
+      result.externalChecks.checked.map((/** @type {any} */ c) => [c.url, c.status]).sort()
+    ).toEqual([
+      ['https://a.test/ok', 200],
+      ['https://b.test/gone', 404],
+    ]);
+    // No request to another site goes through the audited site's fetch.
+    expect(requested(s).some((/** @type {string} */ url) => url.includes('.test'))).toBe(false);
+  });
+
+  it('is off when set to 0: no field and no request', async () => {
+    const calls = /** @type {string[]} */ ([]);
+    const s = makeSite({[AUDITED]: {body: externalPage(['https://a.test/x'])}});
+    const result = await crawl(s, {fetchExternal: fetchExternal(calls)});
+    expect(result.externalChecks).toBeNull();
+    expect(calls).toEqual([]);
+  });
+
+  it('honours the configured number, counting the rest as not checked', async () => {
+    const calls = /** @type {string[]} */ ([]);
+    const urls = Array.from({length: 6}, (_, i) => `https://h${i}.test/`);
+    const s = makeSite({[AUDITED]: {body: externalPage(urls)}});
+    const result = await crawl(
+      s,
+      withExternal({
+        fetchExternal: fetchExternal(calls),
+        env: {LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS: '2'},
+      })
+    );
+    expect(result.externalChecks.checked).toHaveLength(2);
+    expect(result.externalChecks.notChecked).toBe(4);
+  });
+
+  it('runs for a snapshot that came from the cache too, and not when the crawl is off', async () => {
+    const calls = /** @type {string[]} */ ([]);
+    const s = makeSite({[AUDITED]: {body: externalPage(['https://a.test/x'])}});
+    const first = await crawl(s, {});
+    const cached = await crawl(
+      s,
+      withExternal({
+        cache: fakeCache(first.snapshot),
+        fetchExternal: fetchExternal(calls),
+        env: {LHCI_SEO_CRAWL_CACHE_DIR: '/c'},
+      })
+    );
+    expect(cached.state).toBe('cached');
+    expect(calls).toEqual(['https://a.test/x']);
+    const off = await crawl(
+      s,
+      withExternal({fetchExternal: fetchExternal(calls), env: {LHCI_SEO_CRAWL: '0'}})
+    );
+    expect(off.externalChecks).toBeNull();
+  });
+
+  it('survives a fetch that throws and a page with no external links', async () => {
+    const s = makeSite({[AUDITED]: {body: externalPage(['https://a.test/x'])}});
+    const boom = jest.fn(async () => {
+      throw new Error('socket hang up');
+    });
+    const result = await crawl(s, withExternal({fetchExternal: boom}));
+    expect(result.externalChecks.checked[0]).toMatchObject({status: null, error: 'OTHER'});
+    const none = await crawl(makeSite({}), withExternal({fetchExternal: boom}));
+    expect(none.externalChecks).toEqual({checked: [], notChecked: 0});
   });
 });
 

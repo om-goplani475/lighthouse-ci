@@ -70,6 +70,7 @@ import {pickEvenly} from './sitemap-url-sample.js';
  *   redirects: CrawlHop[],
  *   state: 'checked' | 'blocked-by-robots',
  * }} LinkCheck
+ * @typedef {import('./external-link-checker.js').ExternalCheck} ExternalCheck
  * @typedef {{
  *   state: 'crawled' | 'cached' | 'disabled' | 'unavailable',
  *   auditedUrl: string,
@@ -77,6 +78,7 @@ import {pickEvenly} from './sitemap-url-sample.js';
  *   snapshot: CrawlSnapshot | null,
  *   auditedRenderedTextLength: number | null,
  *   linkChecks: {checked: LinkCheck[], notChecked: number} | null,
+ *   externalChecks: {checked: ExternalCheck[], notChecked: number} | null,
  * }} SiteCrawlArtifact
  */
 
