@@ -650,6 +650,22 @@ Lighthouse run** as the `SiteCrawl` gatherer; `lhci autorun` needs no extra step
   sentence is not a duplicate here (near-duplicate detection is a separate, later decision). Text is read from server
   HTML, so for a page built by script, or one the crawler had to truncate, the audit is *not applicable* instead of
   comparing empty app shells.
+- **`dead-end-pages`**, **`internal-link-counts`**, **`orphan-pages`** and **`crawl-depth`** (scored) read the **link graph** of the
+  crawl, with no extra request. Each judges the audited page and lists other offending crawled pages, without failing on
+  them. A nofollow link, a link to the page itself and a link to a page the crawl did not read are not edges of the graph
+  (a link to an unread page still counts as a link *out*).
+  - `dead-end-pages` fails when the page has no followable internal link to a different page.
+  - `internal-link-counts` fails with more than **150** internal links on the page, or **exactly one** crawled page linking to it
+    (fewer than 2; none at all is `orphan-pages`' finding). The homepage is exempt from the low side.
+  - `orphan-pages` fails when no crawled page links to the page. It is **not applicable unless the crawl saw the whole site**
+    (no page cap, depth bound or time budget cut it, nothing blocked by robots.txt or unreadable): "nothing links here" cannot be
+    believed otherwise, and the audit says which limit stopped it. The homepage is not judged. On a big site this means it
+    is usually not applicable until you raise `LHCI_SEO_CRAWL_MAX_PAGES` / `LHCI_SEO_CRAWL_MAX_DEPTH`.
+  - `crawl-depth` fails when the page is more than **3 clicks** from the homepage along followable links. A depth within the limit
+    is always reliable (a shorter path can only make it smaller); a larger one is judged only on a complete crawl, otherwise
+    not applicable ("a shorter path may exist"). A page with no path from the homepage is not applicable (see `orphan-pages`).
+  They read server HTML, so when the audited page looks script-built all four are not applicable. Inbound counts on a partial
+  crawl are shown as a minimum (`3+ in`) and the low side is not judged.
 
 **Environment variables** (read per run, clamped; a page can never change them):
 
@@ -758,7 +774,7 @@ module.exports = {
 };
 ```
 
-This adds all forty-six audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all fifty audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
@@ -769,16 +785,16 @@ This adds all forty-six audits (`structured-data-json-ld`, `structured-data-sche
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
 `sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`, `mixed-content`, `hsts-quality`,
 `ssl-certificate-expiry`, `soft-not-found`, `url-variant-consistency`, `redirect-chain-length`,
-`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`) on top of
+`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the forty-six audits are part of this fork's shared `all`/`recommended` presets
+None of the fifty audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all forty-six here are opt-in via `configPath`, so they can't be part of that
+default, and all fifty here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js

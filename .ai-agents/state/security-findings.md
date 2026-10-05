@@ -748,3 +748,17 @@ homepage, same origin), and more page-controlled strings in the snapshot (anchor
 
 No `critical`, `high` or `medium` findings. Finding 10 is `low` and open (accepted).
 
+## 2026-10-05 — link-graph-audits (Phase 8 items 1 and 2, lightweight)
+
+No new request, gatherer, file or dependency: the four audits (`dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`) read the crawl snapshot.
+The risks left are time and output size on a hostile snapshot, so each builder was run on worst-case snapshots (200 pages; every page linking to all 199 others, with
+1,900-character URLs; a 200-page chain; a star).
+
+- **Time**: first fixed a measured weakness (1.7 s for one builder on the long-URL complete graph, from normalising every link several times); each page's targets
+  are now computed once: worst case **0.37 s**, then about 25 ms per builder; a chain or a star under 4 ms. Bounded by the 200-page and 200-links-per-page caps of the crawler.
+- **Output size**: at most 15 KiB per audit (rows capped at 50, cells clipped to 200 characters), so a hostile site cannot inflate the report.
+- **Injection into the report**: page-controlled URLs are put in table cells only, clipped, never in a title, a score or an id.
+- **No panics**: every builder is unit-tested with a missing, disabled, unavailable and malformed crawl and returns "not applicable".
+
+No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 (from item 0) remains open and accepted.
+

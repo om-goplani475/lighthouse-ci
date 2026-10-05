@@ -6,7 +6,7 @@ not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
-**Status: in progress (2026-10-05).** Item 0 (the crawler extension everything else reads) is built and QA'd live; items 1 to 6 are next.
+**Status: in progress (2026-10-05).** Items 0 (the crawler extension), 1 and 2 (the link-graph audits) are built and QA'd live; items 3 to 6 are next.
 
 ## Planning decisions (2026-10-05)
 
@@ -33,8 +33,8 @@ files are simply ignored).
 | # | Feature | Status | Slug / notes |
 |---|---------|--------|--------------|
 | 0 | Crawler extension: depth 3 from the homepage, snapshot v2 (anchor text per link, pagination head signals) | **done** | `link-graph-crawler`, **lightweight** (an extension of the existing crawler with decisions already made; the intake spec `docs/feature-specs/link-graph-crawler.md` is kept as the design record, no further design documents). The developer questioned the full pipeline on 2026-10-05 and was right. |
-| 1 | Internal link graph: incoming/outgoing counts, unusually high/low counts, dead-end pages | planned | reads the snapshot |
-| 2 | Orphan page detection and crawl depth from the homepage | planned | reads the snapshot |
+| 1 | Internal link graph: incoming/outgoing counts, unusually high/low counts, dead-end pages | **done** | `internal-link-counts` (over 150 links out, or exactly one crawled page linking in) and `dead-end-pages` (no followable link to another page); shared library `crawl-graph.js`, builders in `crawl-link-audits.js`. Lightweight after a short design conversation. QA'd live. |
+| 2 | Orphan page detection and crawl depth from the homepage | **done** | `orphan-pages` (not applicable unless the crawl saw the whole site) and `crawl-depth` (more than 3 clicks from the homepage). Same feature as item 1. QA'd live. |
 | 3 | Broken internal links (404/500), and the Phase 5 deferred checks: links that redirect, redirect chains and loops on internal links | planned | needs link-target statuses |
 | 4 | Anchor-text diversity / over-optimisation signal | planned | reads anchor text from snapshot v2 |
 | 5 | Pagination (`rel=next/prev`, view-all pattern) and infinite-pagination trap detection | planned | |
@@ -53,6 +53,16 @@ Build order: 0 first (everything reads it), then 1 and 2 together, 3, 4, 5, and 
   `truncatedByBudget`) so audits that need a complete graph can say they cannot judge; URLs that are plainly files are not requested
   (`not-a-page`); at most 5 query-string variants of one path are requested (`query-variants`, a crawl-trap guard that the pagination-trap audit
   will read as evidence); the link list keeps one entry per target *and anchor text*, so anchor diversity can be judged.
+- **Items 1 and 2 were built together as four audits on one graph library** (`dead-end-pages`, `internal-link-counts`, `orphan-pages`,
+  `crawl-depth`), with thresholds chosen with the developer: 3 clicks from the homepage, fixed link-count thresholds (150 out, fewer than 2 in),
+  a dead end is a page with no followable link to another page, and orphans are only judged when the crawl saw the whole site. Two rules I added
+  from the same logic and stated up front: the low-inbound side of the counts audit is also only judged on a complete crawl, and a depth beyond
+  the limit is only judged on a complete crawl (a shorter path may exist) while a depth within it is always reliable.
+- **A consequence worth knowing**: with the defaults (50 pages) `orphan-pages` will usually be not applicable on a site of more than a few dozen pages,
+  and says why. That is the price of never reporting a wrong orphan.
+- **Found in QA**: the unreachable-page message of `crawl-depth` pointed at `orphan-pages` even on a partial crawl, where the honest statement is "a path
+  may exist"; fixed. A timing measurement found 1.7 s worst case on a hostile complete graph of long URLs (links were normalised several times); each
+  page's targets are now computed once (0.37 s).
 - **Item 0 was first set up for the full 9-stage pipeline, then switched to lightweight** (2026-10-05) after the developer asked why: it extends
   existing code rather than adding a new capability, so `build-mode-selection.md` points to lightweight. Items 1 to 5 are lightweight; item 6
   (external links, a new outbound surface) gets a short design conversation and a careful security review, not the full pipeline.

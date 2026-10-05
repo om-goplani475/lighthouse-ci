@@ -501,5 +501,21 @@ ignored once and the site is crawled again. `crawl-coverage` now has a Depth col
 (the cache is then skipped and each run crawls again). No new request goes to another origin (a spy server received none). No `.lighthouserc.js`
 migration; one new environment variable.
 
+## 2026-10-05 — Phase 8 items 1 and 2: link-graph audits
+
+Four new scored audits (50 in the fork) that read the link graph of the crawl, with no extra request. Each judges the audited page and lists other
+offending crawled pages without failing on them.
+
+- **`dead-end-pages`**: fails when the page has no followable internal link to a different page (nofollow and self links do not count).
+- **`internal-link-counts`**: fails with more than 150 internal links on the page, or exactly one crawled page linking to it (none at all is `orphan-pages`).
+- **`orphan-pages`**: fails when no crawled page links to the page. Judged only when the crawl saw the whole site: otherwise not applicable, naming the limit
+  (page cap, depth bound, time budget, blocked or unreadable pages). On a site bigger than the crawl's cap it is usually not applicable until you raise
+  `LHCI_SEO_CRAWL_MAX_PAGES` or `LHCI_SEO_CRAWL_MAX_DEPTH`.
+- **`crawl-depth`**: fails when the page is more than 3 clicks from the homepage along followable links. A depth within the limit is always reliable; a larger one is
+  judged only on a complete crawl.
+
+Add the ones you want to your `assertions` yourself, e.g. `'orphan-pages': ['warn', {minScore: 1}]`; none is in the shared presets. They read server HTML, so a
+script-built page is not applicable. **Security**: no new finding. No `.lighthouserc.js` migration.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->

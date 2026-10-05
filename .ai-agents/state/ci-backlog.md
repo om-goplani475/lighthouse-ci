@@ -177,6 +177,12 @@
   site cannot make it exceed the 16 MiB cache cap.
 - status: open
 
+## 2026-10-05 — link-graph-audits
+
+- item: no gap found. No dependency, workflow or Docker change; `package.json`, `yarn.lock` and `.github/` are unchanged by the feature's diff. The new suites are pure
+  (no network, no disk) and fast. The Node 18.20.8 re-run is still to do (see `docs/open-items.md`, A5).
+- status: done (nothing to do)
+
 <!-- Appended by Agent 08. Advisory only — does not block merges or new features. Format per entry:
 
 ## {date} — {slug}
