@@ -534,5 +534,17 @@ only links to pages the crawl read, and say how many targets that leaves uncheck
 ("not checked"), so `crawl-coverage` and the audits no longer count them as errors. **Security**: no new finding; every request is same-origin and robots-aware (a spy server on
 another origin received none). Add the audits you want to your `assertions` yourself; none is in the shared presets. No `.lighthouserc.js` migration; one new environment variable.
 
+## 2026-10-05 — Phase 8 item 4: anchor-text audits
+
+Two new scored audits (55 in the fork) that read the anchor text the crawl stores, with no extra request. Each judges the audited page and lists other crawled pages without failing on them.
+
+- **`anchor-text-diversity`**: fails when one exact anchor is 60% or more of at least 5 editorial internal links to the audited page. Site-wide navigation (a link with the same anchor on 80% of the
+  crawled pages) and links with no text are left out; the homepage is not judged; it counts the crawled pages only.
+- **`descriptive-anchor-text`**: fails when the audited page has an internal link with a generic anchor ("click here", "read more", "here", "learn more", ...) or none (no text, no image alt, no
+  `aria-label` or `title`).
+
+An icon link with an `aria-label` or `title`, or an image with alt text, is no longer called empty. Add the audits you want to your `assertions` yourself, e.g. `'descriptive-anchor-text': ['warn',
+{minScore: 1}]`; none is in the shared presets. **Security**: no new finding. No `.lighthouserc.js` migration.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->

@@ -779,3 +779,11 @@ New surface: up to 100 status-only requests per Lighthouse run to same-origin UR
 
 No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 (item 0) remains open and accepted.
 
+## 2026-10-05 — anchor-text-audits (Phase 8 item 4, lightweight)
+
+No new request, gatherer, file or dependency: `anchor-text-diversity` and `descriptive-anchor-text` read the crawl snapshot. The extractor now also reads `aria-label` and `title` (clipped to
+400 characters before use, 100 stored), which adds no request. Risks left are time and output size on a hostile snapshot: 200 pages x 200 links with 100-character anchors, every page
+linking to every other: worst **246 ms**, output at most **6 KiB** (rows capped at 50, cells clipped). Page-controlled anchor text appears in table cells only, clipped, never in a title, score or id.
+
+No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 (item 0) remains open and accepted.
+

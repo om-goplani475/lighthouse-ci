@@ -1,6 +1,6 @@
 # Open items after Phase 7
 
-Written 2026-10-02 at `main` = `28939f1` (Phases 1-7 merged, 46 audits in `seo-extended`); **updated 2026-10-05** for Phase 8 (in progress, branch `phase-8-internal-linking`; items 0 to 3 built). This is the one place that lists what is
+Written 2026-10-02 at `main` = `28939f1` (Phases 1-7 merged, 46 audits in `seo-extended`); **updated 2026-10-05** for Phase 8 (in progress, branch `phase-8-internal-linking`; items 0 to 4 built). This is the one place that lists what is
 **deferred**, what is **not yet verified**, and the **tests and steps to close each open item**. The per-phase detail stays in
 `docs/phases/`, `docs/qa/` and `.ai-agents/state/`.
 
@@ -9,7 +9,7 @@ Written 2026-10-02 at `main` = `28939f1` (Phases 1-7 merged, 46 audits in `seo-e
 | Area | State |
 |------|-------|
 | Security findings (`.ai-agents/state/security-findings.md`) | **One open, low, accepted: Finding 10** (Phase 8: a hostile site with very long link URLs can make the crawl snapshot exceed the 16 MiB cache cap; see B1). Findings 1-9 are all fixed (8 on 2026-10-01, 9 on 2026-10-02). One risk is *accepted*, not fixed: `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control (the README says so). |
-| `seo-audits` tests | 78 suites / about 1,500 tests pass on the dev machine (Node 24), typecheck and lint clean (Phase 8 item 3 built, uncommitted at the time of writing). Last run on Node 18.20.8 (what CI pins) covered the Phase 7 crawler suites; the five Phase 7 audits and everything in Phase 8 were **not** run there (see A5). |
+| `seo-audits` tests | 79 suites / about 1,540 tests pass on the dev machine (Node 24), typecheck and lint clean (Phase 8 item 4 built, uncommitted at the time of writing). Last run on Node 18.20.8 (what CI pins) covered the Phase 7 crawler suites; the five Phase 7 audits and everything in Phase 8 were **not** run there (see A5). |
 | Failing suites outside `seo-audits` | 11 suites / 92 tests fail in `cli`, `server`, `viewer`, `utils`. Same families failed before Phase 4. Not caused by this work (see C). |
 | Not verified at all | Items A1-A5 below. You deferred A1-A3 until after Phase 7, so they are now due. |
 

@@ -6,7 +6,7 @@ not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
-**Status: in progress (2026-10-05).** Items 0 (the crawler extension), 1 and 2 (the link-graph audits) and 3 (the internal link checks) are built and QA'd live; items 4 to 6 are next.
+**Status: in progress (2026-10-05).** Items 0 (the crawler extension), 1 and 2 (the link-graph audits) 3 (the internal link checks) and 4 (anchor text) are built and QA'd live; items 5 and 6 are next.
 
 ## Planning decisions (2026-10-05)
 
@@ -36,7 +36,7 @@ files are simply ignored).
 | 1 | Internal link graph: incoming/outgoing counts, unusually high/low counts, dead-end pages | **done** | `internal-link-counts` (over 150 links out, or exactly one crawled page linking in) and `dead-end-pages` (no followable link to another page); shared library `crawl-graph.js`, builders in `crawl-link-audits.js`. Lightweight after a short design conversation. QA'd live. |
 | 2 | Orphan page detection and crawl depth from the homepage | **done** | `orphan-pages` (not applicable unless the crawl saw the whole site) and `crawl-depth` (more than 3 clicks from the homepage). Same feature as item 1. QA'd live. |
 | 3 | Broken internal links (404/500), and the Phase 5 deferred checks: links that redirect, redirect chains and loops on internal links | **done** | three audits, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, lib `crawl-link-checks.js`; every crawled page's links judged, plus up to 100 status-only checks of the audited page's own unread links (`linkChecks` on the crawl artifact). Lightweight after a design conversation. QA'd live. |
-| 4 | Anchor-text diversity / over-optimisation signal | planned | reads anchor text from snapshot v2 |
+| 4 | Anchor-text diversity / over-optimisation signal | **done** | `anchor-text-diversity` (60% of at least 5 editorial links, site-wide navigation excluded) and `descriptive-anchor-text` (generic or empty anchors, added at the developer's choice beyond the roadmap row); lib `crawl-anchors.js`. Lightweight after a design conversation. QA'd live. |
 | 5 | Pagination (`rel=next/prev`, view-all pattern) and infinite-pagination trap detection | planned | |
 | 6 | Broken external links | planned | new outbound surface: own security design, on by default but bounded |
 
@@ -71,6 +71,10 @@ Build order: 0 first (everything reads it), then 1 and 2 together, 3, 4, 5, and 
   status checks shared one "already requested" set, so a second link redirecting to the same place stopped at the redirect (they now follow each to its end).
 - **A bug in item 0's crawler, found by the hostile run of item 3 and fixed**: URLs the time budget stopped the crawler from requesting were recorded as pages that
   "did not answer"; they are now recorded as skipped ("not checked"). It would have made `broken-internal-links` call unreached links broken.
+- **Item 4 changed the extractor slightly**: an anchor's text falls back to the image alt text and then to `aria-label` or `title`, so an icon link with a label is not
+  called empty. This changes stored anchors for an already-cached version 2 snapshot (cache lifetime 10 minutes), which is harmless.
+- **Found in live QA of item 4**: the first rule for "site-wide navigation" (a link on at least half the pages) wrongly exempted an anchor repeated on half the
+  site, which is the very pattern the audit is for; navigation is now a link on at least 80% of the crawled pages (with a regression test).
 - **Item 0 was first set up for the full 9-stage pipeline, then switched to lightweight** (2026-10-05) after the developer asked why: it extends
   existing code rather than adding a new capability, so `build-mode-selection.md` points to lightweight. Items 1 to 5 are lightweight; item 6
   (external links, a new outbound surface) gets a short design conversation and a careful security review, not the full pipeline.

@@ -679,6 +679,15 @@ Lighthouse run** as the `SiteCrawl` gatherer; `lhci autorun` needs no extra step
     crawl did not read are not judged; each audit says how many link targets that is (`all 130 distinct link targets checked` or `87 of 130 ...`).
     The check is per Lighthouse run (it depends on which page is audited), not shared through the cache, so it can send up to about 300 requests
     (100 links, 3 hops each) from every run; `crawl-coverage` says how many links were checked.
+- **`anchor-text-diversity`** and **`descriptive-anchor-text`** (scored) read the anchor text the crawl stored (the link's text, else an image's alt text,
+  else its `aria-label` or `title`), with no extra request. Each judges the audited page and lists other crawled pages, without failing on them.
+  - `anchor-text-diversity` fails when **one exact anchor is 60% or more of at least 5 editorial internal links** to the audited page (compared without case or
+    punctuation). Links that appear with the same anchor on **at least 80% of the crawled pages** are site-wide navigation (a menu, a footer) and are left out, as
+    are links with no text; the homepage is not judged. Fewer than 5 editorial links is "too few to judge" (passes). It counts only the pages the crawl reached,
+    so a partial crawl sees a sample (the explanation says so).
+  - `descriptive-anchor-text` fails when the audited page has an internal link whose anchor is **generic** ("click here", "read more", "here", "learn more", "this
+    link", and similar, compared whole: "Read more about our returns policy" is fine) or **empty** (no text, no alt, no aria-label or title). Nofollow links count.
+  Both read server HTML, so a page that looks script-built is not applicable.
 
 **Environment variables** (read per run, clamped; a page can never change them):
 
@@ -788,7 +797,7 @@ module.exports = {
 };
 ```
 
-This adds all fifty-three audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all fifty-five audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
@@ -799,16 +808,16 @@ This adds all fifty-three audits (`structured-data-json-ld`, `structured-data-sc
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
 `sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`, `mixed-content`, `hsts-quality`,
 `ssl-certificate-expiry`, `soft-not-found`, `url-variant-consistency`, `redirect-chain-length`,
-`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`) on top of
+`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, `anchor-text-diversity`, `descriptive-anchor-text`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the fifty-three audits are part of this fork's shared `all`/`recommended` presets
+None of the fifty-five audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all fifty-three here are opt-in via `configPath`, so they can't be part of that
+default, and all fifty-five here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
