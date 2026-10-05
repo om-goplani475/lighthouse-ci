@@ -298,7 +298,7 @@ describe('the on-disk cache, for real', () => {
     const again = await crawl();
     expect(again.state).toBe('crawled');
     expect(hits.length).toBeGreaterThan(before);
-    expect(JSON.parse(fs.readFileSync(path.join(cacheDir, files[0]), 'utf8')).version).toBe(1);
+    expect(JSON.parse(fs.readFileSync(path.join(cacheDir, files[0]), 'utf8')).version).toBe(2);
   });
 
   it('does not use a cache directory that is open to other users', async () => {

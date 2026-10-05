@@ -33,6 +33,9 @@ const page = (over = {}) => {
     textLength: 500,
     wordCount: 80,
     links: [],
+    externalLinks: [],
+    pagination: {next: [], prev: []},
+    depth: 0,
     source: 'audited',
     extraction: 'ok',
     ...over,
@@ -43,15 +46,22 @@ const page = (over = {}) => {
 };
 /** @param {any} over */
 const snapshot = (over = {}) => ({
-  version: 1,
+  version: 2,
   origin: 'https://example.com',
   createdAt: '2026-10-01T00:00:00.000Z',
-  bounds: {pages: 50, budgetMs: 120000, robots: 'honour', userAgent: 'x'},
+  bounds: {pages: 50, depth: 3, budgetMs: 120000, robots: 'honour', userAgent: 'x'},
   robots: {state: 'present'},
-  seeds: {audited: 1, links: 0, sitemap: 0},
+  seeds: {audited: 1, home: 0, links: 0, sitemap: 0},
+  sitemapUrls: [],
   pages: [page()],
   skipped: [],
-  stats: {requests: 2, elapsedMs: 10, truncatedByBudget: false},
+  stats: {
+    requests: 2,
+    elapsedMs: 10,
+    truncatedByBudget: false,
+    overPageCap: false,
+    cutByDepth: false,
+  },
   ...over,
 });
 /** @param {any} over */
@@ -148,7 +158,13 @@ describe('the table', () => {
         snapshot: snapshot({
           pages: [
             page(),
-            page({url: 'https://example.com/a', source: 'link', title: 'A', wordCount: 10}),
+            page({
+              url: 'https://example.com/a',
+              source: 'link',
+              depth: 2,
+              title: 'A',
+              wordCount: 10,
+            }),
             page({url: 'https://example.com/m', source: 'sitemap', title: 'M'}),
           ],
         }),
@@ -156,12 +172,13 @@ describe('the table', () => {
     );
     const rows = p.details.items.filter((/** @type {any} */ i) => !i.url.startsWith('Note: '));
     expect(
-      rows.map((/** @type {any} */ r) => [r.url, r.status, r.title, r.words, r.source])
+      rows.map((/** @type {any} */ r) => [r.url, r.status, r.depth, r.title, r.words, r.source])
     ).toEqual([
-      [A, '200', 'Home', 80, 'audited page'],
-      ['https://example.com/a', '200', 'A', 10, 'link on the page'],
-      ['https://example.com/m', '200', 'M', 80, 'sitemap'],
+      [A, '200', 0, 'Home', 80, 'audited page'],
+      ['https://example.com/a', '200', 2, 'A', 10, 'link on a page'],
+      ['https://example.com/m', '200', 0, 'M', 80, 'sitemap'],
     ]);
+    expect(p.details.headings.map((/** @type {any} */ h) => h.label)).toContain('Depth');
   });
 
   it('describes redirects, non-HTML pages and failures', () => {
@@ -260,14 +277,63 @@ describe('the notes', () => {
     const p = buildCoverageProduct(
       artifact({
         snapshot: snapshot({
-          stats: {requests: 5, elapsedMs: 1, truncatedByBudget: true},
+          stats: {
+            requests: 5,
+            elapsedMs: 1,
+            truncatedByBudget: true,
+            overPageCap: true,
+            cutByDepth: false,
+          },
           skipped: [{url: 'https://example.com/z', reason: 'over-page-cap', detail: null}],
         }),
       })
     );
     const n = notes(p).join('\n');
     expect(n).toMatch(/stopped at its time budget \(120 s\)/);
-    expect(n).toMatch(/more URLs were found than the page cap \(50\)/i);
+    expect(n).toMatch(/more pages were found than the page cap \(50\).*deepest were left out/i);
+    expect(n).toMatch(/LHCI_SEO_CRAWL_MAX_PAGES/);
+  });
+
+  it('say when the crawl was cut by the depth bound, naming the bound', () => {
+    const cut = (/** @type {number} */ depth) =>
+      notes(
+        buildCoverageProduct(
+          artifact({
+            snapshot: snapshot({
+              bounds: {pages: 50, depth, budgetMs: 120000, robots: 'honour', userAgent: 'x'},
+              stats: {
+                requests: 5,
+                elapsedMs: 1,
+                truncatedByBudget: false,
+                overPageCap: false,
+                cutByDepth: true,
+              },
+            }),
+          })
+        )
+      ).join('\n');
+    expect(cut(3)).toMatch(/followed links 3 hops.*LHCI_SEO_CRAWL_MAX_DEPTH/);
+    expect(cut(1)).toMatch(/followed links 1 hop from/);
+  });
+
+  it('say nothing about the cap or the depth when the crawl was complete', () => {
+    const n = notes(buildCoverageProduct(artifact())).join('\n');
+    expect(n).not.toMatch(/page cap|hops?|query-string/);
+  });
+
+  it('count the URLs left out by the query-variant guard', () => {
+    const skipped = [1, 2, 3].map(i => ({
+      url: `https://example.com/list?page=${i}`,
+      reason: 'query-variants',
+      detail: null,
+    }));
+    const p = buildCoverageProduct(artifact({snapshot: snapshot({skipped})}));
+    expect(notes(p).join('\n')).toMatch(/3 URLs with more than 5 query-string variants/);
+    expect(
+      p.details.items.filter(
+        (/** @type {any} */ i) => i.status === 'too many query-string variants of one path'
+      )
+    ).toHaveLength(3);
   });
 
   it('describe each robots.txt state', () => {

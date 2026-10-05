@@ -3,15 +3,20 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  *
- * The bounded site crawl: fetches the audited page, its own internal links and the sitemap's URLs (depth 1:
- * the links of those pages are stored, not followed) and reduces each page to a snapshot entry
+ * The bounded site crawl: fetches the audited page, the site's homepage, a share of the audited page's own
+ * links and of the sitemap's URLs, then follows same-origin links breadth-first for up to
+ * `LHCI_SEO_CRAWL_MAX_DEPTH` hops (default 3) and reduces each page to a snapshot entry
  * (`crawl-extract.js`). Never throws: every failure is data in the returned artifact.
  *
  * Bounds, all constants or clamped environment variables (never settable by the audited page): at most
  * `LHCI_SEO_CRAWL_MAX_PAGES` pages (default 50), 5 requests at a time, 5 s per request with one retry for a
  * network error, a 512 KiB body per page, redirects followed for at most 3 rounds and only within the
  * origin, a request cap of 3 x pages, and a total budget (`LHCI_SEO_CRAWL_TIME_BUDGET_SECONDS`, default
- * 120 s) after which what is left is recorded as not checked.
+ * 120 s) after which what is left is recorded as not checked. Link-following is breadth-first, so when the
+ * page cap bites it is the deepest pages that are left out; URLs that look like files rather than pages
+ * are not requested, and at most `MAX_QUERY_VARIANTS` query-string variants of one path are (a crawl trap
+ * guard); both are recorded as skipped. The snapshot says whether the page cap, the depth bound or the time
+ * budget cut the crawl, so an audit that needs a complete graph can say it was not.
  *
  * Safety: every request is built from the audited page's own origin, never from anything the page says
  * except as a candidate URL that is requested only if it is on that same origin; a redirect off the origin
@@ -33,6 +38,8 @@ import {
   sameOrigin,
   selectSeeds,
   MAX_BODY_BYTES,
+  MAX_EXTERNAL_LINKS_TOTAL,
+  MAX_QUERY_VARIANTS,
   MAX_REDIRECT_ROUNDS,
   REQUEST_CAP_FACTOR,
   SNAPSHOT_VERSION,
@@ -50,6 +57,11 @@ import {resolveCacheSettings, readSnapshot, writeSnapshot} from './crawl-cache.j
 
 const DEFAULT_PAGES = 50;
 const MAX_PAGES = 200;
+const DEFAULT_DEPTH = 3;
+const MAX_DEPTH = 5;
+// URLs that are plainly files, not pages: not worth a page slot (an image, a script, an archive).
+const FILE_EXTENSION =
+  /\.(?:jpe?g|png|gif|webp|avif|svg|ico|bmp|tiff?|css|js|mjs|map|json|xml|txt|pdf|zip|gz|tgz|tar|rar|7z|mp[34]|m4a|wav|ogg|webm|avi|mov|woff2?|ttf|otf|eot|docx?|xlsx?|pptx?|csv|exe|dmg|apk)$/i;
 const DEFAULT_BUDGET_SECONDS = 120;
 const SINGLE_PAGE_BUDGET_MS = 30_000;
 const ROBOTS_TIMEOUT_MS = 5_000;
@@ -79,12 +91,13 @@ function clampedInt(raw, fallback, min, max) {
 
 /**
  * @param {NodeJS.ProcessEnv} env
- * @return {{enabled: boolean, pages: number, budgetMs: number, robots: 'honour' | 'ignore'}}
+ * @return {{enabled: boolean, pages: number, depth: number, budgetMs: number, robots: 'honour' | 'ignore'}}
  */
 function parseConfig(env) {
   return {
     enabled: !isOff(env.LHCI_SEO_CRAWL),
     pages: clampedInt(env.LHCI_SEO_CRAWL_MAX_PAGES, DEFAULT_PAGES, 1, MAX_PAGES),
+    depth: clampedInt(env.LHCI_SEO_CRAWL_MAX_DEPTH, DEFAULT_DEPTH, 1, MAX_DEPTH),
     budgetMs:
       clampedInt(env.LHCI_SEO_CRAWL_TIME_BUDGET_SECONDS, DEFAULT_BUDGET_SECONDS, 10, 600) * 1000,
     robots: isOff(env.LHCI_SEO_CRAWL_RESPECT_ROBOTS) ? 'ignore' : 'honour',
@@ -198,13 +211,15 @@ async function loadSitemapUrls({auditedUrl, collectSitemap, fetchBytes, env, now
 }
 
 /**
- * Requests the seeds, following same-origin redirects for a few rounds, and turns every checked URL into a
- * page entry. Shared by the full crawl and by the single-page top-up of a cached snapshot.
+ * Requests one level of URLs, following same-origin redirects for a few rounds, and turns every checked URL
+ * into a page entry. Shared by the full crawl (once per level) and by the single-page top-up of a cached
+ * snapshot. `visited` is shared across levels so a redirect target already requested is not requested again.
  * @param {{
- *   seeds: Array<{url: string, source: 'audited' | 'link' | 'sitemap'}>,
+ *   seeds: Array<{url: string, source: CrawlPage['source'], depth: number}>,
  *   origin: string,
  *   allowed: (url: string) => boolean,
- *   pages: number,
+ *   requestCap: number,
+ *   visited: Set<string>,
  *   deadline: number,
  *   fetchPage: typeof safeFetchPrefix,
  *   skips: ReturnType<typeof createSkips>,
@@ -212,17 +227,27 @@ async function loadSitemapUrls({auditedUrl, collectSitemap, fetchBytes, env, now
  * }} input
  * @return {Promise<{pages: CrawlPage[], requests: number, truncatedByBudget: boolean, firstError: string | null}>}
  */
-async function fetchPages({seeds, origin, allowed, pages, deadline, fetchPage, skips, now}) {
-  const requestCap = pages * REQUEST_CAP_FACTOR;
-  /** @type {Array<{source: 'audited' | 'link' | 'sitemap', url: string, current: string, hops: CrawlHop[], check: UrlCheck | null}>} */
+async function fetchPages({
+  seeds,
+  origin,
+  allowed,
+  requestCap,
+  visited,
+  deadline,
+  fetchPage,
+  skips,
+  now,
+}) {
+  /** @type {Array<{source: CrawlPage['source'], url: string, depth: number, current: string, hops: CrawlHop[], check: UrlCheck | null}>} */
   const entries = seeds.map(seed => ({
     source: seed.source,
     url: seed.url,
+    depth: seed.depth,
     current: seed.url,
     hops: [],
     check: null,
   }));
-  const visited = new Set(seeds.map(seed => seed.url));
+  for (const seed of seeds) visited.add(seed.url);
   let requests = 0;
   let truncatedByBudget = false;
   /** @type {string | null} */
@@ -320,7 +345,7 @@ async function fetchPages({seeds, origin, allowed, pages, deadline, fetchPage, s
 }
 
 /**
- * @param {{source: 'audited' | 'link' | 'sitemap', url: string, current: string, hops: CrawlHop[], check: UrlCheck | null}} entry
+ * @param {{source: CrawlPage['source'], url: string, depth: number, current: string, hops: CrawlHop[], check: UrlCheck | null}} entry
  * @return {CrawlPage}
  */
 function toPage(entry) {
@@ -352,6 +377,9 @@ function toPage(entry) {
     textLength: 0,
     wordCount: 0,
     links: [],
+    externalLinks: [],
+    pagination: {next: [], prev: []},
+    depth: entry.depth,
     source: entry.source,
     extraction: 'skipped-status',
   };
@@ -372,6 +400,219 @@ function toPage(entry) {
     page.extraction = 'error';
   }
   return page;
+}
+
+/**
+ * @param {string[]} urls
+ * @return {string[]} The URLs in order, without duplicates.
+ */
+function unique(urls) {
+  return [...new Set(urls)];
+}
+
+/**
+ * Whether a URL is worth a page slot: not a plain file (an image, a script, an archive).
+ * @param {string} url
+ * @return {boolean}
+ */
+function looksLikePage(url) {
+  try {
+    return !FILE_EXTENSION.test(new URL(url).pathname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The crawl proper: requests the seeds, then repeatedly the same-origin links found on the pages just
+ * fetched (breadth-first, so the deepest pages are what the page cap leaves out), until the depth bound, the
+ * page cap, the request cap or the time budget stops it. Leftover sitemap URLs fill slots the link-following
+ * leaves spare.
+ * @param {{
+ *   seeds: Array<{url: string, source: CrawlPage['source'], depth: number}>,
+ *   leftoverLinks: string[],
+ *   leftoverSitemap: string[],
+ *   origin: string,
+ *   allowed: (url: string) => boolean,
+ *   config: ReturnType<typeof parseConfig>,
+ *   started: number,
+ *   fetchPage: typeof safeFetchPrefix,
+ *   skips: ReturnType<typeof createSkips>,
+ *   now: () => number,
+ *   follow: boolean,
+ * }} input
+ * @return {Promise<{pages: CrawlPage[], requests: number, truncatedByBudget: boolean, firstError: string | null, overPageCap: boolean, cutByDepth: boolean}>}
+ */
+async function crawlLevels({
+  seeds,
+  leftoverLinks,
+  leftoverSitemap,
+  origin,
+  allowed,
+  config,
+  started,
+  fetchPage,
+  skips,
+  now,
+  follow,
+}) {
+  const requestCap = config.pages * REQUEST_CAP_FACTOR;
+  const deadline = started + config.budgetMs;
+  const visited = new Set(seeds.map(seed => seed.url));
+  // Every URL ever considered as a candidate, so each is judged (and any skip recorded) once.
+  const considered = new Set(visited);
+  /** @type {Map<string, Set<string>>} */
+  const variants = new Map();
+  /** @param {string} url @return {boolean} Whether the URL is within the query-variant limit (and counts it). */
+  const withinVariantLimit = url => {
+    const parsed = new URL(url);
+    if (!parsed.search) return true;
+    const set = variants.get(parsed.pathname) || new Set();
+    variants.set(parsed.pathname, set);
+    if (set.has(parsed.search)) return true;
+    if (set.size >= MAX_QUERY_VARIANTS) return false;
+    set.add(parsed.search);
+    return true;
+  };
+  for (const seed of seeds) withinVariantLimit(seed.url);
+
+  /** @type {CrawlPage[]} */
+  const pages = [];
+  let requests = 0;
+  let truncatedByBudget = false;
+  /** @type {string | null} */
+  let firstError = null;
+  let overPageCap = false;
+  let cutByDepth = false;
+  let pendingLinks = leftoverLinks.map(url => ({url, depth: 1}));
+  let sitemapPool = leftoverSitemap.slice();
+  /** @type {Array<{url: string, source: CrawlPage['source'], depth: number}>} */
+  let level = seeds;
+
+  while (level.length > 0) {
+    const fetched = await fetchPages({
+      seeds: level,
+      origin,
+      allowed,
+      requestCap: requestCap - requests,
+      visited,
+      deadline,
+      fetchPage,
+      skips,
+      now,
+    });
+    pages.push(...fetched.pages);
+    requests += fetched.requests;
+    if (fetched.firstError && firstError === null) firstError = fetched.firstError;
+    if (fetched.truncatedByBudget) {
+      truncatedByBudget = true;
+      break;
+    }
+    if (!follow || requests >= requestCap) break;
+
+    // Candidates for the next level: leftover seed links first, then the links of the pages just fetched,
+    // shallower parents before deeper ones.
+    /** @type {Array<{url: string, depth: number}>} */
+    const found = pendingLinks;
+    pendingLinks = [];
+    const parents = fetched.pages
+      .filter(page => page.extraction === 'ok')
+      .sort((a, b) => a.depth - b.depth);
+    for (const page of parents) {
+      for (const link of page.links) found.push({url: link.url, depth: page.depth + 1});
+    }
+    /** @type {Array<{url: string, source: CrawlPage['source'], depth: number}>} */
+    const candidates = [];
+    for (const {url, depth} of found) {
+      if (visited.has(url) || considered.has(url)) continue;
+      if (depth > config.depth) {
+        // Found on a page at the depth bound: a page exists that the crawl will not go to. Not marked as
+        // considered, so a shallower page found later can still lead to it.
+        if (allowed(url) && looksLikePage(url)) cutByDepth = true;
+        continue;
+      }
+      considered.add(url);
+      if (!allowed(url)) {
+        skips.add(url, 'blocked-by-robots', null);
+      } else if (!looksLikePage(url)) {
+        skips.add(url, 'not-a-page', 'the URL looks like a file, not a page');
+      } else if (!withinVariantLimit(url)) {
+        skips.add(
+          url,
+          'query-variants',
+          `more than ${MAX_QUERY_VARIANTS} query variants of this path`
+        );
+      } else {
+        candidates.push({url, source: 'link', depth});
+      }
+    }
+
+    let room = Math.max(0, config.pages - pages.length);
+    let next = candidates;
+    if (candidates.length > room) {
+      overPageCap = true;
+      const picked = new Set(pickEvenlyKeepingOrder(candidates, room));
+      for (const candidate of candidates) {
+        if (!picked.has(candidate)) skips.add(candidate.url, 'over-page-cap', null);
+      }
+      next = candidates.filter(candidate => picked.has(candidate));
+    }
+    room -= next.length;
+    // Slots the link-following leaves spare go to the sitemap's remaining URLs.
+    if (room > 0 && sitemapPool.length > 0) {
+      sitemapPool = sitemapPool.filter(url => !visited.has(url) && !considered.has(url));
+      const picked = pickEvenly(sitemapPool, Math.min(room, sitemapPool.length));
+      const pickedSet = new Set(picked);
+      sitemapPool = sitemapPool.filter(url => !pickedSet.has(url));
+      for (const url of picked) {
+        considered.add(url);
+        next.push({url, source: 'sitemap', depth: 0});
+      }
+    }
+    level = next;
+  }
+
+  // Whatever is still waiting for a slot was left out by the page cap.
+  for (const url of sitemapPool) {
+    if (!visited.has(url) && !considered.has(url)) {
+      skips.add(url, 'over-page-cap', null);
+      overPageCap = true;
+    }
+  }
+  return {pages, requests, truncatedByBudget, firstError, overPageCap, cutByDepth};
+}
+
+/**
+ * `pickEvenly` for objects: the same evenly spread, deterministic choice, returned as the chosen elements.
+ * @template T
+ * @param {T[]} items
+ * @param {number} count
+ * @return {T[]}
+ */
+function pickEvenlyKeepingOrder(items, count) {
+  if (count <= 0) return [];
+  const indexes = pickEvenly(
+    items.map((_, index) => index),
+    count
+  );
+  return indexes.map(index => items[index]);
+}
+
+/**
+ * At most `MAX_EXTERNAL_LINKS_TOTAL` distinct external URLs across the whole snapshot, in page order, so
+ * the cache file stays small however many outbound links a hostile site has.
+ * @param {CrawlPage[]} pages
+ */
+function limitExternalLinks(pages) {
+  const seen = new Set();
+  for (const page of pages) {
+    page.externalLinks = page.externalLinks.filter(link => {
+      if (seen.has(link.url)) return true;
+      if (seen.size >= MAX_EXTERNAL_LINKS_TOTAL) return false;
+      seen.add(link.url);
+      return true;
+    });
+  }
 }
 
 /**
@@ -440,6 +681,7 @@ async function crawlSite(rawInput) {
     const key = cacheKey({
       origin,
       pages: config.pages,
+      depth: config.depth,
       robots: config.robots,
       userAgent: USER_AGENT,
     });
@@ -456,8 +698,8 @@ async function crawlSite(rawInput) {
     const robots = await loadRobots({origin, mode: config.robots, fetchBytes});
     const skips = createSkips();
 
-    // Seeds: the page's own links, then the sitemap's URLs; anything off the origin or that robots.txt
-    // disallows is recorded and never requested.
+    // Seeds: the audited page, the homepage, the page's own links, then the sitemap's URLs; anything off the
+    // origin or that robots.txt disallows is recorded and never requested.
     /** @param {string[]} raw @param {string} base */
     const sameOriginAllowed = (raw, base) => {
       /** @type {string[]} */
@@ -476,28 +718,52 @@ async function crawlSite(rawInput) {
     let links = [];
     /** @type {string[]} */
     let sitemapUrls = [];
+    /** @type {string[]} */
+    let sitemapListed = [];
+    /** @type {string | null} */
+    let home = null;
     if (robots.state !== 'unavailable') {
       links = sameOriginAllowed(pageLinks, audited);
-      sitemapUrls = sameOriginAllowed(
-        await loadSitemapUrls({auditedUrl: audited, collectSitemap, fetchBytes, env, now}),
-        audited
+      const rawSitemap = await loadSitemapUrls({
+        auditedUrl: audited,
+        collectSitemap,
+        fetchBytes,
+        env,
+        now,
+      });
+      sitemapListed = unique(
+        rawSitemap
+          .map(href => normalizeUrl(href, audited))
+          .filter(/** @return {url is string} */ url => url !== null && sameOrigin(url, origin))
       );
+      sitemapUrls = sameOriginAllowed(rawSitemap, audited);
+      const homeUrl = normalizeUrl('/', origin);
+      if (homeUrl && homeUrl !== audited) {
+        if (robots.allowed(homeUrl)) home = homeUrl;
+        else skips.add(homeUrl, 'blocked-by-robots', 'the homepage');
+      }
     }
-    const seeds = selectSeeds({audited, links, sitemapUrls, pages: config.pages});
+    const seeds = selectSeeds({audited, home, links, sitemapUrls, pages: config.pages});
     const chosen = new Set(seeds.map(seed => seed.url));
-    for (const url of [...links, ...sitemapUrls]) {
-      if (!chosen.has(url)) skips.add(url, 'over-page-cap', null);
-    }
+    // Seed candidates that did not get a seed slot are not lost: the page's own links are found again by
+    // the link-following below, and the leftover sitemap URLs fill any slots it leaves spare.
+    const leftoverLinks = links.filter(url => !chosen.has(url));
+    const leftoverSitemap = sitemapUrls.filter(
+      url => !chosen.has(url) && !leftoverLinks.includes(url)
+    );
 
-    const fetched = await fetchPages({
-      seeds,
+    const crawl = await crawlLevels({
+      seeds: seeds.map(seed => ({...seed, depth: seed.source === 'link' ? 1 : 0})),
+      leftoverLinks,
+      leftoverSitemap,
       origin,
       allowed: robots.allowed,
-      pages: config.pages,
-      deadline: started + config.budgetMs,
+      config,
+      started,
       fetchPage,
       skips,
       now,
+      follow: robots.state !== 'unavailable',
     });
     if (robots.state === 'unavailable') {
       skips.add(
@@ -506,6 +772,7 @@ async function crawlSite(rawInput) {
         `robots.txt could not be read (${robots.reason}), so only the audited page was requested`
       );
     }
+    limitExternalLinks(crawl.pages);
 
     /** @type {CrawlSnapshot} */
     const snapshot = {
@@ -514,6 +781,7 @@ async function crawlSite(rawInput) {
       createdAt: new Date(now()).toISOString(),
       bounds: {
         pages: config.pages,
+        depth: config.depth,
         budgetMs: config.budgetMs,
         robots: config.robots,
         userAgent: USER_AGENT,
@@ -521,17 +789,22 @@ async function crawlSite(rawInput) {
       robots: {state: robots.state},
       seeds: {
         audited: 1,
+        home: seeds.filter(seed => seed.source === 'home').length,
         links: seeds.filter(seed => seed.source === 'link').length,
         sitemap: seeds.filter(seed => seed.source === 'sitemap').length,
       },
-      pages: fetched.pages,
+      sitemapUrls: sitemapListed,
+      pages: crawl.pages,
       skipped: skips.finish(),
       stats: {
-        requests: fetched.requests + (config.robots === 'honour' ? 1 : 0),
+        requests: crawl.requests + (config.robots === 'honour' ? 1 : 0),
         elapsedMs: Math.max(0, now() - started),
-        truncatedByBudget: fetched.truncatedByBudget,
+        truncatedByBudget: crawl.truncatedByBudget,
+        overPageCap: crawl.overPageCap,
+        cutByDepth: crawl.cutByDepth,
       },
     };
+    const fetched = crawl;
 
     const answered = snapshot.pages.filter(page => page.status !== null);
     if (answered.length === 0) {
@@ -570,10 +843,11 @@ async function topUpCached({cached, audited, origin, fetchPage, now, artifact}) 
 
   const skips = createSkips();
   const fetched = await fetchPages({
-    seeds: [{url: audited, source: 'audited'}],
+    seeds: [{url: audited, source: 'audited', depth: 0}],
     origin,
     allowed: () => true,
-    pages: 1,
+    requestCap: REQUEST_CAP_FACTOR,
+    visited: new Set(),
     deadline: now() + SINGLE_PAGE_BUDGET_MS,
     fetchPage,
     skips,

@@ -33,7 +33,7 @@ function makeSite(routes) {
     fetchPage: async (/** @type {string} */ url, /** @type {any} */ options) => {
       requests.push({url, options});
       clock += site.perRequestMs;
-      const route = routes[url];
+      const route = routes[url] ?? (routes.__default ? routes.__default(url) : undefined);
       if (route instanceof Error) throw route;
       // A URL the test did not script is a normal, working page.
       return response(route?.status ?? 200, route?.body ?? page(), route || {});
@@ -105,9 +105,18 @@ describe('parseConfig', () => {
     expect(parseConfig({})).toEqual({
       enabled: true,
       pages: 50,
+      depth: 3,
       budgetMs: 120_000,
       robots: 'honour',
     });
+  });
+
+  it('clamps the depth to 1 to 5 and ignores garbage', () => {
+    expect(parseConfig({LHCI_SEO_CRAWL_MAX_DEPTH: '0'}).depth).toBe(1);
+    expect(parseConfig({LHCI_SEO_CRAWL_MAX_DEPTH: '-2'}).depth).toBe(1);
+    expect(parseConfig({LHCI_SEO_CRAWL_MAX_DEPTH: '99'}).depth).toBe(5);
+    expect(parseConfig({LHCI_SEO_CRAWL_MAX_DEPTH: '2'}).depth).toBe(2);
+    expect(parseConfig({LHCI_SEO_CRAWL_MAX_DEPTH: 'deep'}).depth).toBe(3);
   });
 
   it('clamps pages and the time budget, and ignores garbage', () => {
@@ -149,7 +158,7 @@ describe('crawlSite: switched off and bad input', () => {
   it('is unavailable for an audited URL that is not http(s), without throwing', async () => {
     const site = makeSite({});
     for (const bad of [
-      'not a url',
+      'ftp://example.com/file',
       'ftp://example.com/',
       'file:///etc/passwd',
       '',
@@ -191,10 +200,11 @@ describe('crawlSite: a cold crawl', () => {
     });
     expect(snap.pages[0].links.map((/** @type {any} */ l) => l.url)).toEqual([u('/a')]);
     expect(snap.pages[0].textHash).toMatch(/^[0-9a-f]{64}$/);
-    expect(snap.seeds).toEqual({audited: 1, links: 2, sitemap: 0});
+    expect(snap.seeds).toEqual({audited: 1, home: 0, links: 2, sitemap: 0});
     expect(snap.robots).toEqual({state: 'absent'});
     expect(snap.bounds).toEqual({
       pages: 50,
+      depth: 3,
       budgetMs: 120_000,
       robots: 'honour',
       userAgent: USER_AGENT,
@@ -223,7 +233,7 @@ describe('crawlSite: a cold crawl', () => {
     const [dir, key, snap] = cache.write.mock.calls[0];
     expect(dir).toBe('/cache');
     expect(key).toBe(
-      cacheKey({origin: ORIGIN, pages: 20, robots: 'honour', userAgent: USER_AGENT})
+      cacheKey({origin: ORIGIN, pages: 20, depth: 3, robots: 'honour', userAgent: USER_AGENT})
     );
     expect(snap.pages).toHaveLength(1);
   });
@@ -281,13 +291,15 @@ describe('crawlSite: bounds', () => {
     });
     expect(site.requests).toHaveLength(10);
     expect(result.snapshot.pages).toHaveLength(10);
-    expect(result.snapshot.seeds).toEqual({audited: 1, links: 5, sitemap: 4});
+    // Seeds take at most half of the slots after the audited page (here 3 links and 2 sitemap URLs); the
+    // rest is filled by the link-following and by more sitemap URLs.
+    expect(result.snapshot.seeds).toEqual({audited: 1, home: 0, links: 3, sitemap: 2});
     expect(
       result.snapshot.skipped.some((/** @type {any} */ s) => s.reason === 'over-page-cap')
     ).toBe(true);
   });
 
-  it('splits the slots between the page links and the sitemap', async () => {
+  it('gives the page links their slots first and fills the spare ones from the sitemap', async () => {
     const site = makeSite({});
     await crawl(site, {
       pageLinks: [u('/l1'), u('/l2')],
@@ -295,7 +307,7 @@ describe('crawlSite: bounds', () => {
       env: {LHCI_SEO_CRAWL_MAX_PAGES: '5'},
     });
     expect(new Set(requested(site))).toEqual(
-      new Set([AUDITED, u('/l1'), u('/l2'), u('/s1'), u('/s4')])
+      new Set([AUDITED, u('/l1'), u('/l2'), u('/s1'), u('/s2')])
     );
   });
 
@@ -567,6 +579,272 @@ describe('crawlSite: robots.txt identifies the crawler', () => {
   });
 });
 
+const linksTo = (/** @type {string[]} */ paths) =>
+  paths.map(path => `<a href="${path}">${path}</a>`).join('');
+const depthsOf = (/** @type {any} */ result) =>
+  Object.fromEntries(result.snapshot.pages.map((/** @type {any} */ p) => [p.url, p.depth]));
+
+describe('crawlSite: link-following', () => {
+  /** A chain: / -> /a -> /b -> /c -> /d -> /e. */
+  const chain = () =>
+    makeSite({
+      [AUDITED]: {body: page('Home', linksTo(['/a']))},
+      [u('/a')]: {body: page('A', linksTo(['/b']))},
+      [u('/b')]: {body: page('B', linksTo(['/c']))},
+      [u('/c')]: {body: page('C', linksTo(['/d']))},
+      [u('/d')]: {body: page('D', linksTo(['/e']))},
+    });
+
+  it('follows links for three hops by default, records each page depth, and says the crawl was cut by depth', async () => {
+    const site = chain();
+    const result = await crawl(site);
+    expect(requested(site)).toEqual([AUDITED, u('/a'), u('/b'), u('/c')]);
+    expect(depthsOf(result)).toEqual({[AUDITED]: 0, [u('/a')]: 1, [u('/b')]: 2, [u('/c')]: 3});
+    expect(result.snapshot.stats.cutByDepth).toBe(true);
+    expect(result.snapshot.stats.overPageCap).toBe(false);
+    expect(result.snapshot.bounds.depth).toBe(3);
+  });
+
+  it('follows as far as LHCI_SEO_CRAWL_MAX_DEPTH says, and is not cut when nothing is left', async () => {
+    const one = await crawl(chain(), {env: {LHCI_SEO_CRAWL_MAX_DEPTH: '1'}});
+    expect(Object.keys(depthsOf(one))).toEqual([AUDITED, u('/a')]);
+    expect(one.snapshot.stats.cutByDepth).toBe(true);
+    const five = await crawl(chain(), {env: {LHCI_SEO_CRAWL_MAX_DEPTH: '5'}});
+    expect(Object.keys(depthsOf(five))).toHaveLength(6);
+    expect(five.snapshot.stats.cutByDepth).toBe(false);
+  });
+
+  it('is not cut by depth on a site it has fully crawled', async () => {
+    const site = makeSite({
+      [AUDITED]: {body: page('Home', linksTo(['/a', '/b']))},
+      [u('/a')]: {body: page('A', linksTo(['/b', '/']))},
+    });
+    const result = await crawl(site);
+    expect(result.snapshot.pages).toHaveLength(3);
+    expect(result.snapshot.stats).toMatchObject({cutByDepth: false, overPageCap: false});
+  });
+
+  it('crawls shallower pages before deeper ones, so the page cap leaves out the deepest', async () => {
+    const site = makeSite({
+      [AUDITED]: {body: page('Home', linksTo(['/a', '/b', '/c']))},
+      [u('/a')]: {body: page('A', linksTo(['/a1', '/a2']))},
+      [u('/b')]: {body: page('B', linksTo(['/b1', '/b2']))},
+      [u('/c')]: {body: page('C', linksTo(['/c1', '/c2']))},
+    });
+    const result = await crawl(site, {env: {LHCI_SEO_CRAWL_MAX_PAGES: '6'}});
+    const depths = depthsOf(result);
+    // 1 + 3 pages at depth 1, then 2 of the 6 pages at depth 2.
+    expect(Object.values(depths).filter(d => d === 1)).toHaveLength(3);
+    expect(Object.values(depths).filter(d => d === 2)).toHaveLength(2);
+    expect(result.snapshot.pages).toHaveLength(6);
+    expect(result.snapshot.stats.overPageCap).toBe(true);
+    expect(
+      result.snapshot.skipped.filter((/** @type {any} */ s) => s.reason === 'over-page-cap')
+    ).toHaveLength(4);
+  });
+
+  it('requests the homepage as a second seed when the audited page is deeper', async () => {
+    const deep = u('/blog/post');
+    const site = makeSite({
+      [deep]: {body: page('Post', '<p>post</p>')},
+      [AUDITED]: {body: page('Home', linksTo(['/about']))},
+    });
+    const result = await crawl(site, {auditedUrl: deep});
+    expect(requested(site).slice(0, 2)).toEqual([deep, AUDITED]);
+    expect(result.snapshot.pages.map((/** @type {any} */ p) => [p.url, p.source, p.depth])).toEqual(
+      [
+        [deep, 'audited', 0],
+        [AUDITED, 'home', 0],
+        [u('/about'), 'link', 1],
+      ]
+    );
+    expect(result.snapshot.seeds.home).toBe(1);
+  });
+
+  it('does not request the homepage twice when it is the audited page', async () => {
+    const site = makeSite({});
+    await crawl(site);
+    expect(requested(site).filter(url => url === AUDITED)).toHaveLength(1);
+  });
+
+  it('records a homepage that robots.txt disallows instead of requesting it', async () => {
+    const deep = u('/blog/post');
+    const site = makeSite({});
+    const result = await crawl(site, {
+      auditedUrl: deep,
+      fetchBytes: robots(200, 'User-agent: *\nDisallow: /$'),
+    });
+    expect(requested(site)).toEqual([deep]);
+    expect(result.snapshot.seeds.home).toBe(0);
+    expect(
+      result.snapshot.skipped.some(
+        (/** @type {any} */ s) => s.reason === 'blocked-by-robots' && s.url === AUDITED
+      )
+    ).toBe(true);
+  });
+
+  it('gives sitemap seeds depth 0 and the audited page’s own links depth 1', async () => {
+    const site = makeSite({});
+    const result = await crawl(site, {
+      pageLinks: [u('/l1')],
+      collectSitemap: sitemapOf([u('/s1')]),
+    });
+    expect(depthsOf(result)).toEqual({[AUDITED]: 0, [u('/l1')]: 1, [u('/s1')]: 0});
+  });
+
+  it('does not follow a link robots.txt disallows, and records it', async () => {
+    const site = makeSite({
+      [AUDITED]: {body: page('Home', linksTo(['/ok', '/private/x']))},
+    });
+    const result = await crawl(site, {
+      fetchBytes: robots(200, 'User-agent: *\nDisallow: /private/'),
+    });
+    expect(requested(site)).toEqual([AUDITED, u('/ok')]);
+    expect(
+      result.snapshot.skipped.some(
+        (/** @type {any} */ s) => s.reason === 'blocked-by-robots' && s.url === u('/private/x')
+      )
+    ).toBe(true);
+  });
+
+  it('never requests another origin, whatever the pages link to', async () => {
+    const site = makeSite({
+      [AUDITED]: {
+        body: page(
+          'Home',
+          '<a href="https://evil.test/x">e</a><a href="http://example.com/x">scheme</a><a href="https://sub.example.com/">sub</a><a href="/ok">ok</a>'
+        ),
+      },
+    });
+    await crawl(site);
+    expect(requested(site)).toEqual([AUDITED, u('/ok')]);
+  });
+
+  it('does not spend page slots on files, and records them', async () => {
+    const site = makeSite({
+      [AUDITED]: {body: page('Home', linksTo(['/logo.PNG', '/guide.pdf', '/page', '/app.js?v=2']))},
+    });
+    const result = await crawl(site);
+    expect(requested(site)).toEqual([AUDITED, u('/page')]);
+    expect(
+      result.snapshot.skipped
+        .filter((/** @type {any} */ s) => s.reason === 'not-a-page')
+        .map((/** @type {any} */ s) => s.url)
+    ).toEqual([u('/logo.PNG'), u('/guide.pdf'), u('/app.js?v=2')]);
+  });
+
+  it('stops following at five query-string variants of one path, and records the rest', async () => {
+    const paths = Array.from({length: 12}, (_, i) => `/list?page=${i + 1}`);
+    const site = makeSite({[AUDITED]: {body: page('Home', linksTo([...paths, '/list']))}});
+    const result = await crawl(site);
+    const listRequests = requested(site).filter(url => url.includes('/list'));
+    expect(listRequests).toHaveLength(6); // /list itself and five variants
+    expect(
+      result.snapshot.skipped.filter((/** @type {any} */ s) => s.reason === 'query-variants')
+    ).toHaveLength(7);
+  });
+
+  it('does not follow anything when robots.txt cannot be read: only the audited page is requested', async () => {
+    const site = makeSite({[AUDITED]: {body: page('Home', linksTo(['/a']))}});
+    const result = await crawl(site, {fetchBytes: robots(503)});
+    expect(requested(site)).toEqual([AUDITED]);
+    expect(result.snapshot.pages).toHaveLength(1);
+  });
+
+  it('does not follow links of a page that was not read as HTML or answered with an error', async () => {
+    const site = makeSite({
+      [AUDITED]: {body: page('Home', linksTo(['/gone', '/doc']))},
+      [u('/gone')]: {status: 404},
+      [u('/doc')]: {contentType: 'application/pdf'},
+    });
+    const result = await crawl(site);
+    expect(requested(site)).toEqual([AUDITED, u('/gone'), u('/doc')]);
+    expect(result.snapshot.pages).toHaveLength(3);
+  });
+
+  it('fills slots the link-following leaves spare with the sitemap’s remaining URLs', async () => {
+    const site = makeSite({});
+    const sitemap = Array.from({length: 30}, (_, i) => u(`/s${i}`));
+    const result = await crawl(site, {
+      collectSitemap: sitemapOf(sitemap),
+      env: {LHCI_SEO_CRAWL_MAX_PAGES: '10'},
+    });
+    expect(result.snapshot.pages).toHaveLength(10);
+    expect(result.snapshot.stats.overPageCap).toBe(true);
+    expect(result.snapshot.sitemapUrls).toEqual(sitemap);
+  });
+
+  it('keeps the sitemap URL list: same-origin only, normalised, without duplicates', async () => {
+    const site = makeSite({});
+    const result = await crawl(site, {
+      collectSitemap: sitemapOf([
+        u('/a#frag'),
+        u('/a'),
+        'https://other.test/x',
+        u('/b'),
+        'ftp://example.com/file',
+      ]),
+    });
+    expect(result.snapshot.sitemapUrls).toEqual([u('/a'), u('/b')]);
+  });
+
+  it('stays inside the page and request caps against a site that links to endless new pages', async () => {
+    let n = 0;
+    const site = makeSite({
+      __default: () => ({body: page('T', linksTo(Array.from({length: 40}, () => `/t/${n++}`)))}),
+    });
+    const result = await crawl(site, {env: {LHCI_SEO_CRAWL_MAX_PAGES: '30'}});
+    expect(result.snapshot.pages.length).toBeLessThanOrEqual(30);
+    expect(site.requests.length).toBeLessThanOrEqual(90);
+    expect(result.snapshot.stats.overPageCap).toBe(true);
+  });
+
+  it('stops following when the time budget runs out and says so', async () => {
+    const site = makeSite({
+      __default: (/** @type {string} */ url) => ({
+        body: page(url, linksTo([`${new URL(url).pathname}x`, `${new URL(url).pathname}y`])),
+      }),
+    });
+    site.perRequestMs = 40_000;
+    const result = await crawl(site, {env: {LHCI_SEO_CRAWL_TIME_BUDGET_SECONDS: '100'}});
+    expect(result.snapshot.stats.truncatedByBudget).toBe(true);
+    expect(result.snapshot.pages.length).toBeLessThan(10);
+  });
+
+  it('keeps at most 500 distinct external links across the snapshot', async () => {
+    let pageNumber = 0;
+    const site = makeSite({
+      __default: () => {
+        const base = pageNumber++ * 20;
+        const external = Array.from(
+          {length: 20},
+          (_, i) => `<a href="https://o${base + i}.test/">x</a>`
+        ).join('');
+        return {body: page('T', external + linksTo([`/n${pageNumber}`]))};
+      },
+    });
+    const result = await crawl(site, {
+      env: {LHCI_SEO_CRAWL_MAX_PAGES: '40', LHCI_SEO_CRAWL_MAX_DEPTH: '5'},
+    });
+    const all = result.snapshot.pages.flatMap((/** @type {any} */ p) =>
+      p.externalLinks.map((/** @type {any} */ l) => l.url)
+    );
+    expect(new Set(all).size).toBeLessThanOrEqual(500);
+    expect(all.length).toBeLessThanOrEqual(500);
+  });
+
+  it('uses a different cache key for a different depth', async () => {
+    const cache = fakeCache();
+    await crawl(makeSite({}), {cache, env: {LHCI_SEO_CRAWL_CACHE_DIR: '/c'}});
+    await crawl(makeSite({}), {
+      cache: cache,
+      env: {LHCI_SEO_CRAWL_CACHE_DIR: '/c', LHCI_SEO_CRAWL_MAX_DEPTH: '2'},
+    });
+    const keys = cache.read.mock.calls.map(([, key]) => key);
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+});
+
 describe('crawlSite: the sitemap', () => {
   it('asks the Phase 4 discovery for the URLs, with the page sample switched off', async () => {
     const site = makeSite({});
@@ -677,7 +955,9 @@ describe('crawlSite: the cache', () => {
     });
     const [dir, key, options] = cache.read.mock.calls[0];
     expect(dir).toBe('/c');
-    expect(key).toBe(cacheKey({origin: ORIGIN, pages: 7, robots: 'honour', userAgent: USER_AGENT}));
+    expect(key).toBe(
+      cacheKey({origin: ORIGIN, pages: 7, depth: 3, robots: 'honour', userAgent: USER_AGENT})
+    );
     expect(options.ttlMs).toBe(30_000);
   });
 

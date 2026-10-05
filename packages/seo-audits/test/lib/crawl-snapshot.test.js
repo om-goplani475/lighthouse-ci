@@ -85,87 +85,120 @@ const range = (/** @type {string} */ prefix, /** @type {number} */ n) =>
   Array.from({length: n}, (_, i) => u(`${prefix}${i}`));
 
 describe('selectSeeds', () => {
-  it('always starts with the audited page', () => {
-    const seeds = selectSeeds({audited: A, links: [u('a')], sitemapUrls: [u('b')], pages: 10});
+  const H = 'https://example.com/home';
+  const count = (/** @type {any[]} */ seeds, /** @type {string} */ source) =>
+    seeds.filter(s => s.source === source).length;
+
+  it('always starts with the audited page, then the homepage', () => {
+    const seeds = selectSeeds({
+      audited: A,
+      home: H,
+      links: [u('a')],
+      sitemapUrls: [u('b')],
+      pages: 10,
+    });
     expect(seeds[0]).toEqual({url: A, source: 'audited'});
+    expect(seeds[1]).toEqual({url: H, source: 'home'});
   });
 
-  it('returns only the audited page when the cap is 1 (or invalid)', () => {
-    expect(
-      selectSeeds({audited: A, links: [u('a')], sitemapUrls: [u('b')], pages: 1})
-    ).toHaveLength(1);
-    expect(
-      selectSeeds({audited: A, links: [u('a')], sitemapUrls: [u('b')], pages: 0})
-    ).toHaveLength(1);
+  it('adds no homepage seed when it is the audited page, absent, or the cap leaves no room', () => {
+    expect(selectSeeds({audited: A, home: A, links: [], sitemapUrls: [], pages: 10})).toEqual([
+      {url: A, source: 'audited'},
+    ]);
+    expect(selectSeeds({audited: A, links: [], sitemapUrls: [], pages: 10})).toHaveLength(1);
+    expect(selectSeeds({audited: A, home: H, links: [u('a')], sitemapUrls: [], pages: 1})).toEqual([
+      {url: A, source: 'audited'},
+    ]);
+    expect(selectSeeds({audited: A, home: H, links: [u('a')], sitemapUrls: [], pages: 2})).toEqual([
+      {url: A, source: 'audited'},
+      {url: H, source: 'home'},
+    ]);
   });
 
-  it('splits the remaining slots between links and the sitemap, links getting the extra one when odd', () => {
+  it('returns only the audited page when the cap is 1 or invalid', () => {
+    for (const pages of [1, 0, -5, NaN]) {
+      expect(
+        selectSeeds({audited: A, home: H, links: [u('a')], sitemapUrls: [u('b')], pages})
+      ).toHaveLength(1);
+    }
+  });
+
+  it('leaves at least half of the remaining slots for link-following', () => {
+    const seeds = selectSeeds({
+      audited: A,
+      home: H,
+      links: range('l', 100),
+      sitemapUrls: range('s', 100),
+      pages: 50,
+    });
+    // 48 slots after the audited page and the homepage: 24 for seeds (12 links, 12 sitemap), 24 left.
+    expect(seeds).toHaveLength(26);
+    expect(count(seeds, 'link')).toBe(12);
+    expect(count(seeds, 'sitemap')).toBe(12);
+  });
+
+  it('splits the seed share between links and the sitemap, links getting the extra one when odd', () => {
     const odd = selectSeeds({
       audited: A,
       links: range('l', 50),
       sitemapUrls: range('s', 50),
       pages: 10,
     });
-    expect(odd.filter(s => s.source === 'link')).toHaveLength(5);
-    expect(odd.filter(s => s.source === 'sitemap')).toHaveLength(4);
-    const even = selectSeeds({
-      audited: A,
-      links: range('l', 50),
-      sitemapUrls: range('s', 50),
-      pages: 9,
-    });
-    expect(even.filter(s => s.source === 'link')).toHaveLength(4);
-    expect(even.filter(s => s.source === 'sitemap')).toHaveLength(4);
+    // 9 slots, share 5: 3 links, 2 sitemap.
+    expect(count(odd, 'link')).toBe(3);
+    expect(count(odd, 'sitemap')).toBe(2);
   });
 
   it('never exceeds the page cap', () => {
     for (const pages of [2, 3, 7, 50, 200]) {
       const seeds = selectSeeds({
         audited: A,
+        home: H,
         links: range('l', 300),
         sitemapUrls: range('s', 300),
         pages,
       });
       expect(seeds.length).toBeLessThanOrEqual(pages);
-      expect(seeds).toHaveLength(pages);
+      expect(seeds.length).toBeLessThanOrEqual(2 + Math.ceil((pages - 2) / 2));
     }
   });
 
-  it('gives spare slots to the other list when one is short', () => {
+  it('gives spare seed slots to the other list when one is short, but never past the share', () => {
     const fewLinks = selectSeeds({
       audited: A,
-      links: range('l', 2),
+      links: range('l', 1),
       sitemapUrls: range('s', 50),
       pages: 10,
     });
-    expect(fewLinks.filter(s => s.source === 'link')).toHaveLength(2);
-    expect(fewLinks.filter(s => s.source === 'sitemap')).toHaveLength(7);
+    expect(count(fewLinks, 'link')).toBe(1);
+    expect(count(fewLinks, 'sitemap')).toBe(4);
     const fewSitemap = selectSeeds({
       audited: A,
       links: range('l', 50),
       sitemapUrls: range('s', 1),
       pages: 10,
     });
-    expect(fewSitemap.filter(s => s.source === 'sitemap')).toHaveLength(1);
-    expect(fewSitemap.filter(s => s.source === 'link')).toHaveLength(8);
+    expect(count(fewSitemap, 'sitemap')).toBe(1);
+    expect(count(fewSitemap, 'link')).toBe(4);
     const neither = selectSeeds({audited: A, links: [], sitemapUrls: [], pages: 10});
     expect(neither).toEqual([{url: A, source: 'audited'}]);
   });
 
-  it('deduplicates, drops the audited page from the lists, and counts a URL in both as a link', () => {
+  it('deduplicates, drops the audited page and the homepage from the lists, and counts a URL in both as a link', () => {
     const seeds = selectSeeds({
       audited: A,
-      links: [A, u('a'), u('a'), u('b')],
-      sitemapUrls: [A, u('b'), u('c'), u('c')],
-      pages: 10,
+      home: H,
+      links: [A, H, u('a'), u('a'), u('b')],
+      sitemapUrls: [A, H, u('b'), u('c'), u('c')],
+      pages: 20,
     });
-    expect(seeds.map(s => s.url)).toEqual([A, u('a'), u('b'), u('c')]);
+    expect(seeds.map(s => s.url)).toEqual([A, H, u('a'), u('b'), u('c')]);
     expect(seeds.find(s => s.url === u('b'))?.source).toBe('link');
     expect(seeds.find(s => s.url === u('c'))?.source).toBe('sitemap');
   });
 
   it('is deterministic, and keeps the first and last of a long list', () => {
-    const input = {audited: A, links: range('l', 100), sitemapUrls: range('s', 100), pages: 10};
+    const input = {audited: A, links: range('l', 100), sitemapUrls: range('s', 100), pages: 20};
     expect(selectSeeds(input)).toEqual(selectSeeds(input));
     const links = selectSeeds(input)
       .filter(s => s.source === 'link')
@@ -179,6 +212,7 @@ describe('cacheKey', () => {
   const base = {
     origin: 'https://example.com',
     pages: 50,
+    depth: 3,
     robots: /** @type {'honour'} */ ('honour'),
     userAgent: USER_AGENT,
   };
@@ -193,10 +227,11 @@ describe('cacheKey', () => {
       cacheKey(base),
       cacheKey({...base, origin: 'https://example.org'}),
       cacheKey({...base, pages: 49}),
+      cacheKey({...base, depth: 2}),
       cacheKey({...base, robots: 'ignore'}),
       cacheKey({...base, userAgent: 'other/1'}),
     ]);
-    expect(keys.size).toBe(5);
+    expect(keys.size).toBe(6);
   });
 
   it('cannot be steered by a hostile origin into a path (it is always hex)', () => {
@@ -222,6 +257,9 @@ const page = (/** @type {any} */ over = {}) => ({
   textLength: 3,
   wordCount: 1,
   links: [],
+  externalLinks: [],
+  pagination: {next: [], prev: []},
+  depth: 0,
   source: 'audited',
   extraction: 'ok',
   ...over,
@@ -230,12 +268,19 @@ const snapshot = (/** @type {any} */ over = {}) => ({
   version: SNAPSHOT_VERSION,
   origin: 'https://example.com',
   createdAt: '2026-10-01T00:00:00.000Z',
-  bounds: {pages: 50, budgetMs: 120000, robots: 'honour', userAgent: USER_AGENT},
+  bounds: {pages: 50, depth: 3, budgetMs: 120000, robots: 'honour', userAgent: USER_AGENT},
   robots: {state: 'present'},
-  seeds: {audited: 1, links: 0, sitemap: 0},
+  seeds: {audited: 1, home: 0, links: 0, sitemap: 0},
+  sitemapUrls: [],
   pages: [page()],
   skipped: [],
-  stats: {requests: 1, elapsedMs: 5, truncatedByBudget: false},
+  stats: {
+    requests: 1,
+    elapsedMs: 5,
+    truncatedByBudget: false,
+    overPageCap: false,
+    cutByDepth: false,
+  },
   ...over,
 });
 
@@ -253,7 +298,9 @@ describe('isSnapshot', () => {
   });
 
   it('rejects a wrong or missing version', () => {
-    expect(isSnapshot(snapshot({version: 2}))).toBe(false);
+    // A version 1 cache file (before Phase 8) is not read as version 2: the site is crawled again.
+    expect(isSnapshot(snapshot({version: 1}))).toBe(false);
+    expect(isSnapshot(snapshot({version: 3}))).toBe(false);
     expect(isSnapshot(snapshot({version: undefined}))).toBe(false);
   });
 
@@ -263,11 +310,15 @@ describe('isSnapshot', () => {
       {createdAt: 'not a date'},
       {createdAt: 5},
       {bounds: null},
-      {bounds: {pages: 50, budgetMs: 1, robots: 'maybe', userAgent: 'x'}},
-      {bounds: {pages: '50', budgetMs: 1, robots: 'honour', userAgent: 'x'}},
+      {bounds: {pages: 50, depth: 3, budgetMs: 1, robots: 'maybe', userAgent: 'x'}},
+      {bounds: {pages: '50', depth: 3, budgetMs: 1, robots: 'honour', userAgent: 'x'}},
+      {bounds: {pages: 50, budgetMs: 1, robots: 'honour', userAgent: 'x'}},
       {robots: {state: 'weird'}},
       {robots: null},
       {seeds: {audited: 1}},
+      {seeds: {audited: 1, links: 0, sitemap: 0}},
+      {sitemapUrls: 'x'},
+      {stats: {requests: 1, elapsedMs: 5, truncatedByBudget: false}},
       {pages: 'x'},
       {skipped: null},
       {stats: {requests: 1}},
@@ -284,6 +335,10 @@ describe('isSnapshot', () => {
       {extraction: 'weird'},
       {status: '200'},
       {textHash: 5},
+      {depth: '0'},
+      {externalLinks: null},
+      {pagination: null},
+      {pagination: {next: []}},
     ]) {
       expect(isSnapshot(snapshot({pages: [page(over)]}))).toBe(false);
     }

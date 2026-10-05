@@ -17,13 +17,20 @@ import {Audit} from 'lighthouse/core/audits/audit.js';
 
 const MAX_ROWS = 100;
 const MAX_CELL_CHARS = 200;
-const SOURCE_LABEL = {audited: 'audited page', link: 'link on the page', sitemap: 'sitemap'};
+const SOURCE_LABEL = {
+  audited: 'audited page',
+  home: 'homepage',
+  link: 'link on a page',
+  sitemap: 'sitemap',
+};
 const SKIP_LABEL = {
   'blocked-by-robots': 'blocked by robots.txt',
   'cross-origin': 'other origin, not requested',
   'over-page-cap': 'over the page cap',
   'not-checked': 'not checked',
   failed: 'failed',
+  'query-variants': 'too many query-string variants of one path',
+  'not-a-page': 'a file, not a page',
 };
 
 /**
@@ -81,10 +88,25 @@ function notesFor(artifact) {
       )} s): the rest was not checked.`
     );
   }
-  const overCap = snapshot.skipped.some(s => s.reason === 'over-page-cap');
-  if (overCap) {
+  if (snapshot.stats.overPageCap) {
     notes.push(
-      `More URLs were found than the page cap (${snapshot.bounds.pages}); the pages crawled are an evenly spread sample, not the whole site.`
+      `More pages were found than the page cap (${snapshot.bounds.pages}), so the deepest were left out: what was crawled is the part of the site nearest the audited page and the homepage, not the whole site. Raise LHCI_SEO_CRAWL_MAX_PAGES to see more.`
+    );
+  }
+  if (snapshot.stats.cutByDepth) {
+    notes.push(
+      `The crawl followed links ${snapshot.bounds.depth} ${
+        snapshot.bounds.depth === 1 ? 'hop' : 'hops'
+      } from its starting pages and stopped there: pages further away were not requested. Raise LHCI_SEO_CRAWL_MAX_DEPTH to follow further.`
+    );
+  }
+  const variants = snapshot.skipped.filter(s => s.reason === 'query-variants').length;
+  if (variants > 0) {
+    notes.push(
+      `${count(
+        variants,
+        'URL'
+      )} with more than 5 query-string variants of one path were not requested (a crawl-trap guard).`
     );
   }
   const blocked = snapshot.skipped.filter(s => s.reason === 'blocked-by-robots').length;
@@ -111,7 +133,7 @@ function notesFor(artifact) {
 
 /**
  * @param {CrawlPage} page
- * @return {{url: string, status: string, title: string, words: number | string, source: string}}
+ * @return {{url: string, status: string, depth: number | string, title: string, words: number | string, source: string}}
  */
 function pageRow(page) {
   const status =
@@ -125,6 +147,7 @@ function pageRow(page) {
   return {
     url: clip(shown),
     status,
+    depth: page.depth,
     title: page.title ? clip(page.title, 100) : '',
     words: page.extraction === 'ok' ? page.wordCount : '',
     source: SOURCE_LABEL[page.source] || page.source,
@@ -173,6 +196,7 @@ function buildCoverageProduct(artifact) {
   const headings = [
     {key: 'url', valueType: 'text', label: 'URL'},
     {key: 'status', valueType: 'text', label: 'Result'},
+    {key: 'depth', valueType: 'text', label: 'Depth'},
     {key: 'title', valueType: 'text', label: 'Title'},
     {key: 'words', valueType: 'text', label: 'Words'},
     {key: 'source', valueType: 'text', label: 'Found by'},
@@ -180,6 +204,7 @@ function buildCoverageProduct(artifact) {
   const notes = notesFor(artifact).map(note => ({
     url: `Note: ${note}`,
     status: '',
+    depth: '',
     title: '',
     words: '',
     source: '',
@@ -189,6 +214,7 @@ function buildCoverageProduct(artifact) {
     ...snapshot.skipped.map(s => ({
       url: clip(s.url),
       status: SKIP_LABEL[s.reason] || s.reason,
+      depth: '',
       title: '',
       words: '',
       source: '',
@@ -199,7 +225,14 @@ function buildCoverageProduct(artifact) {
   const hidden = rows.length - shown.length;
   const items = [...notes, ...shown];
   if (hidden > 0) {
-    items.push({url: `${hidden} more not shown`, status: '', title: '', words: '', source: ''});
+    items.push({
+      url: `${hidden} more not shown`,
+      status: '',
+      depth: '',
+      title: '',
+      words: '',
+      source: '',
+    });
   }
   return {
     score: 1,

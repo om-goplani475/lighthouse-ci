@@ -11,8 +11,8 @@ const UIStrings = {
   title: 'The meta description is unique across the crawled pages',
   failureTitle: 'Another crawled page has the same meta description',
   description:
-    'Fails when another crawled page has the same meta description as the audited page. Compared with the other pages the site crawl reached (the audited page, its links and the ' +
-    'sitemap URLs, same origin, from server HTML), equal after trimming and ignoring case. A missing ' +
+    'Fails when another crawled page has the same meta description as the audited page. Compared with the other pages the site crawl reached (the audited page, the homepage, the sitemap URLs and the pages ' +
+    'they link to, up to 3 hops, same origin, from server HTML), equal after trimming and ignoring case. A missing ' +
     'value is not counted here. See crawl-coverage for how much of the site was seen.',
 };
 

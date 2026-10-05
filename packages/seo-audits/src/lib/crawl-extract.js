@@ -26,11 +26,16 @@ import {
   sameOrigin,
   MAX_TEXT_CHARS,
   MAX_LINKS_PER_PAGE,
+  MAX_ANCHOR_CHARS,
+  MAX_EXTERNAL_LINKS_PER_PAGE,
+  MAX_PAGINATION_LINKS,
   MAX_H1,
   MAX_CANONICALS,
 } from './crawl-snapshot.js';
 
 /** @typedef {import('./crawl-snapshot.js').CrawlLink} CrawlLink */
+/** @typedef {import('./crawl-snapshot.js').CrawlExternalLink} CrawlExternalLink */
+/** @typedef {import('./crawl-snapshot.js').CrawlPagination} CrawlPagination */
 /**
  * @typedef {{
  *   title: string | null,
@@ -42,10 +47,13 @@ import {
  *   textLength: number,
  *   wordCount: number,
  *   links: CrawlLink[],
+ *   externalLinks: CrawlExternalLink[],
+ *   pagination: CrawlPagination,
  * }} PageExtract
  */
 
 const MAX_H1_CHARS = 300;
+const MAX_ANCHOR_BUFFER_CHARS = MAX_ANCHOR_CHARS * 4;
 const MAX_ROBOTS_METAS = 20;
 const MAX_URL_CHARS = 2_000;
 const MAX_TEXT_BUFFER_CHARS = 4 * 1024 * 1024;
@@ -111,6 +119,8 @@ function emptyExtract() {
     textLength: 0,
     wordCount: 0,
     links: [],
+    externalLinks: [],
+    pagination: {next: [], prev: []},
   };
 }
 
@@ -167,6 +177,16 @@ function parse(html, pageUrl) {
   /** @type {CrawlLink[]} */
   const links = [];
   const seenLinks = new Set();
+  /** @type {CrawlExternalLink[]} */
+  const externalLinks = [];
+  const seenExternal = new Set();
+  /** @type {CrawlPagination} */
+  const pagination = {next: [], prev: []};
+  /**
+   * The `<a>` being read: where it goes, and the text and image alt inside it, which become its anchor.
+   * @type {{url: string, internal: boolean, rel: string[], text: string, alt: string} | null}
+   */
+  let anchor = null;
   /** @type {string[]} */
   const textParts = [];
   let textChars = 0;
@@ -176,6 +196,46 @@ function parse(html, pageUrl) {
     if (textChars >= MAX_TEXT_BUFFER_CHARS) return;
     textParts.push(text);
     textChars += text.length;
+  };
+
+  /** @param {string[]} rel @param {string} href */
+  const addPagination = (rel, href) => {
+    const url = normalizeUrl(href.trim(), pageUrl);
+    if (!url || url.length > MAX_URL_CHARS) return;
+    for (const token of rel) {
+      const list =
+        token === 'next'
+          ? pagination.next
+          : token === 'prev' || token === 'previous'
+          ? pagination.prev
+          : null;
+      if (list && list.length < MAX_PAGINATION_LINKS && !list.includes(url)) list.push(url);
+    }
+  };
+
+  /** Ends the open anchor: records it as an internal or an external link, once per target and anchor text. */
+  const finishAnchor = () => {
+    if (!anchor) return;
+    const done = anchor;
+    anchor = null;
+    const text = clip(collapse(done.text) || collapse(done.alt), MAX_ANCHOR_CHARS);
+    const nofollow = done.rel.includes('nofollow');
+    if (done.internal) {
+      const key = `${done.url}\n${text}`;
+      if (links.length < MAX_LINKS_PER_PAGE && !seenLinks.has(key)) {
+        seenLinks.add(key);
+        links.push({
+          url: done.url,
+          nofollow,
+          sponsored: done.rel.includes('sponsored'),
+          ugc: done.rel.includes('ugc'),
+          anchor: text,
+        });
+      }
+    } else if (externalLinks.length < MAX_EXTERNAL_LINKS_PER_PAGE && !seenExternal.has(done.url)) {
+      seenExternal.add(done.url);
+      externalLinks.push({url: done.url, anchor: text, nofollow});
+    }
   };
 
   const parser = new Parser(
@@ -229,22 +289,22 @@ function parse(html, pageUrl) {
           ) {
             canonicals.push(href);
           }
+          if (href && href.length <= MAX_URL_CHARS) addPagination(rel, href);
         } else if (name === 'h1') {
           h1Depth++;
-        } else if (name === 'a' && attrs.href && links.length < MAX_LINKS_PER_PAGE) {
-          if (attrs.href.length <= MAX_URL_CHARS) {
+        } else if (name === 'a') {
+          // An `<a>` inside an unclosed `<a>` ends the first one, as in HTML.
+          finishAnchor();
+          if (attrs.href && attrs.href.length <= MAX_URL_CHARS) {
             const url = normalizeUrl(attrs.href.trim(), pageUrl);
-            if (
-              url &&
-              url.length <= MAX_URL_CHARS &&
-              sameOrigin(url, pageUrl) &&
-              !seenLinks.has(url)
-            ) {
-              seenLinks.add(url);
-              const nofollow = (attrs.rel || '').toLowerCase().split(/\s+/).includes('nofollow');
-              links.push({url, nofollow});
+            if (url && url.length <= MAX_URL_CHARS) {
+              const rel = (attrs.rel || '').toLowerCase().split(/\s+/);
+              anchor = {url, internal: sameOrigin(url, pageUrl), rel, text: '', alt: ''};
+              addPagination(rel, attrs.href);
             }
           }
+        } else if (name === 'img' && anchor && !anchor.alt && typeof attrs.alt === 'string') {
+          anchor.alt = clip(attrs.alt, MAX_ANCHOR_BUFFER_CHARS);
         }
       },
 
@@ -254,6 +314,7 @@ function parse(html, pageUrl) {
           return;
         }
         if (hiddenDepth > 0) return;
+        if (anchor && anchor.text.length < MAX_ANCHOR_BUFFER_CHARS) anchor.text += text;
         if (h1Depth > 0 && h1Buffer.length < MAX_H1_CHARS * 4) h1Buffer += text;
         if (headDepth === 0) addText(text);
       },
@@ -267,6 +328,7 @@ function parse(html, pageUrl) {
           entry.head = false;
         }
         if (hiddenDepth > 0) return;
+        if (name === 'a') finishAnchor();
         if (name === 'title' && inTitle) {
           inTitle = false;
           titleDone = true;
@@ -290,6 +352,7 @@ function parse(html, pageUrl) {
   );
   parser.write(html);
   parser.end();
+  finishAnchor();
 
   const text = collapse(textParts.join('')).toLowerCase();
   return {
@@ -302,6 +365,8 @@ function parse(html, pageUrl) {
     textLength: text.length,
     wordCount: text ? text.split(' ').length : 0,
     links,
+    externalLinks,
+    pagination,
   };
 }
 

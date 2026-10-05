@@ -10,12 +10,13 @@ import {buildCoverageProduct} from '../lib/crawl-coverage.js';
 const UIStrings = {
   title: 'Site crawl coverage',
   description:
-    'Shows what the site crawl saw: the audited page, its own links and the sitemap URLs (one level, ' +
-    'same origin only), up to 50 pages by default, honouring robots.txt, from server HTML. The cross-page ' +
-    'audits read the same crawl, so this tells you how much of the site they were judging. Informational: ' +
-    'it never fails. Set LHCI_SEO_CRAWL=0 to switch the crawl off; LHCI_SEO_CRAWL_MAX_PAGES, ' +
+    "Shows what the site crawl saw: the audited page, the site homepage, the audited page's own links and the " +
+    'sitemap URLs, then the pages those link to, up to 3 hops (same origin only), up to 50 pages by ' +
+    'default, honouring robots.txt, from server HTML. The cross-page audits read the same crawl, so this ' +
+    'tells you how much of the site they were judging. Informational: it never fails. Set ' +
+    'LHCI_SEO_CRAWL=0 to switch the crawl off; LHCI_SEO_CRAWL_MAX_PAGES, LHCI_SEO_CRAWL_MAX_DEPTH, ' +
     'LHCI_SEO_CRAWL_TIME_BUDGET_SECONDS, LHCI_SEO_CRAWL_RESPECT_ROBOTS and the cache variables tune it. ' +
-    'It sends up to about 100 requests to the audited site on a cold cache, and none when a fresh cache ' +
+    'It sends up to about 150 requests to the audited site on a cold cache, and none when a fresh cache ' +
     'exists from another run of the same collect.',
 };
 

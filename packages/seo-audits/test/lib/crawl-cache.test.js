@@ -27,21 +27,29 @@ const posixOnly = UID === null ? it.skip : it;
 const KEY = cacheKey({
   origin: 'https://example.com',
   pages: 50,
+  depth: 3,
   robots: 'honour',
   userAgent: USER_AGENT,
 });
 
 /** @param {number} [createdAt] */
 const snapshot = (createdAt = Date.now(), requests = 1) => ({
-  version: 1,
+  version: 2,
   origin: 'https://example.com',
   createdAt: new Date(createdAt).toISOString(),
-  bounds: {pages: 50, budgetMs: 120000, robots: 'honour', userAgent: USER_AGENT},
+  bounds: {pages: 50, depth: 3, budgetMs: 120000, robots: 'honour', userAgent: USER_AGENT},
   robots: {state: 'present'},
-  seeds: {audited: 1, links: 0, sitemap: 0},
+  seeds: {audited: 1, home: 0, links: 0, sitemap: 0},
+  sitemapUrls: [],
   pages: [],
   skipped: [],
-  stats: {requests, elapsedMs: 5, truncatedByBudget: false},
+  stats: {
+    requests,
+    elapsedMs: 5,
+    truncatedByBudget: false,
+    overPageCap: false,
+    cutByDepth: false,
+  },
 });
 
 /** @type {string} */
@@ -201,8 +209,8 @@ describe('writeSnapshot and readSnapshot', () => {
       'null',
       '[]',
       '"a string"',
-      JSON.stringify({version: 1}),
-      JSON.stringify({...snapshot(), version: 2}),
+      JSON.stringify({version: 2}),
+      JSON.stringify({...snapshot(), version: 1}),
       JSON.stringify({...snapshot(), pages: 'x'}),
       JSON.stringify({...snapshot(), createdAt: 'yesterday'}),
     ]) {
@@ -264,10 +272,10 @@ describe('atomic writes under concurrency', () => {
     const script = `
       import {writeSnapshot} from ${JSON.stringify(modulePath)};
       const [dir, key, id] = process.argv.slice(1);
-      const snap = n => ({version: 1, origin: 'https://example.com', createdAt: new Date().toISOString(),
-        bounds: {pages: 50, budgetMs: 1, robots: 'honour', userAgent: 'x'}, robots: {state: 'present'},
-        seeds: {audited: 1, links: 0, sitemap: 0}, pages: [], skipped: [{url: 'x', reason: 'failed', detail: 'p'.repeat(200000)}],
-        stats: {requests: n, elapsedMs: 1, truncatedByBudget: false}});
+      const snap = n => ({version: 2, origin: 'https://example.com', createdAt: new Date().toISOString(),
+        bounds: {pages: 50, depth: 3, budgetMs: 1, robots: 'honour', userAgent: 'x'}, robots: {state: 'present'},
+        seeds: {audited: 1, home: 0, links: 0, sitemap: 0}, sitemapUrls: [], pages: [], skipped: [{url: 'x', reason: 'failed', detail: 'p'.repeat(200000)}],
+        stats: {requests: n, elapsedMs: 1, truncatedByBudget: false, overPageCap: false, cutByDepth: false}});
       for (let i = 0; i < 150; i++) writeSnapshot(dir, key, snap(Number(id) * 1000 + i));
     `;
     ensureCacheDir(dir);
@@ -297,7 +305,7 @@ describe('atomic writes under concurrency', () => {
       if (read === null) missing++;
       else {
         valid++;
-        expect(read.version).toBe(1);
+        expect(read.version).toBe(2);
         expect(read.skipped[0].detail).toHaveLength(200000);
       }
       await new Promise(resolve => setImmediate(resolve));

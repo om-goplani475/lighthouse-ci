@@ -220,7 +220,7 @@ describe('links', () => {
   it('keeps same-origin http(s) links, resolved, deduplicated, without the fragment', () => {
     expect(
       links(
-        '<a href="/a">1</a><a href="/a#top">2</a><a href="b">3</a><a href="https://example.com/c?x=1">4</a><a href="//example.com/d">5</a>'
+        '<a href="/a">1</a><a href="/a#top">1</a><a href="b">3</a><a href="https://example.com/c?x=1">4</a><a href="//example.com/d">5</a>'
       ).map(l => l.url)
     ).toEqual([
       'https://example.com/a',
@@ -240,9 +240,9 @@ describe('links', () => {
 
   it('notes nofollow, case-insensitively, among other rel tokens', () => {
     const l = links('<a href="/a" rel="NoFollow noopener">1</a><a href="/b" rel="noopener">2</a>');
-    expect(l).toEqual([
-      {url: 'https://example.com/a', nofollow: true},
-      {url: 'https://example.com/b', nofollow: false},
+    expect(l.map(x => [x.url, x.nofollow])).toEqual([
+      ['https://example.com/a', true],
+      ['https://example.com/b', false],
     ]);
   });
 
@@ -258,6 +258,136 @@ describe('links', () => {
     const many = Array.from({length: 500}, (_, i) => `<a href="/p/${i}">x</a>`).join('');
     expect(links(many)).toHaveLength(200);
     expect(links(`<a href="/${'a'.repeat(5000)}">x</a>`)).toEqual([]);
+  });
+});
+
+describe('anchor text, rel flags and repeated links', () => {
+  const links = (/** @type {string} */ body) => run(doc('', body)).links;
+
+  it('records the anchor text, collapsed, with text from nested inline elements', () => {
+    expect(links('<a href="/a">  Buy   <b>red</b>\n shoes </a>').map(l => l.anchor)).toEqual([
+      'Buy red shoes',
+    ]);
+  });
+
+  it('uses the image alt text when the link has no text of its own, and the text when it has both', () => {
+    expect(links('<a href="/a"><img src="x.png" alt="Company logo"></a>')[0].anchor).toBe(
+      'Company logo'
+    );
+    expect(links('<a href="/a">Home<img src="x.png" alt="ignored"></a>')[0].anchor).toBe('Home');
+    expect(links('<a href="/a"><img src="x.png"></a>')[0].anchor).toBe('');
+  });
+
+  it('decodes entities and caps a long anchor at 100 characters', () => {
+    expect(links('<a href="/a">Fish &amp; chips</a>')[0].anchor).toBe('Fish & chips');
+    expect(links(`<a href="/a">${'word '.repeat(200)}</a>`)[0].anchor).toHaveLength(100);
+  });
+
+  it('keeps the same target once per distinct anchor text, so anchor diversity can be judged', () => {
+    const l = links(
+      '<a href="/a">click here</a><a href="/a">click here</a><a href="/a">our shoes</a>'
+    );
+    expect(l.map(x => x.anchor)).toEqual(['click here', 'our shoes']);
+  });
+
+  it('reads nofollow, sponsored and ugc independently', () => {
+    const l = links(
+      '<a href="/a" rel="sponsored">1</a><a href="/b" rel="UGC nofollow">2</a><a href="/c">3</a>'
+    );
+    expect(l.map(x => [x.nofollow, x.sponsored, x.ugc])).toEqual([
+      [false, true, false],
+      [true, false, true],
+      [false, false, false],
+    ]);
+  });
+
+  it('ends an unclosed link where the next one starts and at the end of the document', () => {
+    const l = links('<a href="/a">first <a href="/b">second');
+    expect(l.map(x => [x.url, x.anchor])).toEqual([
+      ['https://example.com/a', 'first'],
+      ['https://example.com/b', 'second'],
+    ]);
+  });
+
+  it('does not attach text outside a link to the previous link', () => {
+    expect(links('<a href="/a">in</a> out <p>more</p>')[0].anchor).toBe('in');
+  });
+
+  it('gives a link without a usable href no anchor of its own', () => {
+    expect(links('<a>plain</a><a href="mailto:a@b.c">m</a>')).toEqual([]);
+  });
+});
+
+describe('external links', () => {
+  const ext = (/** @type {string} */ body) => run(doc('', body)).externalLinks;
+
+  it('records other-origin http(s) links with their anchor and nofollow, once per URL', () => {
+    expect(
+      ext(
+        '<a href="https://other.test/x#frag" rel="nofollow">Other</a><a href="https://other.test/x">Again</a><a href="http://example.com/x">Scheme</a><a href="https://example.com:8443/">Port</a>'
+      )
+    ).toEqual([
+      {url: 'https://other.test/x', anchor: 'Other', nofollow: true},
+      {url: 'http://example.com/x', anchor: 'Scheme', nofollow: false},
+      {url: 'https://example.com:8443/', anchor: 'Port', nofollow: false},
+    ]);
+  });
+
+  it('ignores other schemes, credentials, hidden and scripted links, and keeps same-origin links out', () => {
+    expect(
+      ext(
+        '<a href="mailto:a@b.c">1</a><a href="javascript:x">2</a><a href="https://u:p@other.test/">3</a><a hidden href="https://other.test/h">4</a><script>"<a href=https://other.test/s>"</script><a href="/inside">5</a>'
+      )
+    ).toEqual([]);
+  });
+
+  it('caps the list at 20 per page and drops an absurdly long URL', () => {
+    const many = Array.from({length: 100}, (_, i) => `<a href="https://o${i}.test/">x</a>`).join(
+      ''
+    );
+    expect(ext(many)).toHaveLength(20);
+    expect(ext(`<a href="https://other.test/${'a'.repeat(5000)}">x</a>`)).toEqual([]);
+  });
+});
+
+describe('pagination links', () => {
+  const pag = (/** @type {string} */ head, /** @type {string} */ body = '') =>
+    run(doc(head, body)).pagination;
+
+  it('reads <link rel=next|prev> from the head, resolved', () => {
+    expect(
+      pag('<link rel="next" href="/shop/shoes?page=3"><link rel="prev" href="?page=1">')
+    ).toEqual({
+      next: ['https://example.com/shop/shoes?page=3'],
+      prev: ['https://example.com/shop/shoes?page=1'],
+    });
+  });
+
+  it('reads rel=next|prev|previous on links in the body, case-insensitively, among other tokens', () => {
+    expect(
+      pag(
+        '',
+        '<a href="/p/3" rel="Next nofollow">n</a><a href="/p/1" rel="PREVIOUS">p</a><a href="/x">x</a>'
+      )
+    ).toEqual({next: ['https://example.com/p/3'], prev: ['https://example.com/p/1']});
+  });
+
+  it('deduplicates, caps at 5 each, and ignores an unusable or hidden link', () => {
+    const body = Array.from({length: 20}, (_, i) => `<a href="/p/${i}" rel="next">x</a>`).join('');
+    expect(pag('', body).next).toHaveLength(5);
+    expect(pag('<link rel="next" href="/a"><link rel="next" href="/a">').next).toEqual([
+      'https://example.com/a',
+    ]);
+    expect(
+      pag('', '<a hidden href="/h" rel="next">x</a><a href="mailto:a@b.c" rel="next">m</a>')
+    ).toEqual({
+      next: [],
+      prev: [],
+    });
+  });
+
+  it('does not treat a body <link> as a head signal', () => {
+    expect(pag('', '<link rel="next" href="/late">').next).toEqual([]);
   });
 });
 
@@ -285,6 +415,11 @@ describe('never throws, and stays fast on hostile input at the 512 KiB cap', () 
     'misnested b/i': () => cut('<b><i>'.repeat(100_000)),
     'nested table': () => cut('<table><tr><td>'.repeat(30_000)),
     'unclosed a': () => cut('<a href=/x>'.repeat(60_000)),
+    'many external links': () => cut('<a href="https://o.test/1">x</a>'.repeat(15_000)),
+    'one enormous anchor': () => cut(`<a href="/x">${'word '.repeat(200_000)}</a>`),
+    'alt text flood': () =>
+      cut(`<a href="/x">${'<img alt="a long alternative text">'.repeat(20_000)}</a>`),
+    'pagination flood': () => cut('<a rel="next" href="/p/1">x</a>'.repeat(15_000)),
     '100k links': () => cut('<a href="/p/1">x</a>'.repeat(30_000)),
     '170k p': () => cut('<p>'.repeat(170_000)),
     'entity run': () => cut('&amp;&lt;&#x41;&nbsp;'.repeat(60_000)),
@@ -308,6 +443,10 @@ describe('never throws, and stays fast on hostile input at the 512 KiB cap', () 
       expect(r.links.length).toBeLessThanOrEqual(200);
       expect(r.h1.length).toBeLessThanOrEqual(5);
       expect(r.canonicals.length).toBeLessThanOrEqual(5);
+      expect(r.externalLinks.length).toBeLessThanOrEqual(20);
+      expect(r.pagination.next.length).toBeLessThanOrEqual(5);
+      expect(r.pagination.prev.length).toBeLessThanOrEqual(5);
+      for (const link of r.links) expect(link.anchor.length).toBeLessThanOrEqual(100);
       expect(r.textHash).toMatch(/^[0-9a-f]{64}$/);
     });
   }
