@@ -1,9 +1,13 @@
 # Current phase
 
-- phase: phase-12-js-rendering (built and QA'd, awaiting the merge into main; Phase 11 hreflang skipped for now)
-- branch: phase-12-js-rendering
+- phase: none in progress (Phase 11 hreflang PAUSED about 30% built on branch phase-11-hreflang, not merged; Phase 12 is merged)
+- branch: main
 - roadmap: docs/master-roadmap.md (next: Phase 9, URL Quality) and docs/open-items.md (the verification checks still to do)
-- status: in-progress (docs/phases/phase-12-js-rendering.md)
+- status: idle (see docs/phases/phase-11-hreflang.md to resume Phase 11)
+
+<!-- Phase 12 (JavaScript rendering) closed 2026-10-05: seven audits and two gatherers, ff-merged into main, branch deleted. See docs/phases/phase-12-js-rendering.md. -->
+
+<!-- Phase 11 (hreflang) PAUSED 2026-10-05 on branch phase-11-hreflang: foundation built and tested (sitemap xhtml:link capture, looseKey, head extractor), library, gatherer and audits not built. See docs/phases/phase-11-hreflang.md. -->
 
 <!-- Phase 10 (images) closed 2026-10-05: seven audits and one gatherer, ff-merged into main, branch deleted. See docs/phases/phase-10-images.md. -->
 

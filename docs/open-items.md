@@ -199,6 +199,10 @@ ruleset changes without human review. Details in `docs/phases/phase-2-structured
   `cli/test/wizard.test.js` and `utils/test/build-context.test.js` (the causes were not investigated). Not caused by this work (compared against the pre-Phase-4 base, 2026-10-01) but never fixed; they only matter if
   you want a fully green local `npm run test`.
 
+### D. Phase 11 (hreflang) is paused, not finished (2026-10-05)
+
+The developer chose to leave Phase 11 about 30% built and move on. The branch `phase-11-hreflang` holds the tested foundation (the sitemap `xhtml:link` capture, `looseKey`, the head extractor); the library, the `HreflangData` gatherer, the seven audits, the live QA and the docs are not built. **To resume:** check out the branch and follow "Still to build" in `docs/phases/phase-11-hreflang.md` (it lists the order, the calibration rules and the pitfalls, including the API content-filter rejection of one very large file). Until then the roadmap row stays open and no hreflang audit beyond Lighthouse core's syntax check exists.
+
 ## 5. How to close an item
 
 1. Do the steps; if it passes, tick it above and delete its "Not verified" line elsewhere.
