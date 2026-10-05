@@ -77,23 +77,11 @@ function isLoop(hops) {
 }
 
 /**
- * Every internal link with an outcome we know: from the pages the crawl read, and for the audited page also
- * from the status checks of its own links.
- * @param {SiteCrawlArtifact | null | undefined} artifact
- * @return {{product: Product} | {outcomes: LinkOutcome[], total: number, known: number}}
+ * What the crawl and the status checks know about each URL: its status, where it ends up and every redirect hop.
+ * @param {import('./crawl-snapshot.js').CrawlSnapshot} snapshot
+ * @param {SiteCrawlArtifact['linkChecks'] | undefined} linkChecks
  */
-function collectOutcomes(artifact) {
-  if (!artifact || typeof artifact !== 'object') {
-    return {product: notApplicable('The site crawl was not collected.')};
-  }
-  if (artifact.state === 'disabled' || artifact.state === 'unavailable') {
-    return {product: notApplicable(artifact.reason || 'The site crawl did not run.')};
-  }
-  const snapshot = artifact.snapshot;
-  if (!snapshot || !Array.isArray(snapshot.pages)) {
-    return {product: notApplicable('The site crawl could not run.')};
-  }
-
+function buildLookup(snapshot, linkChecks) {
   /** @type {Map<string, CrawlPage>} */
   const byRequested = new Map();
   /** @type {Map<string, CrawlPage>} */
@@ -106,7 +94,6 @@ function collectOutcomes(artifact) {
   }
   /** @type {Map<string, {status: number | null, finalUrl: string, hops: CrawlHop[]}>} */
   const checks = new Map();
-  const linkChecks = artifact.linkChecks;
   if (linkChecks && Array.isArray(linkChecks.checked)) {
     for (const check of linkChecks.checked) {
       const url = normalizeUrl(check.url);
@@ -151,6 +138,51 @@ function collectOutcomes(artifact) {
     }
     return {status, finalUrl, hops};
   };
+
+  return {byRequested, byFinal, checks, resolveEnd};
+}
+
+/**
+ * The outcome for one URL: from the crawl when it was read (the page requested at that URL, or the page it ends
+ * on), else from the audited page's own status checks; null when neither knows it.
+ * @param {ReturnType<typeof buildLookup>} lookup
+ * @param {string} rawUrl
+ * @return {{status: number | null, finalUrl: string, hops: CrawlHop[]} | null}
+ */
+function outcomeFor(lookup, rawUrl) {
+  const url = normalizeUrl(rawUrl);
+  if (!url) return null;
+  const crawled = lookup.byRequested.get(url) || lookup.byFinal.get(url);
+  if (crawled) {
+    const direct = lookup.byRequested.get(url) === crawled;
+    return lookup.resolveEnd(
+      crawled.extraction === 'error' ? null : crawled.status,
+      crawled.finalUrl || crawled.url,
+      direct ? crawled.redirects || [] : []
+    );
+  }
+  return lookup.checks.get(url) || null;
+}
+
+/**
+ * Every internal link with an outcome we know: from the pages the crawl read, and for the audited page also
+ * from the status checks of its own links.
+ * @param {SiteCrawlArtifact | null | undefined} artifact
+ * @return {{product: Product} | {outcomes: LinkOutcome[], total: number, known: number}}
+ */
+function collectOutcomes(artifact) {
+  if (!artifact || typeof artifact !== 'object') {
+    return {product: notApplicable('The site crawl was not collected.')};
+  }
+  if (artifact.state === 'disabled' || artifact.state === 'unavailable') {
+    return {product: notApplicable(artifact.reason || 'The site crawl did not run.')};
+  }
+  const snapshot = artifact.snapshot;
+  if (!snapshot || !Array.isArray(snapshot.pages)) {
+    return {product: notApplicable('The site crawl could not run.')};
+  }
+
+  const {byRequested, byFinal, checks, resolveEnd} = buildLookup(snapshot, artifact.linkChecks);
 
   /** @type {LinkOutcome[]} */
   const outcomes = [];
@@ -383,6 +415,8 @@ export {
   buildRedirectingLinksProduct,
   buildRedirectChainsProduct,
   collectOutcomes,
+  buildLookup,
+  outcomeFor,
   isLoop,
   MAX_ROWS,
 };
