@@ -517,5 +517,22 @@ offending crawled pages without failing on them.
 Add the ones you want to your `assertions` yourself, e.g. `'orphan-pages': ['warn', {minScore: 1}]`; none is in the shared presets. They read server HTML, so a
 script-built page is not applicable. **Security**: no new finding. No `.lighthouserc.js` migration.
 
+## 2026-10-05 — Phase 8 item 3: internal link checks
+
+Three new scored audits (53 in the fork) that judge **every internal link on every crawled page**. They close the three link checks deferred from Phase 5.
+
+- **`broken-internal-links`**: fails when a link points at a page that answers 4xx or 5xx, or does not answer.
+- **`redirecting-internal-links`**: fails when a link points at a URL that permanently redirects once (301 or 308). A temporary redirect (302, 303, 307) is listed with a note
+  and does not fail.
+- **`internal-redirect-chains`**: fails when a link points at a URL that redirects two or more times, or in a circle.
+
+**New requests**: so that all of the audited page's links are covered, up to **100 of its own links that the crawl did not read** get a status-only check (same origin, robots.txt
+honoured, no body read, a 30 s budget) in every Lighthouse run, up to about 300 requests in the worst case. `LHCI_SEO_CRAWL_MAX_LINK_CHECKS=0` switches it off (the audits then judge
+only links to pages the crawl read, and say how many targets that leaves unchecked). `crawl-coverage` says how many links were checked.
+
+**Fix to the crawler (since Phase 7)**: URLs that the crawl time budget never let it request were recorded as pages that "did not answer"; they are now recorded as skipped
+("not checked"), so `crawl-coverage` and the audits no longer count them as errors. **Security**: no new finding; every request is same-origin and robots-aware (a spy server on
+another origin received none). Add the audits you want to your `assertions` yourself; none is in the shared presets. No `.lighthouserc.js` migration; one new environment variable.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->

@@ -183,6 +183,16 @@
   (no network, no disk) and fast. The Node 18.20.8 re-run is still to do (see `docs/open-items.md`, A5).
 - status: done (nothing to do)
 
+## 2026-10-05 — link-check-audits
+
+- item: no gap found in the workflow files. No dependency, workflow or Docker change; `package.json`, `yarn.lock` and `.github/` are unchanged by the feature's diff. The Node 18.20.8
+  re-run is still to do (`docs/open-items.md`, A5).
+- status: done (nothing to do)
+
+- item: for any CI job: every Lighthouse run now sends up to about 300 extra status-only requests to the audited site (100 of the audited page's own links, 3 hops each), per run,
+  not cached; with `numberOfRuns` > 1 they repeat. They add up to 30 s to a run in the worst case. `LHCI_SEO_CRAWL_MAX_LINK_CHECKS` (0 to 200, default 100) tunes or switches them off.
+- status: done (documented in the README)
+
 <!-- Appended by Agent 08. Advisory only — does not block merges or new features. Format per entry:
 
 ## {date} — {slug}

@@ -762,3 +762,20 @@ The risks left are time and output size on a hostile snapshot, so each builder w
 
 No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 (from item 0) remains open and accepted.
 
+## 2026-10-05 — link-check-audits (Phase 8 item 3, lightweight, a new request surface)
+
+New surface: up to 100 status-only requests per Lighthouse run to same-origin URLs that the audited page links to (`checkAuditedLinks`), through the same fetch
+(`safe-fetch.js`, the private-address policy, `LHCI_SEO_ALLOW_PRIVATE_NETWORK`). Every attack below was **run against the real crawler** with hostile and spy servers.
+
+- **Other origins**: only same-origin targets are requested (the filter is `sameOrigin` on a normalised URL). Two links that redirect to another origin: the spy server
+  received **zero** requests; the redirect is recorded and not followed.
+- **robots.txt**: honoured for every target; a disallowed target is recorded, never requested; an unreadable robots.txt means no checks.
+- **Bounds**: at most 100 targets, 3 requests each, a 30 s budget, 5 s per request, bodies read to at most 2 KiB. A server with 60 hanging, 60 forever-redirecting and
+  60 5-MiB links: the run ended at the budget with 40 requests and 164 targets counted as not checked (not misreported as broken).
+- **Cost to the audited site**: up to about 300 requests per Lighthouse run in the worst case, visible in its logs with the crawler user-agent; switchable with
+  `LHCI_SEO_CRAWL_MAX_LINK_CHECKS=0`.
+- **Outcome integrity** (a correctness bug with a security flavour, fixed): URLs the time budget never let the crawler request were recorded as pages that "did not
+  answer"; they could have made an audit assert a false "broken link". They are now skipped entries, and the link checks count unrequested targets as "not checked".
+
+No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 (item 0) remains open and accepted.
+

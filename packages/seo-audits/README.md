@@ -666,6 +666,19 @@ Lighthouse run** as the `SiteCrawl` gatherer; `lhci autorun` needs no extra step
     not applicable ("a shorter path may exist"). A page with no path from the homepage is not applicable (see `orphan-pages`).
   They read server HTML, so when the audited page looks script-built all four are not applicable. Inbound counts on a partial
   crawl are shown as a minimum (`3+ in`) and the low side is not judged.
+- **`broken-internal-links`**, **`redirecting-internal-links`** and **`internal-redirect-chains`** (scored) judge **every internal
+  link on every crawled page** (a broken link on another crawled page fails the run; the audited page's rows come first).
+  - `broken-internal-links` fails when a link points at a page that answers 4xx or 5xx, or does not answer.
+  - `redirecting-internal-links` fails when a link points at a URL that **permanently redirects once** (301 or 308): link to the final
+    URL. A temporary redirect (302, 303, 307) is listed with a note and does not fail.
+  - `internal-redirect-chains` fails when a link points at a URL that redirects **two or more times, or in a circle**, whatever the
+    statuses. (Three audits so you can set a different severity for each.)
+  - **Where the statuses come from**: the pages the crawl read, and, so that *all* of the audited page's links are covered, a **status-only
+    check of up to 100 of the audited page's own links that the crawl did not read** (same origin only, robots.txt honoured, no body read,
+    redirects followed for a few hops, a 30 s budget; `LHCI_SEO_CRAWL_MAX_LINK_CHECKS`, `0` switches it off). Links on other pages that the
+    crawl did not read are not judged; each audit says how many link targets that is (`all 130 distinct link targets checked` or `87 of 130 ...`).
+    The check is per Lighthouse run (it depends on which page is audited), not shared through the cache, so it can send up to about 300 requests
+    (100 links, 3 hops each) from every run; `crawl-coverage` says how many links were checked.
 
 **Environment variables** (read per run, clamped; a page can never change them):
 
@@ -674,6 +687,7 @@ Lighthouse run** as the `SiteCrawl` gatherer; `lhci autorun` needs no extra step
 | `LHCI_SEO_CRAWL` | on | `0` or `false` switches the crawl off entirely (no requests; the audits that read it are not applicable) |
 | `LHCI_SEO_CRAWL_MAX_PAGES` | 50 (1 to 200) | page cap, the audited page included |
 | `LHCI_SEO_CRAWL_MAX_DEPTH` | 3 (1 to 5) | how many hops of links to follow from the starting pages |
+| `LHCI_SEO_CRAWL_MAX_LINK_CHECKS` | 100 (0 to 200) | status-only checks of the audited page's own links the crawl did not read; `0` switches them off (the link-check audits then judge only links to pages the crawl read) |
 | `LHCI_SEO_CRAWL_TIME_BUDGET_SECONDS` | 120 (10 to 600) | total crawl time |
 | `LHCI_SEO_CRAWL_RESPECT_ROBOTS` | on | `0` or `false` requests URLs robots.txt disallows (for auditing your own staging site) |
 | `LHCI_SEO_CRAWL_CACHE_DIR` | `<tmp>/lhci-seo-crawl-<uid>` | where the snapshot cache lives (its parent must already exist) |
@@ -774,7 +788,7 @@ module.exports = {
 };
 ```
 
-This adds all fifty audits (`structured-data-json-ld`, `structured-data-schema-properties`,
+This adds all fifty-three audits (`structured-data-json-ld`, `structured-data-schema-properties`,
 `structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
 `structured-data-deprecated-properties`, `pixel-width-truncation`,
 `meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
@@ -785,16 +799,16 @@ This adds all fifty audits (`structured-data-json-ld`, `structured-data-schema-p
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
 `sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`, `mixed-content`, `hsts-quality`,
 `ssl-certificate-expiry`, `soft-not-found`, `url-variant-consistency`, `redirect-chain-length`,
-`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`) on top of
+`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
 ### Assertion severity
 
-None of the fifty audits are part of this fork's shared `all`/`recommended` presets
+None of the fifty-three audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all fifty here are opt-in via `configPath`, so they can't be part of that
+default, and all fifty-three here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
