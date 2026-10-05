@@ -485,5 +485,21 @@ Add the ones you want to your `assertions` yourself, e.g. `'duplicate-titles': [
 Limit: they judge only the pages the crawl reached (the audited page, its links and the sitemap URLs), so read `crawl-coverage` first.
 **Security**: one `low` finding (a quadratic slash regex in `duplicate-content`, 0.87 s worst case), fixed. No `.lighthouserc.js` migration.
 
+## 2026-10-05 — Phase 8 item 0: the crawler follows links to depth 3
+
+The site crawler (`SiteCrawl`) now builds the site's **link graph**, which the Phase 8 audits will read. It also starts from the **homepage**, follows
+same-origin links **breadth-first for up to 3 hops** (`LHCI_SEO_CRAWL_MAX_DEPTH`, 1 to 5), and stores per page its depth, its internal links with
+**anchor text** and `nofollow`/`sponsored`/`ugc` flags, up to 20 external links (never requested), its `rel=next/prev` pagination links, the sitemap's URL
+list, and whether the page cap, the depth bound or the time budget cut the crawl. Raw HTML is still never stored.
+
+**What changes for you**: the cross-page audits from Phase 7 (`duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`,
+`duplicate-content`) now see more, and deeper, pages, so their results can change on a site with more than a handful of pages. A cold crawl sends up to
+about 150 requests. Files (`.png`, `.pdf`, `.js`) are not requested, and at most 5 query-string variants of one path are. Cached snapshots from before are
+ignored once and the site is crawled again. `crawl-coverage` now has a Depth column and says when the page cap or the depth bound cut the crawl.
+
+**Security**: one `low` finding, open and accepted (Finding 10): a hostile site with very long link URLs can make the snapshot exceed the 16 MiB cache cap
+(the cache is then skipped and each run crawls again). No new request goes to another origin (a spy server received none). No `.lighthouserc.js`
+migration; one new environment variable.
+
 <!-- Appended by Agent 09 after each feature. Cleared into docs/changelog/{version}.md on a
 /write-changelog --release run. -->

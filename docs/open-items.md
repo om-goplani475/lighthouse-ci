@@ -1,6 +1,6 @@
 # Open items after Phase 7
 
-Written 2026-10-02, at `main` = `28939f1` (Phases 1-7 merged, 46 audits in `seo-extended`). This is the one place that lists what is
+Written 2026-10-02 at `main` = `28939f1` (Phases 1-7 merged, 46 audits in `seo-extended`); **updated 2026-10-05** for Phase 8 (in progress, branch `phase-8-internal-linking`). This is the one place that lists what is
 **deferred**, what is **not yet verified**, and the **tests and steps to close each open item**. The per-phase detail stays in
 `docs/phases/`, `docs/qa/` and `.ai-agents/state/`.
 
@@ -8,8 +8,8 @@ Written 2026-10-02, at `main` = `28939f1` (Phases 1-7 merged, 46 audits in `seo-
 
 | Area | State |
 |------|-------|
-| Security findings (`.ai-agents/state/security-findings.md`) | **None open.** Findings 1-9 are all fixed (8 on 2026-10-01, 9 on 2026-10-02). One risk is *accepted*, not fixed: `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control (the README says so). |
-| `seo-audits` tests | 75 suites / 1,308 tests pass on the dev machine (Node 24), typecheck and lint clean. Last run on Node 18.20.8 (what CI pins) covered the crawler suites; the five audits built after it were **not** run there (see A5). |
+| Security findings (`.ai-agents/state/security-findings.md`) | **One open, low, accepted: Finding 10** (Phase 8: a hostile site with very long link URLs can make the crawl snapshot exceed the 16 MiB cache cap; see B1). Findings 1-9 are all fixed (8 on 2026-10-01, 9 on 2026-10-02). One risk is *accepted*, not fixed: `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control (the README says so). |
+| `seo-audits` tests | 75 suites / 1,350 tests pass on the dev machine (Node 24), typecheck and lint clean (Phase 8 item 0 built, uncommitted at the time of writing). Last run on Node 18.20.8 (what CI pins) covered the Phase 7 crawler suites; the five Phase 7 audits and everything in Phase 8 were **not** run there (see A5). |
 | Failing suites outside `seo-audits` | 11 suites / 92 tests fail in `cli`, `server`, `viewer`, `utils`. Same families failed before Phase 4. Not caused by this work (see C). |
 | Not verified at all | Items A1-A5 below. You deferred A1-A3 until after Phase 7, so they are now due. |
 
@@ -74,11 +74,11 @@ I could not do this from the session (no lookup available). Run `yarn audit --gr
 a finding here would most likely be informational. **Pass when** nothing high or critical is reported for the packages the crawler uses
 (`htmlparser2`, `saxes`, `parse5`, `robots-parser`); anything else goes into `security-findings.md`.
 
-### A5. Re-run the Phase 7 suites under Node 18.20.8
+### A5. Re-run the Phase 7 and Phase 8 suites under Node 18.20.8
 
-CI pins Node 18; The Phase 5, Phase 6 and crawler suites were run there; the five audits built after the crawler (and the `safeFetchBytes` change) were not. `nvm use 18 && npx jest packages/seo-audits`. **Pass when** all
-75 suites pass. The risky spots are `server.closeAllConnections()` (Node 18.2+) and the crawler's integration test, which waits for a
-real 10 s budget.
+CI pins Node 18. The Phase 5, Phase 6 and Phase 7 crawler suites were run there; the five Phase 7 audits, the `safeFetchBytes` change and all of
+Phase 8 (so far the crawler extension) were not. `nvm use 18 && npx jest packages/seo-audits`. **Pass when** all 75 suites pass. The risky spots are
+`server.closeAllConnections()` (Node 18.2+) and the crawler's integration test, which waits for a real 10 s budget.
 
 ### A6. Spot-check the five new audits on a few real sites (optional)
 
@@ -86,11 +86,33 @@ They were run against planted local pages only. Run `lhci collect` with the fork
 tables once. Look for false positives: a script-built site that is wrongly judged thin or duplicate (it should say "not applicable"),
 or a site that serves bots a different page. Anything wrong is a `fix(seo-audits)` commit with a test.
 
+### B. Opened by Phase 8 (updated as the phase proceeds)
+
+**B1. Close Finding 10 (low, open, accepted): the crawl snapshot can exceed the cache cap on a hostile site.**
+Item 0 stores each page's links with their URLs (up to 2,000 characters each) and anchor text. At the default 50 pages the worst case is a 20 MiB snapshot
+(about 360 MB resident, 1.5 s); at 200 pages, 81 MiB (about 750 MB). The cache refuses a file over 16 MiB, so each Lighthouse run then crawls again.
+1. Decide whether it matters for your sites: it needs a site whose pages carry hundreds of near-2,000-character link URLs. Real sites do not.
+2. To close it: give the snapshot a byte budget for stored links (or a lower URL length for stored links), on a `fix/...` branch, with a test that a hostile
+   site's snapshot stays under the cache cap. The reproduction is in `docs/qa/link-graph-crawler.md` (a server whose pages each link to 250 pages with
+   1,900-character URLs; run the crawler at `LHCI_SEO_CRAWL_MAX_PAGES=200`).
+3. **Pass when** that reproduction produces a snapshot under 16 MiB and the cache write succeeds. Then mark Finding 10 fixed in `security-findings.md` and the
+   `ci-backlog.md` entry done.
+
+**B2. Extra things to look at in the real GitHub Actions run (A3), because of the deeper crawl.**
+The crawl now follows links 3 hops and starts from the homepage: a cold crawl is up to about 150 requests and may spend the full 120 s on a big site. In the
+real run, check how long the first Lighthouse run takes with the crawl on, and that the page cap (50) or the time budget is what ends it (the `crawl-coverage`
+table notes say which). If it is too slow for CI, lower `LHCI_SEO_CRAWL_MAX_PAGES` or `LHCI_SEO_CRAWL_MAX_DEPTH`, or set `LHCI_SEO_CRAWL=0`.
+
+**B3. Viewer (A1) will also need to show `crawl-coverage`'s new Depth column.** No action beyond A1.
+
 ## 3. Deferred features (choices, not bugs)
 
 Grouped by what unblocks them. Phase numbers are the fork's own phases (`docs/phases/`).
 
 ### Unblocked by Phase 8 (link-following beyond depth 1, the link graph)
+
+The crawler now follows links to depth 3 (Phase 8 item 0, built); the audits that use it are Phase 8 items 1 to 6 and are not built yet. Each row below is
+closed by one of them (see `docs/phases/phase-8-internal-linking.md`).
 
 | Item | From | Note |
 |------|------|------|

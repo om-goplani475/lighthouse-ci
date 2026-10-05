@@ -590,24 +590,33 @@ audited page: HTTP status, robots.txt (Googlebot and Bingbot), meta robots and `
 ### The site crawler (`crawl-coverage`, and what the cross-page audits read)
 
 Every audit before Phase 7 judges **one page**. Phase 7's duplicate-detection audits compare a page with the rest of
-the site, so this fork has a small, bounded, polite crawler whose snapshot they read. It runs **inside the normal
+the site, and Phase 8's link-graph audits need the site's link structure, so this fork has a small, bounded, polite
+crawler whose snapshot they read. It runs **inside the normal
 Lighthouse run** as the `SiteCrawl` gatherer; `lhci autorun` needs no extra step.
 
-- **What it crawls** (one level, "depth 1"): the audited page, **the page's own internal links**, and the **URLs in
-  the site's sitemap** (found through robots.txt `Sitemap:` lines, else `/sitemap.xml`). The links *of* those pages
-  are stored but **not followed** (following links to a greater depth waits for Phase 8). Same origin only: a link or a
-  redirect to another host, port or scheme is recorded and **never requested**. HTML only, server HTML (no JavaScript
-  is run), up to 512 KiB per page.
+- **What it crawls**: the audited page, **the site's homepage** (crawl depth is measured from it), a share of **the page's
+  own internal links** and of the **URLs in the site's sitemap** (found through robots.txt `Sitemap:` lines, else
+  `/sitemap.xml`), then **follows the same-origin links of every page it fetched, breadth-first, for up to 3 hops**
+  (`LHCI_SEO_CRAWL_MAX_DEPTH`). The seeds take at most half of the page slots, so the other half is left for following
+  links. Breadth-first means that when the page cap bites it is the **deepest pages that are left out**. Same origin only: a
+  link or a redirect to another host, port or scheme is recorded and **never requested** (external links are stored, not
+  requested). URLs that are plainly files (`.png`, `.pdf`, `.js`, ...) are not requested, and at most **5 query-string
+  variants of one path** are (a crawl-trap guard); both are listed as skipped. HTML only, server HTML (no JavaScript is
+  run), up to 512 KiB per page.
 - **What it keeps** per page: final URL and redirect chain, status, content type, `<title>`, meta description,
   canonicals, robots meta and `X-Robots-Tag`, the first five `<h1>` texts, a **hash** of the visible text with its
-  length and word count, and the page's internal links. **Raw HTML is never stored.**
+  length and word count, **how deep the crawl found it**, its internal links **with their anchor text** (image alt text when
+  there is no text; `nofollow`, `sponsored` and `ugc` flags), up to 20 **external links** (never requested here), and its
+  `rel=next` / `rel=prev` pagination links; plus the sitemap's URL list and whether the **page cap**, the **depth bound** or
+  the **time budget** cut the crawl. **Raw HTML is never stored.**
 - **robots.txt is honoured by default**: URLs it disallows for the crawler's own user-agent
   (`lhci-seo-audits-crawler/1.0`, falling back to `*`) are not requested and are listed as blocked. The audited page is
   always requested once. If robots.txt cannot be read (a 5xx, a redirect, a network error) **only the audited page is
   requested** (the crawler does not guess what robots.txt would have allowed) and the run warns.
-- **Default bounds**: 50 pages, 5 requests at a time, 5 s per request (one retry for a network error), redirects
-  followed for at most 3 rounds and at most 3 requests per page, **120 s** in total, after which the rest is recorded as
-  not checked.
+- **Default bounds**: 50 pages, **3 hops**, 5 requests at a time, 5 s per request (one retry for a network error),
+  redirects followed for at most 3 rounds and at most 3 requests per page, **120 s** in total, after which the rest is
+  recorded as not checked. A cold crawl sends up to about **150 requests** (3 per page at most) and, on a big site, usually
+  finishes by hitting the page cap or the time budget; `crawl-coverage` says which.
 - **`crawl-coverage`** (informational, never fails) shows what was crawled, what was blocked or skipped, and the limits
   in one table. Leave it out of `assertions`: Lighthouse normalises an informational score to 1, so a `minScore`
   assertion on it always passes.
@@ -616,7 +625,7 @@ Lighthouse run** as the `SiteCrawl` gatherer; `lhci autorun` needs no extra step
   nothing fuzzier (`Home | Site` and `Home - Site` are different). An empty value never counts: a missing title or
   description is already reported by Lighthouse's own SEO audits, and the audit is not applicable when the audited page
   has none. Two requested URLs that end on one final URL are one page. They only see the pages the crawl reached (the
-  audited page, its own links and the sitemap URLs), so a duplicate on a page the crawl did not reach is not reported:
+  audited page, the homepage, their links to 3 hops and the sitemap URLs), so a duplicate on a page the crawl did not reach is not reported:
   read `crawl-coverage` for how much was seen. Both are `assert`-able, e.g. `'duplicate-titles': ['error', {minScore: 1}]`.
 - **`thin-content`** (scored) fails when the audited page has fewer than **200 words** of visible text in its server HTML.
   The text-to-HTML ratio (visible characters per byte of HTML read) is shown in the table and never judged: a low ratio is
@@ -648,6 +657,7 @@ Lighthouse run** as the `SiteCrawl` gatherer; `lhci autorun` needs no extra step
 |---|---|---|
 | `LHCI_SEO_CRAWL` | on | `0` or `false` switches the crawl off entirely (no requests; the audits that read it are not applicable) |
 | `LHCI_SEO_CRAWL_MAX_PAGES` | 50 (1 to 200) | page cap, the audited page included |
+| `LHCI_SEO_CRAWL_MAX_DEPTH` | 3 (1 to 5) | how many hops of links to follow from the starting pages |
 | `LHCI_SEO_CRAWL_TIME_BUDGET_SECONDS` | 120 (10 to 600) | total crawl time |
 | `LHCI_SEO_CRAWL_RESPECT_ROBOTS` | on | `0` or `false` requests URLs robots.txt disallows (for auditing your own staging site) |
 | `LHCI_SEO_CRAWL_CACHE_DIR` | `<tmp>/lhci-seo-crawl-<uid>` | where the snapshot cache lives (its parent must already exist) |
@@ -657,10 +667,11 @@ Lighthouse run** as the `SiteCrawl` gatherer; `lhci autorun` needs no extra step
 it the crawl cannot run and the report carries a warning naming the setting).
 
 **The cache.** `lhci collect` runs every Lighthouse run as its own process, so a cache on disk is how several URLs, or
-several runs of one URL, crawl the site **once**: a fresh snapshot for the same origin and the same bounds is reused with
+several runs of one URL, crawl the site **once**: a fresh snapshot for the same origin and the same bounds (pages, depth,
+robots) is reused with
 **no request to your site**, and another URL of the same site only gets its own page requested and added. The directory
 is used only if it is a real directory (not a symlink) **owned by you with no group or other access**; anything else
-means no cache, never a trusted forgery. Files are written atomically, a corrupt or expired file is ignored, and only the
+means no cache, never a trusted forgery. A file written by an older version of the fork (a different snapshot version) is ignored and the site is crawled again. Files are written atomically, a corrupt or expired file is ignored, and only the
 extracted snapshot is stored.
 
 **Cost.** On a cold cache the crawl sends up to about 100 requests to the audited site (visible in its logs) and can take

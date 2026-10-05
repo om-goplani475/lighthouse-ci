@@ -161,6 +161,22 @@
   crawler's robots.txt and sitemap requests identify themselves.
 - status: done (2026-10-01)
 
+## 2026-10-05 — link-graph-crawler
+
+- item: no gap found in the workflow files. No dependency was added (`package.json` and `yarn.lock` are unchanged by the feature's diff), no new script
+  or build step, no Docker config exists. The seo-audits suites (75 suites) pass; the Node 18.20.8 re-run for this change is still to do (listed in
+  `docs/open-items.md`).
+- status: done (nothing to do)
+
+- item: for any CI job: the crawl now follows links for up to 3 hops and starts from the homepage too, so a cold crawl sends up to about 150 requests
+  (3 per page at most, 50 pages by default) instead of about 100 and finishes by hitting the page cap or the 120 s budget on a big site.
+  `LHCI_SEO_CRAWL_MAX_DEPTH` (1 to 5) tunes it. The snapshot version and the depth are in the cache key, so the first run after upgrading re-crawls.
+- status: done (documented in the README)
+
+- item: follow-up from the security review (Finding 10, low): give the snapshot a byte budget for stored links, or a lower URL length for them, so a hostile
+  site cannot make it exceed the 16 MiB cache cap.
+- status: open
+
 <!-- Appended by Agent 08. Advisory only — does not block merges or new features. Format per entry:
 
 ## {date} — {slug}

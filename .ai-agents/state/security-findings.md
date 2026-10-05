@@ -711,3 +711,40 @@ on a hostile crawl, so each builder was run on worst-case snapshots (200 pages, 
 - **No panics on odd input**: every builder is unit-tested with a missing, disabled and malformed crawl and returns "not applicable".
 
 No `critical`, `high` or `medium` findings; Finding 9 is `low` and fixed; none open.
+
+## 2026-10-05 — link-graph-crawler (Phase 8 item 0, lightweight)
+
+Reviewed with the security checklist while building; every attack below was **run against the real crawler** (a local site, spy servers,
+the real fetch path), not only unit-tested. New surface: link-following (more requests to the audited site's own pages), one extra seed (the
+homepage, same origin), and more page-controlled strings in the snapshot (anchor text, external link URLs).
+
+- **Other origins are never requested.** A spy server on another port, linked from the homepage as an absolute URL, received **zero**
+  requests; external links are stored (capped) and never requested here. Every candidate URL is the output of `normalizeUrl` and a
+  same-origin check; `javascript:`, `mailto:` and credentialed URLs are dropped by the extractor.
+- **robots.txt**: `/private/` was linked from the homepage and never requested; a homepage that robots.txt disallows is recorded, not requested.
+  If robots.txt cannot be read, only the audited page is requested (no link-following).
+- **Bounds hold against a hostile site**: a site whose every page links to 250 new pages and 60 external URLs, run at the maximum settings (200 pages,
+  depth 5): 200 pages, 201 requests (the cap is 600), 2.2 s, at most 500 distinct external links kept; at the default 50 pages, 1.5 s. A page
+  chain that never ends stops at the depth bound (`cutByDepth`).
+- **Crawl traps**: a calendar-style query-string trap stops at 5 variants of one path; files (`.png`, `.pdf`, `.js`) are not requested.
+- **Crawled once across processes** (a real `lhci collect`, 2 URLs x 2 runs): 41 distinct paths requested, only the two audited URLs more than once
+  (Lighthouse's own page loads); one cache file. The cache key now includes the depth and the snapshot version, so an older file is ignored.
+- **Parsing**: the new anchor, alt-text, external-link and pagination reads are linear: hostile 512 KiB inputs (an unclosed `<a>` repeated, one enormous
+  anchor, an alt-text flood, 15,000 external links, a pagination flood) all extract in under 2 s with bounded output (asserted in tests).
+
+### Finding 10
+
+- severity: low
+- finding: **A hostile site can make the snapshot bigger than the cache allows and the crawl heavy on memory.** Links are stored with their URL (up
+  to 2,000 characters) and anchor text. A site whose pages each have 200 links, every one a 1,900-character URL, gives a snapshot of **20 MiB at the default
+  50 pages (about 360 MB resident, 1.5 s)** and **81 MiB at 200 pages (about 750 MB, 5 s)**. The cache refuses a file over 16 MiB, so each Lighthouse run of
+  that collect crawls again (still inside its own bounds). It needs a hostile or very odd site that the developer chose to audit; no exposure beyond cost.
+- status: open, accepted for now. A follow-up would be a byte budget for stored links per snapshot (or a lower URL length for stored links). Recorded in
+  `.ai-agents/state/ci-backlog.md` and `docs/open-items.md`.
+
+### Not verified
+
+- A real GitHub Actions run (a shared runner's memory and the cache directory), as for the crawler itself.
+
+No `critical`, `high` or `medium` findings. Finding 10 is `low` and open (accepted).
+
