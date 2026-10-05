@@ -203,6 +203,10 @@ ruleset changes without human review. Details in `docs/phases/phase-2-structured
 
 The developer chose to leave Phase 11 about 30% built and move on. The branch `phase-11-hreflang` holds the tested foundation (the sitemap `xhtml:link` capture, `looseKey`, the head extractor); the library, the `HreflangData` gatherer, the seven audits, the live QA and the docs are not built. **To resume:** check out the branch and follow "Still to build" in `docs/phases/phase-11-hreflang.md` (it lists the order, the calibration rules and the pitfalls, including the API content-filter rejection of one very large file). Until then the roadmap row stays open and no hreflang audit beyond Lighthouse core's syntax check exists.
 
+### E. Phase 13: verify `core-web-vitals-field` with a real key (needs you)
+
+The audit was built and run live without a key (not applicable), with a key on localhost (nothing sent) and against the real Google endpoint with a fake key (a clear 400), but **the success path has never seen real data**. **Steps:** create a Google Cloud API key and enable the "Chrome UX Report API" (free); then `LHCI_SEO_CRUX_API_KEY=<key> npx lhci collect --url=<a busy public site, for example https://web.dev/> --settings.configPath=packages/seo-audits/src/lighthouse-config.js` and read the `core-web-vitals-field` table. **Pass when** it shows LCP, INP and CLS values with a Google rating and a collection period, says whether the URL or the whole site answered, and the key does not appear in the report JSON. A site with too little traffic returns "no data", which is expected. Anything off is a `fix(seo-audits)` commit with a test using the real response shape.
+
 ## 5. How to close an item
 
 1. Do the steps; if it passes, tick it above and delete its "Not verified" line elsewhere.

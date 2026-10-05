@@ -857,3 +857,21 @@ Two new gatherers and seven audits. One new request surface: **`device-content-p
 
 No `critical`, `high` or `medium` findings, and no new `low` finding left open; Finding 10 remains open and accepted.
 
+## 2026-10-05 — performance-audits (Phase 13, lightweight with a careful review)
+
+The first audit that sends a **secret** and the audited page's address to a **third party** (Google's CrUX API). Off unless `LHCI_SEO_CRUX_API_KEY` is set.
+
+- **The key**: read only from the environment (never a config file); sent in the `X-Goog-Api-Key` header, never in the URL or body; never placed in the artifact, the report or an error message (tested: a thrown error, bad JSON, and an error body that echoes the key all come back scrubbed). Run: with a fake key the real API answered 400 and the key was absent from the result.
+- **What is sent**: the origin and path of the audited page and the form factor. The **query string and fragment are dropped** (they may carry tokens). **An address that is not a public host name is never sent**: localhost, any IP literal, a name without a dot, `.local`/`.internal`/`.lan`/`.test` and similar (tested; run: a localhost page with a key set made no request). The audited URL is chosen by the user, so this is a disclosure to Google of a site the user audits, stated in the README and in the audit description.
+- **SSRF**: not applicable: the request goes to one fixed host (`chromeuxreport.googleapis.com`, constant in the source); no URL taken from the page or the response is ever requested. No redirect is followed.
+- **Bounds**: 8 s timeout, a 256 KiB response cap (the request is destroyed when exceeded), at most two requests per run (URL, then origin). Output is parsed defensively (a missing or malformed record is "no data").
+- **Report integrity**: missing key, no data, an API error and a non-public address are "not applicable" with a reason, never a failure; a metric must be "poor" at the 75th percentile by Google's published thresholds to fail.
+- **The two reports** read the HTML and the network log already collected (no request). The HTML is parsed with the linear streaming tokenizer, only the part before `<body>`, capped at 2 MiB, at most 100 resources.
+
+### Not verified
+
+- The success path with a real key and real CrUX data.
+- Behaviour at the API quota (a 429 is reported as "quota exceeded", unit-tested only).
+
+No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 remains open and accepted.
+

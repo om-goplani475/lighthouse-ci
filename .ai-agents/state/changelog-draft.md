@@ -593,3 +593,7 @@ Seven new audits in `seo-extended`, comparing what a crawler reads (the raw HTML
 
 **New request: `device-content-parity` fetches the audited page twice per run** (a mobile and a desktop user-agent, each ending in `lhci-seo-audits/1.0`, 512 KiB, no redirect followed, the audited URL only). Set `LHCI_SEO_DEVICE_PARITY=0` to switch it off (the audit is then not applicable). No `.lighthouserc.js` migration; add the audits to your `assertions` yourself.
 
+## 2026-10-05 — performance-audits (Phase 13)
+
+Three new audits in `seo-extended`: `core-web-vitals-field` (real-visitor Core Web Vitals from Google's Chrome UX Report; fails only when LCP, INP or CLS is "poor" at the 75th percentile by Google's published thresholds), and two informational reports, `render-blocking-report` and `request-weight-report`. One new gatherer (`FieldData`). **`core-web-vitals-field` is off unless you set `LHCI_SEO_CRUX_API_KEY`; when set, each run sends the audited page's origin and path (no query string, never a private or non-public address) to Google, with the key in a request header and never in the report.** Not applicable without a key or when CrUX has no data. No `.lighthouserc.js` migration; add the audits to your `assertions` yourself.
+

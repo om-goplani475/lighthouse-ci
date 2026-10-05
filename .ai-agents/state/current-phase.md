@@ -1,9 +1,9 @@
 # Current phase
 
-- phase: none in progress (Phase 11 hreflang PAUSED about 30% built on branch phase-11-hreflang, not merged; Phase 12 is merged)
-- branch: main
+- phase: phase-13-performance (built and QA'd, awaiting the merge into main; Phase 11 hreflang is PAUSED on its own branch)
+- branch: phase-13-performance
 - roadmap: docs/master-roadmap.md (next: Phase 9, URL Quality) and docs/open-items.md (the verification checks still to do)
-- status: idle (see docs/phases/phase-11-hreflang.md to resume Phase 11)
+- status: in-progress (docs/phases/phase-13-performance.md)
 
 <!-- Phase 12 (JavaScript rendering) closed 2026-10-05: seven audits and two gatherers, ff-merged into main, branch deleted. See docs/phases/phase-12-js-rendering.md. -->
 

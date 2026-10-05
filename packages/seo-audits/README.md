@@ -746,6 +746,14 @@ Seven audits on how the page a crawler reads (the raw HTML) compares with the pa
 
 Excessive DOM size is left to Lighthouse core's `dom-size`.
 
+#### Performance and field-data audits
+
+Three audits on how fast the page is for real visitors and how heavy it is to fetch. Lighthouse itself only measures in a lab; the first adds real-visitor data.
+
+- **`core-web-vitals-field`** (scored) reads real-visitor ("field") Core Web Vitals from Google's **Chrome UX Report (CrUX) API**. It judges Largest Contentful Paint, Interaction to Next Paint and Cumulative Layout Shift at the 75th percentile, and **fails only when one is "poor"** by Google's published thresholds (LCP over 4 s, INP over 500 ms, CLS over 0.25); "needs improvement" is shown, never failed. First Contentful Paint and Time to First Byte are shown, not judged. It asks about the URL first and falls back to the whole site, and says which answered. **It is off unless `LHCI_SEO_CRUX_API_KEY` is set**, and then **each run sends the page's origin and path to Google** (the query string and fragment are dropped; an address that is not a public host name, such as localhost, an IP address or a name without a dot, is never sent) with the key in the `X-Goog-Api-Key` header, never in the URL, never in the report or a log. Not applicable without a key, when CrUX has no data (small or new sites), or on an API error (the reason is shown). Get a key from the Google Cloud console and enable the "Chrome UX Report API"; the key is read only from the environment, never from a config file.
+- **`render-blocking-report`** (informational) lists the external scripts without `async`/`defer`/`type=module` and the stylesheets in the page head, with their sizes and whether they come from this site or another host. Read from the HTML, an approximation (the preload scanner is not modelled).
+- **`request-weight-report`** (informational) shows the number of requests and bytes of the page load by resource type and by host, with the ten largest. Google documents no threshold for either report, so neither ever fails. No extra request.
+
 **Environment variables** (read per run, clamped; a page can never change them):
 
 | Variable | Default | Effect |
@@ -755,6 +763,7 @@ Excessive DOM size is left to Lighthouse core's `dom-size`.
 | `LHCI_SEO_CRAWL_MAX_DEPTH` | 3 (1 to 5) | how many hops of links to follow from the starting pages |
 | `LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS` | 20 (0 to 50) | status-only checks of the external links on the audited page, to other sites (`broken-external-links`); `0` switches them off and that audit is then not applicable |
 | `LHCI_SEO_DEVICE_PARITY` | on (`0` switches it off) | two requests to the audited page, with a mobile and a desktop user-agent (`device-content-parity`); `0` makes that audit not applicable |
+| `LHCI_SEO_CRUX_API_KEY` | unset (off) | a Google API key for the Chrome UX Report API; when set, `core-web-vitals-field` sends the page origin and path to Google once or twice per run (URL, then origin); unset, the audit is not applicable and nothing is sent |
 | `LHCI_SEO_CRAWL_MAX_LINK_CHECKS` | 100 (0 to 200) | status-only checks of the audited page's own links the crawl did not read; `0` switches them off (the link-check audits then judge only links to pages the crawl read) |
 | `LHCI_SEO_CRAWL_TIME_BUDGET_SECONDS` | 120 (10 to 600) | total crawl time |
 | `LHCI_SEO_CRAWL_RESPECT_ROBOTS` | on | `0` or `false` requests URLs robots.txt disallows (for auditing your own staging site) |
@@ -867,7 +876,7 @@ This adds all fifty-nine audits (`structured-data-json-ld`, `structured-data-sch
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
 `sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`, `mixed-content`, `hsts-quality`,
 `ssl-certificate-expiry`, `soft-not-found`, `url-variant-consistency`, `redirect-chain-length`,
-`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, `anchor-text-diversity`, `descriptive-anchor-text`, `pagination-links`, `paginated-canonical`, `pagination-trap`, `broken-external-links`, `url-length`, `url-query-parameters`, `url-session-tracking`, `url-encoding`, `url-case-variants`, `url-trailing-slash-variants`, `url-normalization`, `image-alt-quality`, `image-filename-quality`, `image-lazy-above-fold`, `image-dimensions-attributes`, `image-oversized`, `image-legacy-formats`, `broken-images`, `js-head-signals`, `js-internal-links`, `js-visible-content`, `raw-rendered-diff`, `rendering-mode`, `hydration-errors`, `device-content-parity`) on top of
+`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, `anchor-text-diversity`, `descriptive-anchor-text`, `pagination-links`, `paginated-canonical`, `pagination-trap`, `broken-external-links`, `url-length`, `url-query-parameters`, `url-session-tracking`, `url-encoding`, `url-case-variants`, `url-trailing-slash-variants`, `url-normalization`, `image-alt-quality`, `image-filename-quality`, `image-lazy-above-fold`, `image-dimensions-attributes`, `image-oversized`, `image-legacy-formats`, `broken-images`, `js-head-signals`, `js-internal-links`, `js-visible-content`, `raw-rendered-diff`, `rendering-mode`, `hydration-errors`, `device-content-parity`, `core-web-vitals-field`, `render-blocking-report`, `request-weight-report`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
