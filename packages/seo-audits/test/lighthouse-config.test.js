@@ -62,7 +62,7 @@ describe('seo-audits lighthouse-config', () => {
     expect(artifactIds).toContain('IndexabilitySignals');
     expect(artifactIds).toContain('SiteCrawl');
 
-    // And all forty-six of this fork's audits are actually added, not just defaults preserved.
+    // And all fifty of this fork's audits are actually added, not just defaults preserved.
     expect(auditIds).toContain('structured-data-json-ld');
     expect(auditIds).toContain('structured-data-schema-properties');
     expect(auditIds).toContain('structured-data-rich-result-eligibility');
@@ -109,6 +109,10 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds).toContain('thin-content');
     expect(auditIds).toContain('canonical-conflicts');
     expect(auditIds).toContain('duplicate-content');
+    expect(auditIds).toContain('dead-end-pages');
+    expect(auditIds).toContain('internal-link-counts');
+    expect(auditIds).toContain('orphan-pages');
+    expect(auditIds).toContain('crawl-depth');
   }, 30000);
 
   it('has no audit id with a hyphen followed by a digit', async () => {
@@ -120,7 +124,7 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds.filter(id => /-\d/.test(id))).toEqual([]);
   }, 30000);
 
-  it('adds the seo-extended category with all forty-six audits, without touching the core seo category', async () => {
+  it('adds the seo-extended category with all fifty audits, without touching the core seo category', async () => {
     const {categories} = await resolveConfig();
 
     expect(categories['seo-extended']).toBeDefined();
@@ -128,6 +132,8 @@ describe('seo-audits lighthouse-config', () => {
       'canonical-conflicts',
       'canonical-https',
       'crawl-coverage',
+      'crawl-depth',
+      'dead-end-pages',
       'document-h1-count',
       'document-title-quality',
       'duplicate-content',
@@ -139,6 +145,7 @@ describe('seo-audits lighthouse-config', () => {
       'hsts-quality',
       'indexability-conflicts',
       'indexability-verdict',
+      'internal-link-counts',
       'llms-txt-structure',
       'manifest-icons',
       'meta-description-identical-to-title',
@@ -146,6 +153,7 @@ describe('seo-audits lighthouse-config', () => {
       'open-graph-canonical-match',
       'open-graph-completeness',
       'open-graph-image-reachable',
+      'orphan-pages',
       'pixel-width-truncation',
       'redirect-chain-length',
       'redirect-loop',

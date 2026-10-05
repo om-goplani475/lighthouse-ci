@@ -91,6 +91,10 @@ const config = {
     './audits/thin-content.js',
     './audits/canonical-conflicts.js',
     './audits/duplicate-content.js',
+    './audits/dead-end-pages.js',
+    './audits/internal-link-counts.js',
+    './audits/orphan-pages.js',
+    './audits/crawl-depth.js',
   ],
   categories: {
     'seo-extended': {
@@ -142,6 +146,10 @@ const config = {
         {id: 'thin-content', weight: 1},
         {id: 'canonical-conflicts', weight: 1},
         {id: 'duplicate-content', weight: 1},
+        {id: 'dead-end-pages', weight: 1},
+        {id: 'internal-link-counts', weight: 1},
+        {id: 'orphan-pages', weight: 1},
+        {id: 'crawl-depth', weight: 1},
       ],
     },
   },
