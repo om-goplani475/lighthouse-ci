@@ -583,3 +583,7 @@ Seven new audits in `seo-extended`: `url-length` (over 115 characters of path an
 
 **Bug fix that affects Phases 7 and 8**: when one `lhci collect` audited several URLs of the same origin, the later URLs reused the first URL's cached crawl and the cross-page audits (duplicate titles, thin content, link counts, anchor text and the rest) could judge the *first* page instead of the one being audited. They now judge the right page.
 
+## 2026-10-05 — image-audits (Phase 10)
+
+Seven new audits in `seo-extended`, all on the audited page and all binary: `image-alt-quality` (a file name, a placeholder, over 125 characters, or the same alt on 3 or more images), `image-filename-quality` (IMG_1234, numbers, hashes, generic words; CSS backgrounds included), `image-lazy-above-fold` (any `loading="lazy"` image in the first screen), `image-dimensions-attributes`, `image-oversized` (more than 2x wider than shown), `image-legacy-formats` (JPEG/PNG/GIF over 10 KiB) and `broken-images` (4xx, 5xx or no response). Four overlap Lighthouse core audits with stricter, simpler thresholds, by choice. One new gatherer (`ImageAltText`). No new request, no new environment variable, no `.lighthouserc.js` migration; add the audits to your `assertions` yourself.
+

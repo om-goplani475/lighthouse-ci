@@ -834,3 +834,13 @@ Pure string checks on URLs; **no new request surface, no new gatherer, no new en
 
 No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 remains open and accepted.
 
+## 2026-10-05 — image-audits (Phase 10, lightweight)
+
+One new gatherer (`ImageAltText`) and seven audits; **no new request surface and no new environment variable** (the audits read the page's own network log and DOM data).
+
+- **Page-controlled input**: alt text, image URLs and file names come from the audited page. The gatherer runs in the isolated world, reads attributes only, caps the list at 500 images and the strings at 300 (alt) and 1,000 (URL) characters. Every regular expression is anchored or linear on those bounded strings; the file-name rules run on a decoded name (a malformed escape is kept raw, tested).
+- **No fetching**: image bytes are never requested by the audits; sizes and statuses come from the load Lighthouse already recorded. `data:` URLs are skipped.
+- **Output**: URLs and alt text appear in table cells only, clipped to 200 characters, at most 50 rows.
+
+No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 remains open and accepted.
+

@@ -720,6 +720,18 @@ Seven audits that read URLs, with no new request (they use the audited URL and t
 - **`url-case-variants`** and **`url-trailing-slash-variants`** (scored) fail when the audited page and another crawled URL differ **only** in letter case (or only by a trailing slash), **both answered 200 as HTML**, and their canonicals do not all name one URL. A variant that redirects is one page to the crawl, so it is not reported.
 - **`url-normalization`** (scored) is the general form: the same resource in another form (case, trailing slash, repeated slashes, an index file name, tracking or session parameters, parameter order). It includes what the two audits above report. Other groups are listed, not judged.
 
+#### Image audits
+
+Seven audits on the images of the audited page. No extra request: they read Lighthouse's own image data, the network log of the page load and one small gatherer (`ImageAltText`, because Lighthouse's image data has no alt text). A **content image** is one shown at least 50 x 50 px; icons and tracking pixels are not judged. Each fails on any single offender and lists up to 50. Four overlap Lighthouse core audits on purpose, with different (stricter, simpler) thresholds.
+
+- **`image-alt-quality`** (scored) fails on alt text that is a file name, repeats the image's file name, is a placeholder word (`image`, `photo`, `banner`...), is over 125 characters, or is the same on 3 or more different images. `alt=""` (decorative), `role=presentation` and `aria-hidden` images pass; a missing alt is core's `image-alt`.
+- **`image-filename-quality`** (scored) fails on a camera or tool default name (`IMG_1234`, `DSC0001`, `Screenshot 12`), a number only, a hash or UUID, or a generic word. It also reads CSS background images.
+- **`image-lazy-above-fold`** (scored) fails on an `<img loading="lazy">` inside the first viewport (core `lcp-lazy-loaded` only catches the largest-paint image). The viewport is the emulated one, so a page without `<meta name="viewport">` is laid out 980 px wide and has a taller "first screen".
+- **`image-dimensions-attributes`** (scored) fails on a content `<img>` without a `width` or `height` attribute (core `unsized-images` also accepts CSS sizes).
+- **`image-oversized`** (scored) fails on a raster `<img>` more than 2x wider than it is shown and at least 100 px wider (SVG is not judged).
+- **`image-legacy-formats`** (scored) fails on a loaded JPEG, PNG or GIF over 10 KiB; WebP, AVIF and SVG pass.
+- **`broken-images`** (scored) fails on an image request that answered 4xx or 5xx or got no response; cancelled and blocked requests are ignored.
+
 **Environment variables** (read per run, clamped; a page can never change them):
 
 | Variable | Default | Effect |
@@ -840,7 +852,7 @@ This adds all fifty-nine audits (`structured-data-json-ld`, `structured-data-sch
 `robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
 `sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`, `mixed-content`, `hsts-quality`,
 `ssl-certificate-expiry`, `soft-not-found`, `url-variant-consistency`, `redirect-chain-length`,
-`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, `anchor-text-diversity`, `descriptive-anchor-text`, `pagination-links`, `paginated-canonical`, `pagination-trap`, `broken-external-links`, `url-length`, `url-query-parameters`, `url-session-tracking`, `url-encoding`, `url-case-variants`, `url-trailing-slash-variants`, `url-normalization`) on top of
+`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, `anchor-text-diversity`, `descriptive-anchor-text`, `pagination-links`, `paginated-canonical`, `pagination-trap`, `broken-external-links`, `url-length`, `url-query-parameters`, `url-session-tracking`, `url-encoding`, `url-case-variants`, `url-trailing-slash-variants`, `url-normalization`, `image-alt-quality`, `image-filename-quality`, `image-lazy-above-fold`, `image-dimensions-attributes`, `image-oversized`, `image-legacy-formats`, `broken-images`) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
