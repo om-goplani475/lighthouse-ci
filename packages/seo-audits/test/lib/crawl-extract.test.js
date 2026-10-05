@@ -278,6 +278,16 @@ describe('anchor text, rel flags and repeated links', () => {
     expect(links('<a href="/a"><img src="x.png"></a>')[0].anchor).toBe('');
   });
 
+  it('falls back to the accessible name (aria-label, then title) for an icon link with no text or alt', () => {
+    expect(links('<a href="/a" aria-label="Open the cart"><svg></svg></a>')[0].anchor).toBe(
+      'Open the cart'
+    );
+    expect(links('<a href="/a" title="Contact us"><svg></svg></a>')[0].anchor).toBe('Contact us');
+    expect(links('<a href="/a" aria-label="Cart" title="Basket"></a>')[0].anchor).toBe('Cart');
+    expect(links('<a href="/a" aria-label="Cart">Shop</a>')[0].anchor).toBe('Shop');
+    expect(links('<a href="/a"><img alt="Logo"></a>')[0].anchor).toBe('Logo');
+  });
+
   it('decodes entities and caps a long anchor at 100 characters', () => {
     expect(links('<a href="/a">Fish &amp; chips</a>')[0].anchor).toBe('Fish & chips');
     expect(links(`<a href="/a">${'word '.repeat(200)}</a>`)[0].anchor).toHaveLength(100);

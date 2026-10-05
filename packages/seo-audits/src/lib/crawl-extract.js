@@ -183,8 +183,9 @@ function parse(html, pageUrl) {
   /** @type {CrawlPagination} */
   const pagination = {next: [], prev: []};
   /**
-   * The `<a>` being read: where it goes, and the text and image alt inside it, which become its anchor.
-   * @type {{url: string, internal: boolean, rel: string[], text: string, alt: string} | null}
+   * The `<a>` being read: where it goes, and the text, image alt text and accessible name (aria-label, then title)
+   * of it, which in that order become its anchor.
+   * @type {{url: string, internal: boolean, rel: string[], text: string, alt: string, label: string} | null}
    */
   let anchor = null;
   // The same href is read again and again (navigation, footers): parse each distinct one once per page. Capped so a
@@ -232,7 +233,10 @@ function parse(html, pageUrl) {
     if (!anchor) return;
     const done = anchor;
     anchor = null;
-    const text = clip(collapse(done.text) || collapse(done.alt), MAX_ANCHOR_CHARS);
+    const text = clip(
+      collapse(done.text) || collapse(done.alt) || collapse(done.label),
+      MAX_ANCHOR_CHARS
+    );
     const nofollow = done.rel.includes('nofollow');
     if (done.internal) {
       const key = `${done.url}\n${text}`;
@@ -313,7 +317,15 @@ function parse(html, pageUrl) {
             const resolved = resolveHref(attrs.href);
             if (resolved) {
               const rel = (attrs.rel || '').toLowerCase().split(/\s+/);
-              anchor = {url: resolved.url, internal: resolved.internal, rel, text: '', alt: ''};
+              const label = clip(attrs['aria-label'] || attrs.title || '', MAX_ANCHOR_BUFFER_CHARS);
+              anchor = {
+                url: resolved.url,
+                internal: resolved.internal,
+                rel,
+                text: '',
+                alt: '',
+                label,
+              };
               addPagination(rel, attrs.href);
             }
           }
