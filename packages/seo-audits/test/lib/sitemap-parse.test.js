@@ -323,3 +323,87 @@ describe('parseSitemapBytes — gzip', () => {
     expect(LIMITS.MAX_COMPRESSED_BYTES).toBeGreaterThanOrEqual(LIMITS.MAX_UNCOMPRESSED_BYTES);
   });
 });
+
+describe('targetEntry (xhtml:link alternates of one page)', () => {
+  const {parseSitemapBytes} = require('../../src/lib/sitemap-parse.js');
+  const NS =
+    'xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml"';
+  const parse = (/** @type {string} */ body, /** @type {string | null} */ target) =>
+    parseSitemapBytes(
+      {
+        url: 'https://e.com/sitemap.xml',
+        source: 'declared',
+        parentUrl: null,
+        status: 200,
+        body: Buffer.from(body),
+      },
+      {target}
+    );
+  const urlset = (/** @type {string} */ inner) =>
+    `<?xml version="1.0"?><urlset ${NS}>${inner}</urlset>`;
+  const alt = (/** @type {string} */ l, /** @type {string} */ h) =>
+    `<xhtml:link rel="alternate" hreflang="${l}" href="${h}"/>`;
+
+  it('records the alternates of the target page only', () => {
+    const doc = parse(
+      urlset(
+        `<url><loc>https://e.com/en/</loc>${alt('en', 'https://e.com/en/')}${alt(
+          'fr',
+          'https://e.com/fr/'
+        )}</url>` +
+          `<url><loc>https://e.com/other</loc>${alt('de', 'https://e.com/de/other')}</url>`
+      ),
+      'https://e.com/en'
+    );
+    expect(doc.targetEntry).toEqual({
+      alternates: [
+        {hreflang: 'en', href: 'https://e.com/en/'},
+        {hreflang: 'fr', href: 'https://e.com/fr/'},
+      ],
+      alternatesTruncated: false,
+    });
+    expect(doc.entryCount).toBe(2);
+  });
+
+  it('finds the entry when <loc> comes after the links', () => {
+    const doc = parse(
+      urlset(`<url>${alt('fr', 'https://e.com/fr/')}<loc>https://e.com/en/</loc></url>`),
+      'https://e.com/en/'
+    );
+    expect(doc.targetEntry && doc.targetEntry.alternates).toHaveLength(1);
+  });
+
+  it('is null when the page is not listed, when no target is asked for, and for an index', () => {
+    const xml = urlset(`<url><loc>https://e.com/a</loc>${alt('fr', 'https://e.com/fr/a')}</url>`);
+    expect(parse(xml, 'https://e.com/b').targetEntry).toBeNull();
+    expect(parse(xml, null).targetEntry).toBeNull();
+    expect(
+      parse(
+        `<sitemapindex ${NS}><sitemap><loc>https://e.com/s.xml</loc></sitemap></sitemapindex>`,
+        'https://e.com/s.xml'
+      ).targetEntry
+    ).toBeNull();
+  });
+
+  it('keeps an entry with no alternates, ignores non-alternate and incomplete links, and caps the list', () => {
+    const none = parse(urlset('<url><loc>https://e.com/a</loc></url>'), 'https://e.com/a');
+    expect(none.targetEntry).toEqual({alternates: [], alternatesTruncated: false});
+    const odd = parse(
+      urlset(
+        '<url><loc>https://e.com/a</loc><xhtml:link rel="canonical" hreflang="fr" href="https://e.com/x"/><xhtml:link rel="alternate" href="https://e.com/y"/></url>'
+      ),
+      'https://e.com/a'
+    );
+    expect(odd.targetEntry && odd.targetEntry.alternates).toEqual([]);
+    const many = parse(
+      urlset(
+        `<url><loc>https://e.com/a</loc>${Array.from({length: 130}, (_, i) =>
+          alt('en', `https://e.com/${i}`)
+        ).join('')}</url>`
+      ),
+      'https://e.com/a'
+    );
+    expect(many.targetEntry && many.targetEntry.alternates).toHaveLength(100);
+    expect(many.targetEntry && many.targetEntry.alternatesTruncated).toBe(true);
+  });
+});

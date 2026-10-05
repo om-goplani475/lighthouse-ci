@@ -783,3 +783,41 @@ describe('collectSitemapDocuments — the shared time budget for discovery and t
     expect(LIMITS.MIN_REQUEST_MS).toBe(1_000);
   });
 });
+
+describe('collectSitemapDocuments — hreflang alternates of the audited page', () => {
+  const XHTML = 'xmlns:xhtml="http://www.w3.org/1999/xhtml"';
+  const entry = `<url><loc>https://example.com/products/shoe?x=1</loc><xhtml:link rel="alternate" hreflang="fr" href="https://example.com/fr/shoe"/></url>`;
+
+  it('records the alternates listed for the audited URL in a declared sitemap', async () => {
+    const {fetchBytes} = fakeFetch({
+      'https://example.com/robots.txt': {body: 'Sitemap: https://example.com/s.xml\n'},
+      'https://example.com/s.xml': {body: `<urlset xmlns="${NS}" ${XHTML}>${entry}</urlset>`},
+    });
+    const artifact = await collectSitemapDocuments(PAGE, {
+      fetchBytes,
+      fetchPage: harmlessFetchPage,
+    });
+    expect(artifact.documents[0].targetEntry).toEqual({
+      alternates: [{hreflang: 'fr', href: 'https://example.com/fr/shoe'}],
+      alternatesTruncated: false,
+    });
+  });
+
+  it('finds it in a child sitemap of an index and in the default location', async () => {
+    const {fetchBytes} = fakeFetch({
+      'https://example.com/robots.txt': {status: 404},
+      'https://example.com/sitemap.xml': {
+        body: `<sitemapindex xmlns="${NS}"><sitemap><loc>https://example.com/c.xml</loc></sitemap></sitemapindex>`,
+      },
+      'https://example.com/c.xml': {body: `<urlset xmlns="${NS}" ${XHTML}>${entry}</urlset>`},
+    });
+    const artifact = await collectSitemapDocuments(PAGE, {
+      fetchBytes,
+      fetchPage: harmlessFetchPage,
+    });
+    expect(artifact.documents.map(d => d.targetEntry && d.targetEntry.alternates.length)).toEqual([
+      null,
+      1,
+    ]);
+  });
+});

@@ -16,6 +16,7 @@
 
 import zlib from 'zlib';
 import {SaxesParser} from 'saxes';
+import {looseKey} from './url-key.js';
 
 /**
  * Caps and limits — module constants, deliberately not user-configurable (a knob that loosens a
@@ -54,7 +55,14 @@ class StopParsing extends Error {}
 
 const SITEMAP_NAMESPACE = 'http://www.sitemaps.org/schemas/sitemap/0.9';
 const CHUNK_BYTES = 64 * 1024;
+const XHTML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
+const MAX_TARGET_ALTERNATES = 100;
 
+/**
+ * The `<url>` entry of one chosen page (the audited URL), with the `<xhtml:link rel="alternate" hreflang>`
+ * alternates listed under it. Only recorded for the page asked for, so a huge sitemap never grows the artifact.
+ * @typedef {{alternates: Array<{hreflang: string, href: string}>, alternatesTruncated: boolean}} SitemapTargetEntry
+ */
 /**
  * @typedef {{message: string, line: number, column: number}} SitemapParseError
  * @typedef {{value: string, reason: string}} InvalidLoc
@@ -82,6 +90,7 @@ const CHUNK_BYTES = 64 * 1024;
  *   entriesTruncated: boolean,
  *   invalidLocs: InvalidLoc[],
  *   invalidLocCount: number,
+ *   targetEntry: SitemapTargetEntry | null,
  * }} SitemapDocument
  */
 /**
@@ -170,6 +179,7 @@ function emptyDocument(base) {
     entriesTruncated: false,
     invalidLocs: [],
     invalidLocCount: 0,
+    targetEntry: null,
   };
 }
 
@@ -178,8 +188,15 @@ function emptyDocument(base) {
  * `entriesTruncated`, `invalidLocs` and `invalidLocCount` on `doc`.
  * @param {Buffer} xml
  * @param {SitemapDocument} doc
+ * @param {string | null} [target] The page whose `<xhtml:link>` alternates are recorded in `targetEntry`.
  */
-function parseXmlInto(xml, doc) {
+function parseXmlInto(xml, doc, target = null) {
+  const targetKey = target ? looseKey(target) : null;
+  /** @type {Array<{hreflang: string, href: string}>} */
+  let urlAlternates = [];
+  let urlAlternatesTruncated = false;
+  /** @type {string | null} */
+  let urlLoc = null;
   const parser = new SaxesParser({xmlns: true, position: true});
   const decoder = new TextDecoder('utf-8');
 
@@ -237,6 +254,31 @@ function parseXmlInto(xml, doc) {
       inLoc = true;
       locText = '';
     }
+    if (targetKey && doc.kind === 'urlset') {
+      if (stack.length === 1 && local === 'url' && uri === SITEMAP_NAMESPACE) {
+        urlAlternates = [];
+        urlAlternatesTruncated = false;
+        urlLoc = null;
+      } else if (
+        stack.length === 2 &&
+        local === 'link' &&
+        uri === XHTML_NAMESPACE &&
+        stack[1].local === 'url'
+      ) {
+        const attrs = /** @type {Record<string, {value: string}>} */ (tag.attributes);
+        const rel = attrs.rel ? attrs.rel.value.toLowerCase().split(/\s+/) : [];
+        if (rel.includes('alternate') && attrs.hreflang && attrs.href) {
+          if (urlAlternates.length < MAX_TARGET_ALTERNATES) {
+            urlAlternates.push({
+              hreflang: attrs.hreflang.value.trim().slice(0, 40),
+              href: attrs.href.value.trim().slice(0, 2000),
+            });
+          } else {
+            urlAlternatesTruncated = true;
+          }
+        }
+      }
+    }
     stack.push({local, uri});
   });
 
@@ -250,10 +292,21 @@ function parseXmlInto(xml, doc) {
   parser.on('closetag', tag => {
     if (stopped) return;
     stack.pop();
+    if (
+      targetKey &&
+      tag.local === 'url' &&
+      stack.length === 1 &&
+      doc.targetEntry === null &&
+      urlLoc !== null &&
+      looseKey(urlLoc) === targetKey
+    ) {
+      doc.targetEntry = {alternates: urlAlternates, alternatesTruncated: urlAlternatesTruncated};
+    }
     if (!(inLoc && tag.local === 'loc' && stack.length === 2)) return;
     inLoc = false;
 
     const value = locText.trim();
+    if (targetKey && doc.kind === 'urlset') urlLoc = value;
     doc.entryCount += 1;
     const problem = locProblem(value);
     if (problem) {
@@ -319,12 +372,13 @@ function isGzip(body) {
  *   status: number,
  *   body: Buffer,
  * }} input
- * @param {{maxUncompressedBytes?: number}} [options]
+ * @param {{maxUncompressedBytes?: number, target?: string | null}} [options] `target`: the page whose
+ *   `<xhtml:link>` alternates are recorded in `targetEntry`.
  * @return {SitemapDocument}
  */
 function parseSitemapBytes(
   {url, source, parentUrl, status, body},
-  {maxUncompressedBytes = LIMITS.MAX_UNCOMPRESSED_BYTES} = {}
+  {maxUncompressedBytes = LIMITS.MAX_UNCOMPRESSED_BYTES, target = null} = {}
 ) {
   const doc = emptyDocument({url, source, parentUrl});
   doc.status = status;
@@ -356,7 +410,7 @@ function parseSitemapBytes(
 
   doc.uncompressedBytes = xml.length;
   doc.exceededUncompressedLimit = xml.length >= maxUncompressedBytes;
-  parseXmlInto(xml, doc);
+  parseXmlInto(xml, doc, target);
   return doc;
 }
 

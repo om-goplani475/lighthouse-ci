@@ -59,6 +59,8 @@ function createBudget(totalMs, now) {
  * @param {string} url
  * @param {SitemapDocument['source']} source
  * @param {string | null} parentUrl
+ * @param {number} [timeoutMs]
+ * @param {string | null} [target] The audited URL, whose `<xhtml:link>` alternates are recorded.
  * @return {Promise<SitemapDocument>}
  */
 async function fetchDocument(
@@ -66,7 +68,8 @@ async function fetchDocument(
   url,
   source,
   parentUrl,
-  timeoutMs = LIMITS.REQUEST_TIMEOUT_MS
+  timeoutMs = LIMITS.REQUEST_TIMEOUT_MS,
+  target = null
 ) {
   let response;
   try {
@@ -83,7 +86,7 @@ async function fetchDocument(
 
   const {status, redirectLocation, body} = response;
   if (status >= 200 && status < 300) {
-    return parseSitemapBytes({url, source, parentUrl, status, body});
+    return parseSitemapBytes({url, source, parentUrl, status, body}, {target});
   }
 
   const doc = emptyDocument({url, source, parentUrl});
@@ -158,9 +161,10 @@ function isAbsoluteHttpUrl(value) {
  * @param {FetchBytes} fetchBytes
  * @param {SitemapDocumentsArtifact} artifact Mutated: children are appended to `documents`.
  * @param {{timeout: (maxMs: number) => number | null}} budget
+ * @param {string | null} [target] The audited URL, whose `<xhtml:link>` alternates are recorded.
  * @return {Promise<void>}
  */
-async function followIndexes(fetchBytes, artifact, budget) {
+async function followIndexes(fetchBytes, artifact, budget, target = null) {
   const roots = artifact.documents.filter(
     doc => doc.outcome === 'ok' && doc.kind === 'sitemapindex'
   );
@@ -181,7 +185,7 @@ async function followIndexes(fetchBytes, artifact, budget) {
       }
       seen.add(childUrl);
       artifact.documents.push(
-        await fetchDocument(fetchBytes, childUrl, 'index-child', root.url, timeoutMs)
+        await fetchDocument(fetchBytes, childUrl, 'index-child', root.url, timeoutMs, target)
       );
     }
   }
@@ -196,6 +200,7 @@ async function followIndexes(fetchBytes, artifact, budget) {
  */
 async function collectDocuments(url, fetchBytes, budget) {
   const origin = new URL(url.finalDisplayedUrl).origin;
+  const target = url.finalDisplayedUrl;
 
   /** @type {SitemapDocumentsArtifact} */
   const artifact = {
@@ -237,10 +242,10 @@ async function collectDocuments(url, fetchBytes, budget) {
         break;
       }
       artifact.documents.push(
-        await fetchDocument(fetchBytes, sitemapUrl, 'declared', null, timeoutMs)
+        await fetchDocument(fetchBytes, sitemapUrl, 'declared', null, timeoutMs, target)
       );
     }
-    await followIndexes(fetchBytes, artifact, budget);
+    await followIndexes(fetchBytes, artifact, budget, target);
     return artifact;
   }
 
@@ -251,7 +256,8 @@ async function collectDocuments(url, fetchBytes, budget) {
     `${origin}/sitemap.xml`,
     'default-location',
     null,
-    budget.timeout(LIMITS.REQUEST_TIMEOUT_MS) ?? LIMITS.REQUEST_TIMEOUT_MS
+    budget.timeout(LIMITS.REQUEST_TIMEOUT_MS) ?? LIMITS.REQUEST_TIMEOUT_MS,
+    target
   );
   if (probe.status === 404 || probe.status === 410) {
     artifact.discovery = 'none';
@@ -268,7 +274,7 @@ async function collectDocuments(url, fetchBytes, budget) {
   } else {
     artifact.discovery = 'default-location';
     artifact.documents.push(probe);
-    await followIndexes(fetchBytes, artifact, budget);
+    await followIndexes(fetchBytes, artifact, budget, target);
   }
   return artifact;
 }
