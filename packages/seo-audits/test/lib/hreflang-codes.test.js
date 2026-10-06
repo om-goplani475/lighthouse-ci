@@ -73,6 +73,15 @@ describe('parseHreflang: invalid values and suggestions', () => {
     for (const code of ['fil', 'yue', 'haw', 'fil-PH']) expect(ok(code).valid).toBe(true);
   });
 
+  it('accepts known scripts in any case and refuses an unknown four-letter script', () => {
+    for (const code of ['zh-Hant', 'zh-hans-TW', 'sr-Cyrl-RS', 'sr-LATN']) {
+      expect(ok(code).valid).toBe(true);
+    }
+    const bad = ok('en-Abcd');
+    expect(bad.valid).toBe(false);
+    expect(bad.problem).toMatch(/"abcd" is not a script code/);
+  });
+
   it('refuses a bare country code and tells the author to put the language first', () => {
     const p = ok('GB');
     expect(p.valid).toBe(false);

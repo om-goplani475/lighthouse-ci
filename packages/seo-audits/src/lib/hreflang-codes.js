@@ -9,7 +9,7 @@
  *
  * Rules: the language is a two-letter code (ISO 639-1); a three-letter code that has a two-letter form is refused
  * with that suggestion, and one without (fil, yue, haw) is accepted when the locale data knows it, as Lighthouse
- * core does; a script is any four letters; a region is a two-letter code that the locale data
+ * core does; a script is a four-letter ISO 15924 code the locale data knows (Latn, Hant, Cyrl); a region is a two-letter code that the locale data
  * knows, or three digits (a UN M.49 area such as `es-419`); an underscore is refused with the hyphen form; case is
  * not significant. The common mistake `UK` is refused with `GB`.
  */
@@ -48,15 +48,15 @@ const THREE_LETTER = {
 };
 const LEGACY_LANGUAGES = new Set(['iw', 'in', 'ji']);
 
-/** @type {{language: Intl.DisplayNames | null, region: Intl.DisplayNames | null} | null} */
+/** @type {{language: Intl.DisplayNames | null, region: Intl.DisplayNames | null, script: Intl.DisplayNames | null} | null} */
 let names = null;
 
 /**
- * @return {{language: Intl.DisplayNames | null, region: Intl.DisplayNames | null}}
+ * @return {{language: Intl.DisplayNames | null, region: Intl.DisplayNames | null, script: Intl.DisplayNames | null}}
  */
 function displayNames() {
   if (names) return names;
-  /** @param {'language' | 'region'} type */
+  /** @param {'language' | 'region' | 'script'} type */
   const make = type => {
     try {
       return new Intl.DisplayNames(['en'], {type, fallback: 'none'});
@@ -64,7 +64,7 @@ function displayNames() {
       return null;
     }
   };
-  names = {language: make('language'), region: make('region')};
+  names = {language: make('language'), region: make('region'), script: make('script')};
   return names;
 }
 
@@ -79,6 +79,21 @@ function isKnownLanguage(code) {
   if (!language) return true;
   try {
     return language.of(code) !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * @param {string} code Four letters, any case.
+ * @return {boolean} Whether the runtime knows this ISO 15924 script (Latn, Hant, Cyrl...). Unknown runtime support
+ *   counts as known.
+ */
+function isKnownScript(code) {
+  const {script} = displayNames();
+  if (!script) return true;
+  try {
+    return script.of(code.charAt(0).toUpperCase() + code.slice(1).toLowerCase()) !== undefined;
   } catch {
     return false;
   }
@@ -173,6 +188,14 @@ function parseHreflang(value) {
       return result(raw, {problem: `"${part}" is not a valid script or region`, language});
     }
   }
+  if (script !== null && !isKnownScript(script)) {
+    return result(raw, {
+      problem: `"${script}" is not a script code (for example Latn, Cyrl or Hant)`,
+      language,
+      script,
+      region,
+    });
+  }
   if (region !== null && /^[a-z]{2}$/.test(region)) {
     if (region === 'uk') {
       return result(raw, {
@@ -195,4 +218,4 @@ function parseHreflang(value) {
   return result(raw, {valid: true, language, script, region});
 }
 
-export {parseHreflang, isKnownLanguage, isKnownRegion, THREE_LETTER};
+export {parseHreflang, isKnownLanguage, isKnownRegion, isKnownScript, THREE_LETTER};
