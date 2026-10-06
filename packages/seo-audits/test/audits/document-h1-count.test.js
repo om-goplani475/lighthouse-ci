@@ -21,15 +21,15 @@ describe('document-h1-count audit', () => {
     expect(result.score).toBe(1);
   });
 
-  it('scores 0 with an explanation for zero H1s', () => {
+  it('warns (a partial score) with an explanation for zero H1s', () => {
     const result = runAudit([]);
-    expect(result.score).toBe(0);
+    expect(result.score).toBe(0.5);
     expect(result.explanation).toContain('no <h1> element');
   });
 
-  it('scores 0 with an explanation for multiple H1s', () => {
+  it('passes with a note for more than one H1, which Google allows', () => {
     const result = runAudit(['First Heading', 'Second Heading']);
-    expect(result.score).toBe(0);
-    expect(result.explanation).toContain('2 <h1> elements');
+    expect(result.score).toBe(1);
+    expect(result.displayValue).toContain('2 <h1> elements');
   });
 });

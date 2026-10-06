@@ -11,7 +11,7 @@ const UIStrings = {
   title: 'The page text is in the raw HTML',
   failureTitle: 'Most of the page text appears only after JavaScript',
   description:
-    'Fails when more than half of the words of the rendered page are missing from the raw HTML. Pages with under 50 rendered words are not judged. Both sides are read with the same HTML extractor.',
+    'Warns (a partial score, not a failure) when more than half of the words of the rendered page are missing from the raw HTML. Pages with under 50 rendered words are not judged. Both sides are read with the same HTML extractor.',
 };
 
 class JsVisibleContent extends Audit {

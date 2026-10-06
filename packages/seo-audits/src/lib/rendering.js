@@ -271,7 +271,8 @@ function buildLinksProduct(html, rendered, url) {
   }
   const fails = share > LINK_SHARE_FAIL && onlyRendered.length >= LINK_MIN_DIFFERENT;
   return {
-    score: fails ? 0 : 1,
+    // A warning (0.5): Google follows rendered links; the risk is crawlers that do not run JavaScript.
+    score: fails ? 0.5 : 1,
     displayValue: `${onlyRendered.length} of ${live.links.size} internal links (${pct}%) appear only after JavaScript`,
     explanation: fails
       ? `${pct}% of the page's internal links are missing from the raw HTML. A crawler that does not run JavaScript, or runs it late, will not follow them; make them real <a href> elements in the server HTML.`
@@ -316,7 +317,8 @@ function buildContentProduct(html, rendered, url) {
     });
   }
   return {
-    score: fails ? 0 : 1,
+    // A warning (0.5): Google renders JavaScript; the risk is crawlers and tools that do not.
+    score: fails ? 0.5 : 1,
     displayValue: `${pct}% of the words appear only after JavaScript`,
     explanation: fails
       ? `More than half of the page's text (${pct}%) is missing from the raw HTML. A crawler that does not render JavaScript sees an almost empty page; serve the content in the HTML (server rendering or pre-rendering).`
@@ -526,22 +528,18 @@ function buildDeviceParityProduct(artifact) {
   let failed = rows.length > 0;
   const missingLinks = [...a.links].filter(l => !b.links.has(l));
   const linkShare = a.links.size ? missingLinks.length / a.links.size : 0;
-  if (linkShare > LINK_SHARE_FAIL && missingLinks.length >= LINK_MIN_DIFFERENT) {
-    failed = true;
+  if (missingLinks.length > 0) {
+    // A note, not a failure: a responsive site often has a smaller mobile menu on purpose.
+    const big = linkShare > LINK_SHARE_FAIL && missingLinks.length >= LINK_MIN_DIFFERENT;
     rows.push({
       signal: 'Internal links',
       desktop: String(a.links.size),
       mobile: String(b.links.size),
-      problem: `${missingLinks.length} desktop links (${Math.round(
+      problem: `note: ${missingLinks.length} desktop links (${Math.round(
         linkShare * 100
-      )}%) are missing on mobile`,
-    });
-  } else if (missingLinks.length > 0) {
-    rows.push({
-      signal: 'Internal links',
-      desktop: String(a.links.size),
-      mobile: String(b.links.size),
-      problem: `note: ${missingLinks.length} desktop links are missing on mobile (under the limit)`,
+      )}%) are missing on mobile${
+        big ? ', which is common for a smaller mobile menu' : ' (under the limit)'
+      }`,
     });
   }
   const wordShare = a.words >= MIN_WORDS_TO_JUDGE ? 1 - Math.min(1, b.words / a.words) : 0;
@@ -559,7 +557,7 @@ function buildDeviceParityProduct(artifact) {
     score: failed ? 0 : 1,
     displayValue: failed ? 'Mobile and desktop get a different page' : 'Small differences only',
     explanation: failed
-      ? 'The server sent a mobile user-agent a different title, canonical, noindex, set of links or amount of text than a desktop one. Google indexes the mobile version, so anything missing there can drop out of the index. This compares server HTML only; differences made by CSS or JavaScript between screen sizes are not seen.'
+      ? 'The server sent a mobile user-agent a different title, description, canonical or noindex, or much less text, than a desktop one. Google indexes the mobile version, so anything missing there can drop out of the index. This compares server HTML only; differences made by CSS or JavaScript between screen sizes are not seen.'
       : undefined,
     details: table(rows, [
       ['signal', 'Signal'],

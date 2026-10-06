@@ -11,7 +11,7 @@ const UIStrings = {
   title: 'Internal links are in the raw HTML',
   failureTitle: 'Many internal links appear only after JavaScript',
   description:
-    'Fails when more than 20% of the page internal links (and at least 3) exist only in the rendered DOM, not in the raw HTML. Fewer are listed as a note. A crawler that does not run JavaScript will not follow links that are not in the HTML.',
+    'Warns (a partial score, not a failure) when more than 20% of the page internal links (and at least 3) exist only in the rendered DOM, not in the raw HTML. Fewer are listed as a note. A crawler that does not run JavaScript will not follow links that are not in the HTML.',
 };
 
 class JsInternalLinks extends Audit {

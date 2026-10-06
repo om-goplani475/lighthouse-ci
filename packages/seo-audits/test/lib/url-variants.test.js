@@ -286,7 +286,7 @@ describe('chainLengthProduct', () => {
   it('passes zero, one and two redirects, fails three', () => {
     for (const n of [0, 1, 2]) expect(chainLengthProduct(artifact([chain(n)])).score).toBe(1);
     const p = chainLengthProduct(artifact([chain(3)]));
-    expect(p.score).toBe(0);
+    expect(p.score).toBe(0.5);
     expect(p.explanation).toMatch(/1 URL variant\(s\) take more than 2 redirects/);
   });
 

@@ -89,9 +89,9 @@ describe('buildLinksProduct', () => {
   it('passes when every rendered link is in the raw HTML', () => {
     expect(run(many, many).displayValue).toBe('All 10 internal links are in the raw HTML');
   });
-  it('fails past 20% and at least 3 links', () => {
+  it('warns (0.5) past 20% and at least 3 links', () => {
     const p = run(many.slice(0, 6), many);
-    expect(p.score).toBe(0);
+    expect(p.score).toBe(0.5);
     expect(p.details.items).toHaveLength(4);
   });
   it('is a note under the share or under 3 links', () => {
@@ -115,9 +115,9 @@ describe('buildContentProduct', () => {
   it('passes similar text', () => {
     expect(run(200, 210).score).toBe(1);
   });
-  it('fails when over half of the words appear only after JavaScript', () => {
+  it('warns (0.5) when over half of the words appear only after JavaScript', () => {
     const p = run(20, 200);
-    expect(p.score).toBe(0);
+    expect(p.score).toBe(0.5);
     expect(p.displayValue).toMatch(/9\d% of the words/);
   });
   it('passes at exactly half missing and reports a heading that exists only after JavaScript', () => {
@@ -237,13 +237,13 @@ describe('buildDeviceParityProduct', () => {
     expect(p.score).toBe(0);
     expect(p.details.items.map((/** @type {any} */ i) => i.signal)).toEqual(['Title', 'Canonical']);
   });
-  it('fails links missing on mobile past the share, notes a small gap, ignores extra mobile links', () => {
+  it('only notes links missing on mobile (a smaller mobile menu), whatever the share, and ignores extra mobile links', () => {
     const many = Array.from({length: 10}, (_, i) => `/p${i}`);
-    expect(
-      lib.buildDeviceParityProduct(
-        art(fetched(html({links: many.slice(0, 6)})), fetched(html({links: many})))
-      ).score
-    ).toBe(0);
+    const big = lib.buildDeviceParityProduct(
+      art(fetched(html({links: many.slice(0, 6)})), fetched(html({links: many})))
+    );
+    expect(big.score).toBe(1);
+    expect(big.details.items[0].problem).toMatch(/^note: .*smaller mobile menu/);
     const note = lib.buildDeviceParityProduct(
       art(fetched(html({links: many.slice(0, 9)})), fetched(html({links: many})))
     );

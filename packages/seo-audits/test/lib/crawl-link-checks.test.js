@@ -224,7 +224,7 @@ describe('redirecting-internal-links', () => {
 
   it.each([301, 308])('fails a link to a permanent redirect (%i)', status => {
     const product = run(redirecting(status));
-    expect(product.score).toBe(0);
+    expect(product.score).toBe(0.5);
     expect(product.details.items[0]).toMatchObject({
       result: `${status} to ${mkUrl('/new')}`,
       note: 'permanent redirect: link to the final URL',
@@ -245,7 +245,7 @@ describe('redirecting-internal-links', () => {
       page('/tmp', {redirects: [hop('/tmp', 302, '/new')], finalUrl: mkUrl('/new')}),
       page('/new'),
     ]);
-    expect(product.score).toBe(0);
+    expect(product.score).toBe(0.5);
     expect(product.explanation).toMatch(
       /1 link to a temporary redirect is also listed, not judged/
     );
@@ -264,7 +264,7 @@ describe('redirecting-internal-links', () => {
     const product = run([audited('/', {links: ['/a']}), page('/a')], {
       linkChecks: {checked: [checkOf('/old', 200, [hop('/old', 301, '/new')])], notChecked: 0},
     });
-    expect(product.score).toBe(0);
+    expect(product.score).toBe(0.5);
     const fine = run([audited('/', {links: ['/new']}), page('/new')]);
     expect(fine.score).toBe(1);
   });
@@ -320,7 +320,7 @@ describe('redirects whose destination the crawl already held', () => {
         stopped('/a', 301, '/b'),
       ])
     );
-    expect(product.score).toBe(0);
+    expect(product.score).toBe(0.5);
     expect(product.details.items[0].note).toBe('301 > 301');
   });
 
@@ -344,7 +344,7 @@ describe('internal-redirect-chains', () => {
       audited('/', {links: ['/a']}),
       page('/a', {redirects: [hop('/a', 302, '/b'), hop('/b', 301, '/c')], finalUrl: mkUrl('/c')}),
     ]);
-    expect(product.score).toBe(0);
+    expect(product.score).toBe(0.5);
     expect(product.details.items[0]).toMatchObject({
       result: `2 hops to ${mkUrl('/c')}`,
       note: '302 > 301',
@@ -387,6 +387,6 @@ describe('internal-redirect-chains', () => {
         notChecked: 0,
       },
     });
-    expect(product.score).toBe(0);
+    expect(product.score).toBe(0.5);
   });
 });

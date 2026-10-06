@@ -11,7 +11,7 @@ const UIStrings = {
   title: 'Every internal link on the page has descriptive anchor text',
   failureTitle: 'Internal links on the page have generic or empty anchor text',
   description:
-    'Fails when the audited page has an internal link whose anchor text is generic (click here, read more, here, learn more and similar) or empty (no text, no image alt text, no aria-label or title). Other crawled pages with such links are listed, not judged. Links are read from the server HTML of the pages the site crawl reached, so a page built by ' +
+    'Warns (a partial score, not a failure) when the audited page has an internal link whose anchor text is generic (click here, read more, here, learn more and similar) or empty (no text, no image alt text, no aria-label or title). Other crawled pages with such links are listed, not judged. Links are read from the server HTML of the pages the site crawl reached, so a page built by ' +
     'JavaScript is not applicable. See crawl-coverage for how much of the site was seen.',
 };
 

@@ -11,7 +11,7 @@ const UIStrings = {
   title: 'Mobile and desktop get the same page',
   failureTitle: 'Mobile and desktop get a different page',
   description:
-    'Fetches the audited page twice (a mobile and a desktop user-agent, each with an lhci-seo-audits/1.0 token, 512 KiB, no redirect followed, LHCI_SEO_DEVICE_PARITY=0 switches it off) and fails when the title, meta description, canonical or noindex differs, when more than 20% of the desktop internal links are missing on mobile, or when mobile has over half fewer words. Server HTML only: differences made by CSS or JavaScript between screen sizes are not seen.',
+    'Fetches the audited page twice (a mobile and a desktop user-agent, each with an lhci-seo-audits/1.0 token, 512 KiB, no redirect followed, LHCI_SEO_DEVICE_PARITY=0 switches it off) and fails when the title, meta description, canonical or noindex differs, or when mobile has over half fewer words. Internal links missing on mobile are a note (a responsive site often has a smaller mobile menu). Server HTML only: differences made by CSS or JavaScript between screen sizes are not seen.',
 };
 
 class DeviceContentParity extends Audit {

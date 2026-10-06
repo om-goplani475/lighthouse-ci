@@ -11,7 +11,7 @@ const UIStrings = {
   title: 'Internal links point straight at their target',
   failureTitle: 'Internal links point at a permanent redirect',
   description:
-    'Fails when an internal link on any crawled page points at a URL that permanently redirects once (301 or 308), because it should link to the final URL. A temporary redirect (302, 303, 307) is listed with a note and does not fail; chains of two or more redirects are internal-redirect-chains. Links are read from the server HTML of the pages the site crawl reached; a target the crawl did not ' +
+    'Warns (a partial score, not a failure) when an internal link on any crawled page points at a URL that permanently redirects once (301 or 308), because it should link to the final URL. A temporary redirect (302, 303, 307) is listed with a note and does not fail; chains of two or more redirects are internal-redirect-chains. Links are read from the server HTML of the pages the site crawl reached; a target the crawl did not ' +
     'read or check is not judged, and the result says how many. See crawl-coverage for how much of the site was seen.',
 };
 

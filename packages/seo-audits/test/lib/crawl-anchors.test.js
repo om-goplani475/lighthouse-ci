@@ -222,7 +222,7 @@ describe('descriptive-anchor-text', () => {
     'this link',
   ])('fails the generic anchor %j', anchor => {
     const product = run([audited('/t', [link('/a', anchor)]), page('/a')]);
-    expect(product.score).toBe(0);
+    expect(product.score).toBe(0.5);
     expect(product.details.items[0]).toMatchObject({problem: 'generic anchor text', anchor});
   });
 
@@ -236,7 +236,7 @@ describe('descriptive-anchor-text', () => {
       ]),
       page('/a'),
     ]);
-    expect(product.score).toBe(0);
+    expect(product.score).toBe(0.5);
     expect(product.displayValue).toBe('3 links with generic or empty anchor text');
     expect(product.details.items.map((/** @type {any} */ i) => i.problem)).toEqual([
       'no anchor text',

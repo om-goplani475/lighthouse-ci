@@ -74,7 +74,7 @@ describe('the URL-variant audits', () => {
     expect(ChainLength.audit(artifact([direct])).score).toBe(1);
     expect(Loop.audit(artifact([direct])).score).toBe(1);
 
-    expect(ChainLength.audit(artifact([long])).score).toBe(0);
+    expect(ChainLength.audit(artifact([long])).score).toBe(0.5);
     expect(Consistency.audit(artifact([long])).score).toBe(1);
     expect(Loop.audit(artifact([long])).score).toBe(1);
 

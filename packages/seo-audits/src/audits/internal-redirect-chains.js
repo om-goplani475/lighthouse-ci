@@ -11,7 +11,7 @@ const UIStrings = {
   title: 'No internal link goes through a redirect chain',
   failureTitle: 'Internal links go through a redirect chain or loop',
   description:
-    'Fails when an internal link on any crawled page points at a URL that redirects two or more times, or in a circle, whatever the statuses. A single redirect is redirecting-internal-links. Links are read from the server HTML of the pages the site crawl reached; a target the crawl did not ' +
+    'Warns (a partial score, not a failure) when an internal link on any crawled page points at a URL that redirects two or more times, or in a circle, whatever the statuses; a loop never resolves, so it fails (a chain only warns). A single redirect is redirecting-internal-links. Links are read from the server HTML of the pages the site crawl reached; a target the crawl did not ' +
     'read or check is not judged, and the result says how many. See crawl-coverage for how much of the site was seen.',
 };
 

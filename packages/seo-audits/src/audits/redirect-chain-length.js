@@ -11,7 +11,7 @@ const UIStrings = {
   title: 'Redirect chains are at most two hops',
   failureTitle: 'A redirect chain is longer than two hops',
   description:
-    'Counts the redirects each other form of the audited URL (see url-variant-consistency for what is probed) takes to resolve. Fails when one takes more than 2, or still redirects after 5: every extra hop slows the visitor and the redirect chain is where link signals and crawl budget leak. Covers the variants of this URL only, not the redirects of every link on the site (that needs the crawler).',
+    'Counts the redirects each other form of the audited URL (see url-variant-consistency for what is probed) takes to resolve. Warns (a partial score) when one takes more than 2, and fails only when one still redirects after 5: every extra hop slows the visitor and the redirect chain is where link signals and crawl budget leak. Covers the variants of this URL only, not the redirects of every link on the site (that needs the crawler).',
 };
 
 // @ts-expect-error - UrlVariants isn't part of Lighthouse's own closed Artifacts type from an

@@ -362,7 +362,8 @@ function buildRedirectingLinksProduct(artifact) {
         : 'temporary redirect, not failing'
   );
   return {
-    score: permanent.length ? 0 : 1,
+    // A warning (0.5): the link works and passes signals; linking to the final URL is housekeeping.
+    score: permanent.length ? 0.5 : 1,
     displayValue: permanent.length
       ? `${count(permanent.length, 'link')} to a permanent redirect on ${pagesText(permanent)}`
       : `${count(temporary.length, 'temporary redirect')} (not failing)`,
@@ -396,7 +397,8 @@ function buildRedirectChainsProduct(artifact) {
   }
   const loops = chains.filter(o => isLoop(o.hops));
   return {
-    score: 0,
+    // A warning (0.5) for a chain; a loop never resolves, so it fails.
+    score: loops.length ? 0 : 0.5,
     displayValue: `${count(chains.length, 'link')} through a redirect chain or loop on ${pagesText(
       chains
     )}`,

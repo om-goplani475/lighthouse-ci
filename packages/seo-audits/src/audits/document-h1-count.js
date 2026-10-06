@@ -7,12 +7,13 @@
 import {Audit} from 'lighthouse/core/audits/audit.js';
 
 const UIStrings = {
-  title: 'Document has exactly one <h1> element',
-  failureTitle: 'Document does not have exactly one <h1> element',
+  title: 'Document has an <h1> element',
+  failureTitle: 'Document has no <h1> element',
   description:
-    'A single, present <h1> gives both search engines and assistive technology a clear ' +
-    'top-level heading for the page. Zero <h1> elements leaves the page without one; more than ' +
-    "one is ambiguous about which heading is actually the page's main heading. (Heading level " +
+    'A present <h1> gives both search engines and assistive technology a clear ' +
+    'top-level heading for the page. Zero <h1> elements leaves the page without one, which is ' +
+    'reported as a warning (a partial score). More than one <h1> is allowed by HTML5 and Google ' +
+    'says it is fine, so it is only shown as a note. (Heading level ' +
     "order and empty headings are already checked by Lighthouse core's `heading-order` and " +
     '`empty-heading` audits — this audit only covers H1 count.)',
 };
@@ -46,15 +47,14 @@ class DocumentH1Count extends Audit {
     }
 
     if (h1Texts.length === 0) {
-      return {score: 0, explanation: 'The page has no <h1> element (with non-empty text).'};
+      return {
+        score: 0.5,
+        displayValue: 'No <h1>',
+        explanation: 'The page has no <h1> element (with non-empty text).',
+      };
     }
 
-    return {
-      score: 0,
-      explanation:
-        `The page has ${h1Texts.length} <h1> elements. It's ambiguous which one is the ` +
-        'actual main heading.',
-    };
+    return {score: 1, displayValue: `${h1Texts.length} <h1> elements (allowed, a note)`};
   }
 }
 

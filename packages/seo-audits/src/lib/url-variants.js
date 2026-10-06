@@ -346,7 +346,9 @@ function chainLengthProduct(artifact) {
   const bad = artifact.variants.filter(flagged);
   if (bad.length) {
     return {
-      score: 0,
+      // A warning (0.5): Google follows up to 10 redirects, so a longer chain is a speed and signal-leak
+      // problem, not a broken page. A chain that never settles (the hop limit) is a failure.
+      score: bad.some(v => v.end === 'hop-limit') ? 0 : 0.5,
       explanation:
         `${bad.length} URL variant(s) take more than ${MAX_CHAIN_REDIRECTS} redirects to resolve: ` +
         'every extra hop slows the visitor and dilutes the signal passed to the final page.',
