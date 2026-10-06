@@ -170,6 +170,10 @@ const config = {
     './audits/news-sitemap-valid.js',
     './audits/news-sitemap-freshness.js',
     './audits/news-sitemap-report.js',
+    './audits/video-structured-data-values.js',
+    './audits/video-sitemap-valid.js',
+    './audits/video-discoverability.js',
+    './audits/video-thumbnail-reachable.js',
   ],
   categories: {
     'seo-extended': {
@@ -292,6 +296,10 @@ const config = {
         {id: 'news-sitemap-valid', weight: 1},
         {id: 'news-sitemap-freshness', weight: 0.5},
         {id: 'news-sitemap-report', weight: 1},
+        {id: 'video-structured-data-values', weight: 0.5},
+        {id: 'video-sitemap-valid', weight: 1},
+        {id: 'video-discoverability', weight: 0.5},
+        {id: 'video-thumbnail-reachable', weight: 0.5},
       ],
     },
   },

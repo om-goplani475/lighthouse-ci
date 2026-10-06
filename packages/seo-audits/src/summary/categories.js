@@ -202,6 +202,15 @@ const CATEGORIES = [
       'news-sitemap-report',
     ],
   },
+  {
+    name: 'Video',
+    audits: [
+      'video-structured-data-values',
+      'video-sitemap-valid',
+      'video-discoverability',
+      'video-thumbnail-reachable',
+    ],
+  },
 ];
 
 /**

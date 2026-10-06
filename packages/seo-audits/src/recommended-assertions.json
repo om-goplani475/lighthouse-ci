@@ -430,5 +430,29 @@
     {
       "minScore": 1
     }
+  ],
+  "video-structured-data-values": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "video-sitemap-valid": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "video-discoverability": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "video-thumbnail-reachable": [
+    "warn",
+    {
+      "minScore": 1
+    }
   ]
 }

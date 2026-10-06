@@ -37,6 +37,10 @@ const PRESETS = {
     description: 'Recommended, with structured data and the news checks as errors.',
     promote: ['Structured data', 'News'],
   },
+  video: {
+    description: 'Recommended, with structured data and the video checks as errors.',
+    promote: ['Structured data', 'Video'],
+  },
   blog: {
     description: 'Recommended, with international and content checks as errors.',
     promote: ['International (hreflang)', 'Content and AI search', 'Social sharing'],
