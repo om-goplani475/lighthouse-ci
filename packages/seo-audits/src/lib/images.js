@@ -26,6 +26,7 @@ const MIN_REPEATED_ALT = 3;
 // 3x assets are normal for 3x-density phones (700 px for a 233 px slot), so only more than 3.5x counts.
 const OVERSIZE_FACTOR = 3.5;
 const OVERSIZE_MIN_EXTRA_PX = 100;
+const FIRST_SCREEN_SHARE = 0.75;
 const LEGACY_MIN_BYTES = 10 * 1024;
 const LEGACY_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/gif']);
 const MAX_ROWS = 50;
@@ -367,7 +368,9 @@ function buildLazyAboveFoldProduct(elements, viewport) {
     const rect = el.clientRect;
     if (!rect || !(Number(el.displayedWidth) > 0) || !(Number(el.displayedHeight) > 0)) continue;
     const insideAcross = !(Number(rect.left) >= width) && !(Number(rect.right) <= 0);
-    if (rect.top < height && rect.bottom > 0 && insideAcross) {
+    // Chrome loads lazy images well before they scroll in, so only an image that starts in the upper part of the
+    // first screen is a real delay; one that starts near its bottom edge is not.
+    if (rect.top < height * FIRST_SCREEN_SHARE && rect.bottom > 0 && insideAcross) {
       offenders.push({
         url: el.src,
         problem: `starts ${Math.round(

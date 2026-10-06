@@ -41,7 +41,7 @@ const MAX_CONSOLE_CHARS = 2_000;
 /** Evidence of a framework in the raw HTML, and what it usually means. */
 /** @type {Array<[RegExp, string]>} */
 const FRAMEWORK_HINTS = [
-  [/__next_data__|id="__next"/i, 'Next.js'],
+  [/__next_data__|id="__next"|__next_f|\/_next\/static\//i, 'Next.js'],
   [/id="__nuxt"|window\.__nuxt__|__nuxt_data__/i, 'Nuxt'],
   [/data-server-rendered="true"/i, 'Vue server rendering'],
   [/ng-version=|ng-server-context/i, 'Angular'],

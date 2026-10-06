@@ -149,6 +149,12 @@ describe('buildLazyAboveFoldProduct', () => {
     // an unknown width falls back to the vertical test alone
     expect(run([slide(5000)], vp).score).toBe(0);
   });
+  it('ignores a lazy image that starts near the bottom edge of the first screen (past 75%)', () => {
+    const at = (/** @type {number} */ top) =>
+      el({loading: 'lazy', clientRect: {top, bottom: top + 200, left: 0, right: 300}});
+    expect(run([at(745)], {innerHeight: 800}).score).toBe(1);
+    expect(run([at(500)], {innerHeight: 800}).score).toBe(0);
+  });
   it('passes lazy images below the fold, eager images and CSS images', () => {
     expect(run([el({loading: 'lazy'})]).score).toBe(1);
     expect(run([el({loading: 'eager', clientRect: {top: 0, bottom: 100}})]).displayValue).toMatch(

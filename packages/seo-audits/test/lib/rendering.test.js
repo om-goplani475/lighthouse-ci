@@ -169,6 +169,13 @@ describe('buildDiffProduct and buildRenderingModeProduct', () => {
     expect(csr.displayValue).toBe('client-rendered');
     expect(csr.details.items[3].value).toBe('Next.js');
     expect(mode(200).details.items[3].value).toBe('none found');
+    // the Next.js app router has no __NEXT_DATA__ or #__next: its script paths and flight data give it away
+    expect(
+      mode(5, '<script src="/_next/static/chunks/main.js"></script>').details.items[3].value
+    ).toBe('Next.js');
+    expect(mode(5, '<script>self.__next_f.push([1,"x"])</script>').details.items[3].value).toBe(
+      'Next.js'
+    );
   });
   it('does not classify a page with too little text', () => {
     const p = lib.buildRenderingModeProduct(
