@@ -142,6 +142,15 @@ describe('judgeConsistency', () => {
     );
   });
 
+  it('does not judge a chain that ends in bot protection or a server error', () => {
+    for (const status of [401, 403, 429, 503]) {
+      const v = variant({
+        hops: [hop('http://example.com/shoes?size=9', 301, AUDITED), hop(AUDITED, status)],
+      });
+      expect(judge(v).verdict).toBe('note');
+    }
+  });
+
   it('fails a chain that ends in an error', () => {
     const v = variant({
       hops: [hop('http://example.com/shoes?size=9', 301, AUDITED), hop(AUDITED, 404)],
@@ -287,6 +296,8 @@ describe('chainLengthProduct', () => {
     for (const n of [0, 1, 2]) expect(chainLengthProduct(artifact([chain(n)])).score).toBe(1);
     const p = chainLengthProduct(artifact([chain(3)]));
     expect(p.score).toBe(0.5);
+    expect(p).toMatchObject({numericValue: 3, numericUnit: 'unitless'});
+    expect(chainLengthProduct(artifact([chain(1), chain(2)])).numericValue).toBe(2);
     expect(p.explanation).toMatch(/1 URL variant\(s\) take more than 2 redirects/);
   });
 

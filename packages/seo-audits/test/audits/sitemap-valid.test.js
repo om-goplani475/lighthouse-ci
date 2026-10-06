@@ -76,7 +76,7 @@ describe('sitemap-valid audit', () => {
     expect(result.details.items[0].detail).toContain('Declare the final URL');
   });
 
-  it('fails a network error and a decompression error with their messages', () => {
+  it('fails a decompression error, and only notes a network error (a timeout says nothing about the sitemap)', () => {
     const result = run([
       doc({outcome: 'network-error', errorMessage: 'timed out after 10000ms', kind: null}),
       doc({
@@ -87,9 +87,15 @@ describe('sitemap-valid audit', () => {
     ]);
     expect(result.score).toBe(0);
     expect(result.details.items.map(i => i.detail)).toEqual([
-      'timed out after 10000ms',
       'could not decompress gzip data: bad',
+      'timed out after 10000ms',
     ]);
+    expect(result.details.items[1].problem).toMatch(/not judged/);
+    const onlyTimeout = run([
+      doc({outcome: 'network-error', errorMessage: 'timed out after 10000ms', kind: null}),
+    ]);
+    expect(onlyTimeout.score).toBe(1);
+    expect(onlyTimeout.displayValue).toMatch(/could not be fetched/);
   });
 
   it('fails malformed XML with the line and column', () => {
@@ -149,13 +155,20 @@ describe('sitemap-valid audit', () => {
     const bad = doc({
       url: 'https://example.com/bad.xml',
       outcome: 'http-error',
-      status: 500,
+      status: 404,
       kind: null,
     });
     const result = run([good, bad]);
     expect(result.score).toBe(0);
     expect(result.explanation).toBe('1 sitemap problem(s) found.');
     expect(result.details.items.map(i => i.url)).toEqual(['https://example.com/bad.xml']);
+  });
+
+  it('does not judge bot protection or a server error on a sitemap', () => {
+    for (const status of [403, 429, 503]) {
+      const result = run([doc({outcome: 'http-error', status, kind: null})]);
+      expect(result.score).toBe(1);
+    }
   });
 
   it('shows ignored robots.txt Sitemap lines without failing an otherwise valid sitemap', () => {

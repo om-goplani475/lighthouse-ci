@@ -30,12 +30,24 @@ const MAX_LOC_EXAMPLES = 3;
 
 /**
  * @param {SitemapDocument} doc
- * @return {Array<{problem: string, detail: string}>}
+ * @return {Array<{problem: string, detail: string, transient?: boolean}>} A `transient` problem (a timeout, a
+ *   network error, bot protection or a server error) says nothing about the sitemap itself: it is a note.
  */
 function problemsFor(doc) {
   switch (doc.outcome) {
     case 'http-error':
-      return [{problem: 'Sitemap could not be fetched', detail: `HTTP ${doc.status}`}];
+      return [
+        {
+          problem: 'Sitemap could not be fetched',
+          detail: `HTTP ${doc.status}`,
+          transient:
+            doc.status === 401 ||
+            doc.status === 403 ||
+            doc.status === 408 ||
+            doc.status === 429 ||
+            Number(doc.status) >= 500,
+        },
+      ];
     case 'redirect':
       return [
         {
@@ -47,7 +59,11 @@ function problemsFor(doc) {
       ];
     case 'network-error':
       return [
-        {problem: 'Sitemap could not be fetched', detail: doc.errorMessage || 'network error'},
+        {
+          problem: 'Sitemap could not be fetched',
+          detail: doc.errorMessage || 'network error',
+          transient: true,
+        },
       ];
     case 'decompression-error':
       return [{problem: 'Sitemap could not be decompressed', detail: doc.errorMessage || ''}];
@@ -123,9 +139,15 @@ class SitemapValid extends Audit {
 
     /** @type {Array<{url: string, problem: string, detail: string}>} */
     const failures = [];
+    /** @type {Array<{url: string, problem: string, detail: string}>} */
+    const transient = [];
     for (const doc of documents) {
-      for (const {problem, detail} of problemsFor(doc)) {
-        failures.push({url: doc.url, problem, detail});
+      for (const {problem, detail, transient: isTransient} of problemsFor(doc)) {
+        if (isTransient) {
+          transient.push({url: doc.url, problem: `${problem} (not judged)`, detail});
+        } else {
+          failures.push({url: doc.url, problem, detail});
+        }
       }
     }
 
@@ -137,7 +159,7 @@ class SitemapValid extends Audit {
       detail: 'Not checked.',
     }));
 
-    const rows = [...failures, ...notes];
+    const rows = [...failures, ...transient, ...notes];
     /** @type {import('lighthouse/types/audit.js').default.Details.Table['headings']} */
     const headings = [
       {key: 'url', valueType: 'text', label: 'Sitemap'},
@@ -147,7 +169,15 @@ class SitemapValid extends Audit {
     const details = rows.length ? Audit.makeTableDetails(headings, rows) : undefined;
 
     if (failures.length === 0) {
-      return details ? {score: 1, details} : {score: 1};
+      return details
+        ? {
+            score: 1,
+            displayValue: transient.length
+              ? `${transient.length} sitemap(s) could not be fetched (a timeout, bot protection or a server error; not judged)`
+              : undefined,
+            details,
+          }
+        : {score: 1};
     }
     return {
       score: 0,

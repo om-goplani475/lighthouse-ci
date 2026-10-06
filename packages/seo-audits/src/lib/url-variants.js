@@ -220,6 +220,13 @@ function judgeConsistency(variant, audited, canonicalOrigin) {
         }
       : {verdict: 'note', text: `Returned HTTP ${last.status} without redirecting; not judged.`};
   }
+  if (last.status === 401 || last.status === 403 || last.status === 429 || last.status >= 500) {
+    // Bot protection, a rate limit or a server hiccup answers our probe; that says nothing about the redirect.
+    return {
+      verdict: 'note',
+      text: `Redirects, but the chain ends in HTTP ${last.status} at ${last.url}, which is often bot protection or a temporary error; not judged.`,
+    };
+  }
   if (!(last.status >= 200 && last.status < 300)) {
     return {
       verdict: 'fail',
@@ -344,18 +351,23 @@ function chainLengthProduct(artifact) {
     };
   }
   const bad = artifact.variants.filter(flagged);
+  const longest = {
+    numericValue: Math.max(0, ...reached.map(v => redirectCount(v))),
+    numericUnit: /** @type {const} */ ('unitless'),
+  };
   if (bad.length) {
     return {
       // A warning (0.5): Google follows up to 10 redirects, so a longer chain is a speed and signal-leak
       // problem, not a broken page. A chain that never settles (the hop limit) is a failure.
       score: bad.some(v => v.end === 'hop-limit') ? 0 : 0.5,
+      ...longest,
       explanation:
         `${bad.length} URL variant(s) take more than ${MAX_CHAIN_REDIRECTS} redirects to resolve: ` +
         'every extra hop slows the visitor and dilutes the signal passed to the final page.',
       details,
     };
   }
-  return {score: 1, details};
+  return {score: 1, ...longest, details};
 }
 
 /**
