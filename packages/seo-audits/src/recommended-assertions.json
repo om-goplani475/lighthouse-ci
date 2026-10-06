@@ -388,5 +388,29 @@
     {
       "minScore": 1
     }
+  ],
+  "local-business-values": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "local-nap-consistency": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "local-name-consistency": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "local-pages-in-sitemap": [
+    "warn",
+    {
+      "minScore": 1
+    }
   ]
 }

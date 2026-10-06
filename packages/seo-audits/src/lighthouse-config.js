@@ -161,6 +161,11 @@ const config = {
     './audits/faceted-navigation-explosion.js',
     './audits/product-pages-in-sitemap.js',
     './audits/product-category-linking.js',
+    './audits/local-business-values.js',
+    './audits/local-nap-consistency.js',
+    './audits/local-name-consistency.js',
+    './audits/local-pages-report.js',
+    './audits/local-pages-in-sitemap.js',
   ],
   categories: {
     'seo-extended': {
@@ -274,6 +279,11 @@ const config = {
         {id: 'faceted-navigation-explosion', weight: 0.5},
         {id: 'product-pages-in-sitemap', weight: 0.5},
         {id: 'product-category-linking', weight: 0.5},
+        {id: 'local-business-values', weight: 0.5},
+        {id: 'local-nap-consistency', weight: 0.5},
+        {id: 'local-name-consistency', weight: 0.5},
+        {id: 'local-pages-report', weight: 1},
+        {id: 'local-pages-in-sitemap', weight: 0.5},
       ],
     },
   },

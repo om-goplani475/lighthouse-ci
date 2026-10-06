@@ -183,6 +183,16 @@ const CATEGORIES = [
       'product-category-linking',
     ],
   },
+  {
+    name: 'Local business',
+    audits: [
+      'local-business-values',
+      'local-nap-consistency',
+      'local-name-consistency',
+      'local-pages-report',
+      'local-pages-in-sitemap',
+    ],
+  },
 ];
 
 /**

@@ -29,6 +29,10 @@ const PRESETS = {
       'Recommended, with structured data, images, duplicate content and the e-commerce checks as errors.',
     promote: ['Structured data', 'Images', 'Duplicates and coverage', 'E-commerce'],
   },
+  local: {
+    description: 'Recommended, with structured data and the local business checks as errors.',
+    promote: ['Structured data', 'Local business'],
+  },
   blog: {
     description: 'Recommended, with international and content checks as errors.',
     promote: ['International (hreflang)', 'Content and AI search', 'Social sharing'],
