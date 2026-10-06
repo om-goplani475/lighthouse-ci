@@ -25,7 +25,12 @@ async function readMetas() {
     const out = [];
     for (const p of config.audits) {
       const mod = await import(new URL(p, 'file://${CONFIG_PATH}').href);
-      out.push({id: mod.default.meta.id, scoreDisplayMode: mod.default.meta.scoreDisplayMode});
+      out.push({
+        id: mod.default.meta.id,
+        scoreDisplayMode: mod.default.meta.scoreDisplayMode,
+        supportedModes: mod.default.meta.supportedModes,
+        requiredArtifacts: mod.default.meta.requiredArtifacts,
+      });
     }
     console.log(JSON.stringify(out));
   `;
@@ -59,6 +64,16 @@ describe('recommended assertions', () => {
       expect(['error', 'warn']).toContain(value[0]);
       expect([0.5, 1]).toContain(value[1].minScore);
       if (value[1].minScore === 0.5) expect(id).toBe('ssl-certificate-expiry');
+    }
+  });
+
+  it('declares navigation-only mode on every audit that reads a navigation-only artifact', () => {
+    const navigationOnly = ['DevtoolsLog', 'MainDocumentContent', 'FieldData'];
+    for (const meta of metas.values()) {
+      const needs = (meta.requiredArtifacts || []).some((/** @type {string} */ a) =>
+        navigationOnly.includes(a)
+      );
+      if (needs) expect([meta.id, meta.supportedModes]).toEqual([meta.id, ['navigation']]);
     }
   });
 });

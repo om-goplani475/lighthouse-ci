@@ -31,6 +31,7 @@ class RobotsTxtCrawlerAccess extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      supportedModes: ['navigation'],
       requiredArtifacts: ['RobotsTxt', 'URL', 'DevtoolsLog'],
     };
   }

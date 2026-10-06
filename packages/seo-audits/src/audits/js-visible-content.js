@@ -24,6 +24,7 @@ class JsVisibleContent extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      supportedModes: ['navigation'],
       // @ts-expect-error - custom artifacts are not part of Lighthouse's closed Artifacts type.
       requiredArtifacts: ['MainDocumentContent', 'RenderedHtml', 'URL'],
     };

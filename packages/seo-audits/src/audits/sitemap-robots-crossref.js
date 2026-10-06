@@ -39,6 +39,7 @@ class SitemapRobotsCrossref extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      supportedModes: ['navigation'],
       // @ts-expect-error - see the class-level @ts-expect-error above.
       requiredArtifacts: ['SitemapDocuments', 'RobotsTxt', 'URL'],
     };

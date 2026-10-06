@@ -25,6 +25,7 @@ class BrokenImages extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      supportedModes: ['navigation'],
       requiredArtifacts: ['DevtoolsLog', 'URL'],
     };
   }

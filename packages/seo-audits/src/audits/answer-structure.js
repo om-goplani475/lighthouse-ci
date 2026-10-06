@@ -22,6 +22,7 @@ class AnswerStructure extends Audit {
       id: 'answer-structure',
       title: UIStrings.title,
       description: UIStrings.description,
+      supportedModes: ['navigation'],
       scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       // Several of these are custom artifacts, which Lighthouse's closed Artifacts type does not list.
       requiredArtifacts: /** @type {any} */ ([

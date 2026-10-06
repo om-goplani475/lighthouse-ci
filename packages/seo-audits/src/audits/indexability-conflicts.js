@@ -31,6 +31,7 @@ class IndexabilityConflicts extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      supportedModes: ['navigation'],
       // @ts-expect-error - IndexabilitySignals isn't part of Lighthouse's own closed Artifacts type from
       // an out-of-tree package — same boundary already documented in the other audits in this package.
       requiredArtifacts: ['RobotsTxt', 'MetaElements', 'IndexabilitySignals', 'DevtoolsLog', 'URL'],

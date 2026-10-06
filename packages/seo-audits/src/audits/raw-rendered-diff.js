@@ -23,6 +23,7 @@ class RawRenderedDiff extends Audit {
       id: 'raw-rendered-diff',
       title: UIStrings.title,
       description: UIStrings.description,
+      supportedModes: ['navigation'],
       scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       // @ts-expect-error - custom artifacts are not part of Lighthouse's closed Artifacts type.
       requiredArtifacts: ['MainDocumentContent', 'RenderedHtml', 'URL', 'SiteCrawl'],

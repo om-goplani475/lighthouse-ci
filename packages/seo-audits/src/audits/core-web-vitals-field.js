@@ -24,6 +24,7 @@ class CoreWebVitalsField extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      supportedModes: ['navigation'],
       // @ts-expect-error - FieldData is a custom artifact, not part of Lighthouse's closed Artifacts type.
       requiredArtifacts: ['FieldData'],
     };

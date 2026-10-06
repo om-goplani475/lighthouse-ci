@@ -23,6 +23,7 @@ class RenderBlockingReport extends Audit {
       id: 'render-blocking-report',
       title: UIStrings.title,
       description: UIStrings.description,
+      supportedModes: ['navigation'],
       scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       requiredArtifacts: ['MainDocumentContent', 'DevtoolsLog', 'URL'],
     };

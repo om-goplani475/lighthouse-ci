@@ -23,6 +23,7 @@ class RequestWeightReport extends Audit {
       id: 'request-weight-report',
       title: UIStrings.title,
       description: UIStrings.description,
+      supportedModes: ['navigation'],
       scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       requiredArtifacts: ['DevtoolsLog', 'URL'],
     };
