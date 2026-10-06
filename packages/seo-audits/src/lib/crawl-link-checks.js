@@ -325,6 +325,8 @@ function buildBrokenLinksProduct(artifact) {
   }
   return {
     score: 0,
+    numericValue: broken.length,
+    numericUnit: 'unitless',
     displayValue: `${count(broken.length, 'broken link')} on ${pagesText(broken)}`,
     explanation: `${count(
       broken.length,

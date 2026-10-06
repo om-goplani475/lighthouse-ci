@@ -140,6 +140,7 @@ describe('broken-internal-links', () => {
     ]);
     expect(mixed.score).toBe(0);
     expect(mixed.displayValue).toBe('1 broken link on 1 page');
+    expect(mixed.numericValue).toBe(1);
     expect(mixed.details.items).toHaveLength(1);
   });
 

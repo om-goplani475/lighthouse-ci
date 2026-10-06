@@ -358,6 +358,8 @@ function buildDescriptiveAnchorsProduct(artifact) {
   return {
     // A warning (0.5): Google recommends descriptive anchors, but "read more" under a heading is common.
     score: mine.length ? 0.5 : 1,
+    numericValue: mine.length,
+    numericUnit: 'unitless',
     displayValue: mine.length
       ? `${count(mine.length, 'link')} with generic or empty anchor text`
       : 'Every internal link on the page describes its target',

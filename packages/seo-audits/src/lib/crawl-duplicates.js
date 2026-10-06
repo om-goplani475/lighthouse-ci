@@ -162,6 +162,8 @@ function buildDuplicateProduct(artifact, field) {
   }
   return {
     score: 0,
+    numericValue: others.length,
+    numericUnit: 'unitless',
     displayValue: `${others.length} other ${
       others.length === 1 ? 'page shares' : 'pages share'
     } it`,

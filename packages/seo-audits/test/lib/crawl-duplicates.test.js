@@ -51,6 +51,7 @@ describe('buildDuplicateProduct', () => {
     );
     expect(product.score).toBe(0);
     expect(product.displayValue).toBe('1 other page shares it');
+    expect(product.numericValue).toBe(1);
     expect(product.details.items).toHaveLength(1);
     expect(product.details.items[0].url).toBe('https://example.com/a');
   });
