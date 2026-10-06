@@ -30,6 +30,23 @@ describe('eligibility-engine', () => {
     expect(findings[0].message).toContain('does not guarantee');
   });
 
+  it('appends the rule note, so FAQ does not read as useless markup', () => {
+    const withNote = {
+      version: '2026-10',
+      types: {
+        FAQPage: {
+          supported: false,
+          richResultFeature: 'FAQ rich results',
+          note: 'Still shown for authoritative government and health sites.',
+        },
+      },
+    };
+    const findings = evaluate('FAQPage', withNote);
+    expect(findings[0].message).toMatch(
+      /not currently documented as supported.*government and health/
+    );
+  });
+
   it('never uses error severity, even for an unsupported type', () => {
     const findings = evaluate('DeprecatedType', ruleset);
     expect(findings[0].severity).toBe('info');

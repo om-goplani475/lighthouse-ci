@@ -205,6 +205,42 @@ describe('structured-data-schema-properties audit', () => {
     expect(note.message).toMatch(/^Recommended/);
   }, 30000);
 
+  it('passes the minimum Google requires for Organization, VideoObject, LocalBusiness and a breadcrumb', async () => {
+    const block = (/** @type {any} */ data) => [
+      {content: JSON.stringify({'@context': 'https://schema.org', ...data})},
+    ];
+    expect((await runAudit(block({'@type': 'Organization'}))).score).toBe(1);
+    expect(
+      (
+        await runAudit(
+          block({
+            '@type': 'VideoObject',
+            name: 'V',
+            thumbnailUrl: 'https://example.com/t.jpg',
+            uploadDate: '2026-09-01',
+          })
+        )
+      ).score
+    ).toBe(1);
+    expect(
+      (await runAudit(block({'@type': 'LocalBusiness', name: 'Shop', address: {}}))).score
+    ).toBe(1);
+    // the last breadcrumb item has no `item` URL, which Google allows
+    expect(
+      (
+        await runAudit(
+          block({
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              {position: 1, name: 'Home', item: 'https://example.com/'},
+              {position: 2, name: 'Shoes'},
+            ],
+          })
+        )
+      ).score
+    ).toBe(1);
+  }, 30000);
+
   it('is not applicable when no block has a tracked type', async () => {
     const result = await runAudit([
       {content: JSON.stringify({'@context': 'https://schema.org', '@type': 'WebSite'})},
@@ -270,7 +306,8 @@ describe('structured-data-schema-properties audit', () => {
     const result = await runAudit([{content: EVENT_MISSING_LOCATION_ADDRESS}]);
     expect(result.score).toBe(0);
     const failure = result.details.items.find(
-      /** @param {any} item */ item => item.namespace === 'google-requirements'
+      /** @param {any} item */ item =>
+        item.namespace === 'google-requirements' && item.message.startsWith('Missing')
     );
     expect(failure.property).toBe('location.address');
   }, 30000);

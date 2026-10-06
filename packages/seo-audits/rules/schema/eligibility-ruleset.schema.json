@@ -14,7 +14,8 @@
         "required": ["supported", "richResultFeature"],
         "properties": {
           "supported": {"type": "boolean"},
-          "richResultFeature": {"type": "string"}
+          "richResultFeature": {"type": "string"},
+          "note": {"type": "string"}
         }
       }
     }

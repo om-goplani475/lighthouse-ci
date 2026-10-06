@@ -1,6 +1,6 @@
 {
   "version": "2026-10",
-  "singularTypes": ["Organization", "WebSite", "BreadcrumbList"],
+  "singularTypes": ["Organization", "WebSite"],
   "identityFields": {
     "Product": ["sku", "gtin", "gtin13", "gtin8", "mpn"],
     "Organization": ["url"],

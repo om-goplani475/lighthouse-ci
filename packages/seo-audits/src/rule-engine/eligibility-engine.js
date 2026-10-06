@@ -22,7 +22,7 @@ export function evaluate(schemaType, ruleset) {
     ? `May be eligible for consideration for ${typeRule.richResultFeature} (as of ruleset ` +
       `${ruleset.version}); valid markup does not guarantee Google will display a rich result.`
     : `${schemaType} is not currently documented as supported for a Google rich result ` +
-      `(as of ruleset ${ruleset.version}).`;
+      `(as of ruleset ${ruleset.version}).${typeRule.note ? ` ${typeRule.note}` : ''}`;
 
   return [
     {

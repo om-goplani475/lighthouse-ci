@@ -24,8 +24,8 @@ const UIStrings = {
     '(12 types), fails only when a property Google REQUIRES is missing (for example a Product needs a name ' +
     'plus one of offers, review or aggregateRating, and an offer needs a price); properties Google only ' +
     'RECOMMENDS (Article has no required ones; Product image, offers.availability) are listed as ' +
-    'recommendations and never fail. Verified for Article, Product and Recipe against the live Google ' +
-    'documentation on 2026-10-06; the other types are still under review. Also reports, separately and always hedged, whether the type is ' +
+    'recommendations and never fail. Every type was checked against the live Google ' +
+    'documentation on 2026-10-06 (FAQPage and HowTo are no longer shown, so only their basic shape is checked). Also reports, separately and always hedged, whether the type is ' +
     'one Google currently documents support for at all — valid markup never guarantees a rich ' +
     'result will actually display.',
 };

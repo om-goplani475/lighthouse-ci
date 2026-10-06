@@ -55,7 +55,7 @@
  * @typedef {{version: string, types: Record<string, GoogleRuleSetTypeRule>}} GoogleRequirementsRuleSet
  */
 
-/** @typedef {{supported: boolean, richResultFeature: string}} EligibilityRuleSetTypeRule */
+/** @typedef {{supported: boolean, richResultFeature: string, note?: string}} EligibilityRuleSetTypeRule */
 /**
  * @typedef {{version: string, types: Record<string, EligibilityRuleSetTypeRule>}} EligibilityRuleSet
  */

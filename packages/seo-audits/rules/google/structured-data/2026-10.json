@@ -26,13 +26,14 @@
       "nested": {
         "itemListElement": {
           "type": "ListItem",
-          "required": ["position", "name", "item"]
+          "required": ["position", "name"]
         }
       },
       "conditional": []
     },
     "Organization": {
-      "required": ["name", "url", "logo"],
+      "required": [],
+      "recommended": ["name", "url", "logo"],
       "nested": {},
       "conditional": []
     },
@@ -41,7 +42,8 @@
       "nested": {
         "address": {
           "type": "PostalAddress",
-          "required": ["streetAddress", "addressLocality"]
+          "required": [],
+          "recommended": ["streetAddress", "addressLocality"]
         }
       },
       "conditional": []
@@ -54,6 +56,7 @@
     },
     "Review": {
       "required": ["itemReviewed", "author", "reviewRating"],
+      "recommended": ["datePublished"],
       "nested": {
         "itemReviewed": {
           "type": "Thing",
@@ -73,6 +76,7 @@
     },
     "Event": {
       "required": ["name", "startDate", "location"],
+      "recommended": ["endDate", "description", "image"],
       "nested": {
         "location": {
           "type": "Place",
@@ -84,6 +88,7 @@
     },
     "JobPosting": {
       "required": ["title", "description", "datePosted", "hiringOrganization", "jobLocation"],
+      "recommended": ["validThrough", "baseSalary", "employmentType"],
       "nested": {
         "hiringOrganization": {
           "type": "Organization",
@@ -98,7 +103,8 @@
       "conditional": []
     },
     "VideoObject": {
-      "required": ["name", "description", "thumbnailUrl", "uploadDate"],
+      "required": ["name", "thumbnailUrl", "uploadDate"],
+      "recommended": ["description", "contentUrl", "embedUrl"],
       "nested": {},
       "datatypes": {"uploadDate": "date"},
       "conditional": []

@@ -99,7 +99,6 @@ describe('rule registry — real production rulesets', () => {
     expect(google.types.BreadcrumbList.nested.itemListElement.required).toEqual([
       'position',
       'name',
-      'item',
     ]);
 
     expect(eligibility.types.Product.supported).toBe(true);
@@ -110,15 +109,10 @@ describe('rule registry — real production rulesets', () => {
     expect(eligibility.types.FAQPage.supported).toBe(false);
     expect(eligibility.types.HowTo.supported).toBe(false);
 
-    expect(typeConflicts.singularTypes.sort()).toEqual([
-      'BreadcrumbList',
-      'Organization',
-      'WebSite',
-    ]);
+    // BreadcrumbList left the list on 2026-10-06: Google allows several breadcrumb trails on one page.
+    expect(typeConflicts.singularTypes.sort()).toEqual(['Organization', 'WebSite']);
+    expect(eligibility.types.FAQPage.note).toMatch(/government and health/);
     expect(typeConflicts.identityFields.Product).toEqual(['sku', 'gtin', 'gtin13', 'gtin8', 'mpn']);
-    // BreadcrumbList is a singular type but deliberately has no identityFields entry — it's
-    // checked for duplicate count, never for entity conflicts. Confirms the two lists are kept
-    // genuinely separate, not accidentally conflated.
     expect(typeConflicts.identityFields.BreadcrumbList).toBeUndefined();
 
     expect(serpPixelBudgets.version).toBe('2026-10');

@@ -43,11 +43,13 @@
     },
     "HowTo": {
       "supported": false,
-      "richResultFeature": "HowTo rich results"
+      "richResultFeature": "HowTo rich results",
+      "note": "Google no longer shows HowTo rich results (the type is gone from its search gallery); the markup is harmless."
     },
     "FAQPage": {
       "supported": false,
-      "richResultFeature": "FAQ rich results"
+      "richResultFeature": "FAQ rich results",
+      "note": "FAQ rich results are still shown for well-known, authoritative government and health websites, and the markup stays valid; for other sites no rich result is shown."
     }
   }
 }
