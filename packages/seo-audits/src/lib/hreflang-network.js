@@ -10,10 +10,12 @@
  * in its HTML and none names this page; an alternate with none may carry its tags in an HTTP header or only in the
  * sitemap, so that is a note. Only a 404/410, a name or connection failure, a redirect or a noindex fails the
  * status audit; 401/403/429, server errors, timeouts and TLS errors are notes (bot protection and transient
- * trouble are not defects of the page).
+ * trouble are not defects of the page). `x-default` is the fallback, often a language chooser that redirects or a
+ * home page with its own hreflang set, so its redirect is a note and its return links are not judged.
  */
 
 import {looseKey} from './url-key.js';
+import {parseHreflang} from './hreflang-codes.js';
 import {clip, gate, notApplicable, selfKeyOf, table} from './hreflang-common.js';
 
 /** @typedef {import('lighthouse/types/audit.js').default.Product} Product */
@@ -68,6 +70,14 @@ function notCheckedNote(data) {
 }
 
 /**
+ * @param {AlternateCheck} check
+ * @return {boolean}
+ */
+function isXDefault(check) {
+  return parseHreflang(check.hreflang).kind === 'x-default';
+}
+
+/**
  * @param {unknown} data
  * @return {Product}
  */
@@ -82,6 +92,15 @@ function buildReturnLinksProduct(data) {
   let failed = 0;
   for (const r of results) {
     if (!readable(r)) continue;
+    if (isXDefault(r)) {
+      rows.push({
+        alternate: clip(r.url),
+        hreflang: r.hreflang,
+        result:
+          'note: x-default is the fallback, not a translation of this page, so it is not judged',
+      });
+      continue;
+    }
     const links = r.alternates.some(a => keys.has(looseKey(a.href)));
     if (r.hasHreflang && !links) {
       judged++;
@@ -113,7 +132,10 @@ function buildReturnLinksProduct(data) {
   if (failed === 0) {
     return {
       score: 1,
-      displayValue: `${judged} of ${judged} judged alternates link back${notCheckedNote(d)}`,
+      displayValue:
+        judged === 0
+          ? `No alternate could be judged${notCheckedNote(d)}`
+          : `${judged} of ${judged} judged alternates link back${notCheckedNote(d)}`,
       details: rows.length ? table(rows, headings) : undefined,
     };
   }
@@ -149,6 +171,10 @@ function buildAlternateStatusProduct(data) {
         fail = r.error === 'ENOTFOUND' ? 'the host does not exist' : 'the connection was refused';
       } else if (r.error === 'PRIVATE') note = 'a private address, not requested';
       else note = 'could not be checked (a timeout, a TLS error or a network problem)';
+    } else if (r.status !== null && r.status >= 300 && r.status < 400 && isXDefault(r)) {
+      note = `the x-default URL redirects${
+        r.redirectLocation ? ` to ${clip(r.redirectLocation, 80)}` : ''
+      }, which is normal for a language chooser`;
     } else if (r.status !== null && r.status >= 300 && r.status < 400) {
       fail = `redirects${
         r.redirectLocation ? ` to ${clip(r.redirectLocation, 80)}` : ''

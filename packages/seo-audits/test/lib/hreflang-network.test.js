@@ -211,3 +211,32 @@ describe('buildCanonicalProduct', () => {
     expect(buildCanonicalProduct(data([], {alternates: []})).notApplicable).toBe(true);
   });
 });
+
+describe('x-default', () => {
+  const X = 'https://example.com/';
+  const xdefault = (/** @type {any} */ over = {}) =>
+    check({url: X, hreflang: 'x-default', canonicals: [X], ...over});
+
+  it('treats a redirecting x-default as a note, not a failure', () => {
+    const p = buildAlternateStatusProduct(
+      data([xdefault({status: 302, redirectLocation: 'https://example.com/en/'})])
+    );
+    expect(p.score).toBe(1);
+    expect(JSON.stringify(p.details)).toMatch(/language chooser/);
+  });
+
+  it('still fails a redirecting language alternate, and a gone x-default', () => {
+    expect(buildAlternateStatusProduct(data([check({status: 301})])).score).toBe(0);
+    expect(buildAlternateStatusProduct(data([xdefault({status: 404})])).score).toBe(0);
+    expect(buildAlternateStatusProduct(data([xdefault({noindex: true})])).score).toBe(0);
+  });
+
+  it('does not judge the return links of the x-default page', () => {
+    const home = xdefault({alternates: [{hreflang: 'x-default', href: X}]});
+    const p = buildReturnLinksProduct(data([home]));
+    expect(p.score).toBe(1);
+    expect(p.displayValue).toMatch(/No alternate could be judged/);
+    expect(JSON.stringify(p.details)).toMatch(/not judged/);
+    expect(buildReturnLinksProduct(data([home, check({alternates: []})])).score).toBe(0);
+  });
+});
