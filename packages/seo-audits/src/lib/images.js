@@ -284,13 +284,16 @@ function buildFilenameProduct(elements) {
 
 /**
  * @param {any[] | null | undefined} elements ImageElements
- * @param {{innerHeight?: number} | null | undefined} viewport
+ * @param {{innerHeight?: number, innerWidth?: number} | null | undefined} viewport
  * @return {Product}
  */
 function buildLazyAboveFoldProduct(elements, viewport) {
   if (!Array.isArray(elements)) return notApplicable('The page images were not collected.');
   const height = viewport && Number(viewport.innerHeight);
   if (!height || height <= 0) return notApplicable('The viewport size was not collected.');
+  // A slide of a carousel can sit below the top yet far to the right: it is not on the first screen.
+  const width =
+    viewport && Number(viewport.innerWidth) > 0 ? Number(viewport.innerWidth) : Infinity;
   const lazy = usable(elements).filter(
     el => !el.isCss && el.loading === 'lazy' && isRealUrl(el.src)
   );
@@ -300,7 +303,8 @@ function buildLazyAboveFoldProduct(elements, viewport) {
   for (const el of lazy) {
     const rect = el.clientRect;
     if (!rect || !(Number(el.displayedWidth) > 0) || !(Number(el.displayedHeight) > 0)) continue;
-    if (rect.top < height && rect.bottom > 0) {
+    const insideAcross = !(Number(rect.left) >= width) && !(Number(rect.right) <= 0);
+    if (rect.top < height && rect.bottom > 0 && insideAcross) {
       offenders.push({
         url: el.src,
         problem: `starts ${Math.round(

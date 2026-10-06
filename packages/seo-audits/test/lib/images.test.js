@@ -137,6 +137,16 @@ describe('buildLazyAboveFoldProduct', () => {
     expect(p.score).toBe(0);
     expect(p.details.items[0].problem).toMatch(/100 px from the top of a 800 px viewport/);
   });
+  it('passes a carousel slide that sits to the right of the screen, and fails one that is on it', () => {
+    const wide = {innerHeight: 800, innerWidth: 1000};
+    const slide = (/** @type {number} */ left) =>
+      el({loading: 'lazy', clientRect: {top: 100, bottom: 300, left, right: left + 300}});
+    expect(run([slide(1000), slide(1300)], wide).score).toBe(1);
+    expect(run([slide(-800)], wide).score).toBe(1);
+    expect(run([slide(900)], wide).score).toBe(0);
+    // an unknown width falls back to the vertical test alone
+    expect(run([slide(5000)], vp).score).toBe(0);
+  });
   it('passes lazy images below the fold, eager images and CSS images', () => {
     expect(run([el({loading: 'lazy'})]).score).toBe(1);
     expect(run([el({loading: 'eager', clientRect: {top: 0, bottom: 100}})]).displayValue).toMatch(
