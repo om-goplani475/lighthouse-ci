@@ -11,7 +11,7 @@ const UIStrings = {
   title: 'Images are not much larger than they are shown',
   failureTitle: 'Some images are far larger than they are shown',
   description:
-    'Fails when a raster content img is more than 2x wider than it is displayed and at least 100 px wider. A simpler rule than core image-size-responsive, which also depends on the device pixel ratio. SVG is not judged.',
+    'Fails when a raster content img is more than 3x wider than it is displayed and at least 100 px wider. A simpler rule than core image-size-responsive, which also depends on the device pixel ratio. SVG is not judged, and an image served by another site is only a note.',
 };
 
 class ImageOversized extends Audit {
@@ -24,7 +24,7 @@ class ImageOversized extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
-      requiredArtifacts: ['ImageElements'],
+      requiredArtifacts: ['ImageElements', 'URL'],
     };
   }
 
@@ -34,7 +34,10 @@ class ImageOversized extends Audit {
    * @return {import('lighthouse/types/audit.js').default.Product}
    */
   static audit(artifacts) {
-    return buildOversizedProduct(artifacts.ImageElements);
+    return buildOversizedProduct(
+      artifacts.ImageElements,
+      artifacts.URL && (artifacts.URL.finalDisplayedUrl || artifacts.URL.requestedUrl)
+    );
   }
 }
 

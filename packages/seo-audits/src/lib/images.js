@@ -18,12 +18,12 @@
 import {Audit} from 'lighthouse/core/audits/audit.js';
 
 /** @typedef {import('lighthouse/types/audit.js').default.Product} Product */
-/** @typedef {{url: string, problem: string}} Offender */
+/** @typedef {{url: string, problem: string, note?: boolean}} Offender A `note` is listed but never fails. */
 
 const MIN_CONTENT_PX = 50;
 const MAX_ALT_CHARS = 125;
 const MIN_REPEATED_ALT = 3;
-const OVERSIZE_FACTOR = 2;
+const OVERSIZE_FACTOR = 3;
 const OVERSIZE_MIN_EXTRA_PX = 100;
 const LEGACY_MIN_BYTES = 10 * 1024;
 const LEGACY_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/gif']);
@@ -117,22 +117,65 @@ function baseName(src) {
  */
 function offenderProduct(offenders, text, urlLabel = 'Image') {
   if (offenders.length === 0) return {score: 1, displayValue: text.pass};
+  const failing = offenders.filter(o => !o.note);
+  const notes = offenders.length - failing.length;
   /** @type {import('lighthouse/types/audit.js').default.Details.Table['headings']} */
   const headings = [
     {key: 'url', valueType: 'text', label: urlLabel},
     {key: 'problem', valueType: 'text', label: 'Problem'},
   ];
-  const shown = offenders.slice(0, MAX_ROWS).map(o => ({url: clip(o.url), problem: o.problem}));
+  const ordered = [...failing, ...offenders.filter(o => o.note)];
+  const shown = ordered
+    .slice(0, MAX_ROWS)
+    .map(o => ({url: clip(o.url), problem: o.note ? `note: ${o.problem}` : o.problem}));
   const items = [...shown];
-  if (offenders.length > shown.length) {
-    items.push({url: `${offenders.length - shown.length} more not shown`, problem: ''});
+  if (ordered.length > shown.length) {
+    items.push({url: `${ordered.length - shown.length} more not shown`, problem: ''});
+  }
+  const details = Audit.makeTableDetails(headings, items);
+  if (failing.length === 0) {
+    return {
+      score: 1,
+      displayValue: `${text.pass}; ${notes} ${notes === 1 ? 'note' : 'notes'}`,
+      details,
+    };
   }
   return {
     score: 0,
-    displayValue: `${offenders.length} ${text.fail}`,
-    explanation: text.explain(offenders.length),
-    details: Audit.makeTableDetails(headings, items),
+    displayValue: `${failing.length} ${text.fail}`,
+    explanation: text.explain(failing.length),
+    details,
   };
+}
+
+/**
+ * Whether an image comes from the audited page's own site (same registrable domain, so a CDN subdomain counts).
+ * Unknown page URL or unparseable URLs count as first party, so nothing is hidden by mistake.
+ * @param {string} src
+ * @param {string | undefined} pageUrl
+ * @return {boolean}
+ */
+function isFirstParty(src, pageUrl) {
+  if (!pageUrl) return true;
+  try {
+    return siteOf(new URL(src).hostname) === siteOf(new URL(pageUrl).hostname);
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * @param {string} host
+ * @return {string} The last two labels (three under a short second-level suffix such as co.uk).
+ */
+function siteOf(host) {
+  const labels = host.toLowerCase().split('.');
+  if (labels.length <= 2) return host.toLowerCase();
+  const sld = labels[labels.length - 2];
+  const short =
+    labels[labels.length - 1].length === 2 &&
+    ['co', 'com', 'org', 'net', 'gov', 'ac', 'edu'].includes(sld);
+  return labels.slice(short ? -3 : -2).join('.');
 }
 
 /**
@@ -207,10 +250,16 @@ function buildAltQualityProduct(artifact) {
       /^(image|photo|picture|graphic) ?\d+$/.test(lowered)
     ) {
       problem = 'the alt text is a placeholder word';
-    } else if (alt.length > MAX_ALT_CHARS) {
-      problem = `the alt text is ${alt.length} characters (over ${MAX_ALT_CHARS})`;
     }
     if (problem) offenders.push({url: img.src, problem});
+    else if (alt.length > MAX_ALT_CHARS) {
+      // A screen-reader convention, not a search rule: a note.
+      offenders.push({
+        url: img.src,
+        problem: `the alt text is ${alt.length} characters (over ${MAX_ALT_CHARS})`,
+        note: true,
+      });
+    }
     const key = alt.toLowerCase();
     const sources = byAlt.get(key) || new Set();
     sources.add(img.src);
@@ -223,6 +272,7 @@ function buildAltQualityProduct(artifact) {
         offenders.push({
           url: src,
           problem: `the same alt text ("${clip(alt, 60)}") is on ${sources.size} different images`,
+          note: true,
         });
       }
     }
@@ -233,7 +283,7 @@ function buildAltQualityProduct(artifact) {
     explain: n =>
       `${n} of ${content.length} content ${
         n === 1 ? 'image has' : 'images have'
-      } alt text that is a file name, a placeholder word, over ${MAX_ALT_CHARS} characters, or repeated on ${MIN_REPEATED_ALT} or more different images. Describe what the image shows, briefly; use alt="" for a purely decorative one.`,
+      } alt text that is a file name, or a placeholder word (a very long alt text, or the same alt on ${MIN_REPEATED_ALT} or more images, is only a note). Describe what the image shows, briefly; use alt="" for a purely decorative one.`,
   });
 }
 
@@ -327,6 +377,36 @@ function buildLazyAboveFoldProduct(elements, viewport) {
 }
 
 /**
+ * @param {string | null | undefined} attribute
+ * @param {string | null | undefined} css
+ * @return {boolean} Whether the HTML attribute or the CSS gives this dimension an explicit value.
+ */
+function hasSize(attribute, css) {
+  if (attribute && !String(attribute).startsWith('+') && parseInt(String(attribute), 10) >= 0) {
+    return true;
+  }
+  return !!css && !['auto', 'initial', 'unset', 'inherit'].includes(css);
+}
+
+/**
+ * An image reserves its space (so it cannot shift the layout) when width and height are both set, or one of them
+ * and a CSS aspect-ratio, by attribute or by CSS. Same rule as Lighthouse core `unsized-images`. Unknown CSS rules
+ * (the gatherer ran out of time) count as sized, and so do fixed and absolute images, which are out of the flow.
+ * @param {any} el
+ * @return {boolean}
+ */
+function isSized(el) {
+  const rules = el.cssEffectiveRules;
+  if (rules === undefined || rules === null) return !!(el.attributeWidth && el.attributeHeight);
+  const position = el.computedStyles && el.computedStyles.position;
+  if (position === 'fixed' || position === 'absolute') return true;
+  const width = hasSize(el.attributeWidth, rules.width);
+  const height = hasSize(el.attributeHeight, rules.height);
+  const ratio = hasSize(null, rules.aspectRatio);
+  return (width && height) || (width && ratio) || (height && ratio);
+}
+
+/**
  * @param {any[] | null | undefined} elements ImageElements
  * @return {Product}
  */
@@ -340,11 +420,20 @@ function buildDimensionsProduct(elements) {
   for (const el of imgs) {
     if (seen.has(el.src)) continue;
     seen.add(el.src);
-    const missing = [];
-    if (!el.attributeWidth) missing.push('width');
-    if (!el.attributeHeight) missing.push('height');
-    if (missing.length) {
-      offenders.push({url: el.src, problem: `no ${missing.join(' or ')} attribute`});
+    if (!isSized(el)) {
+      const missing = [];
+      if (!hasSize(el.attributeWidth, el.cssEffectiveRules && el.cssEffectiveRules.width)) {
+        missing.push('width');
+      }
+      if (!hasSize(el.attributeHeight, el.cssEffectiveRules && el.cssEffectiveRules.height)) {
+        missing.push('height');
+      }
+      offenders.push({
+        url: el.src,
+        problem: missing.length
+          ? `no ${missing.join(' or ')} (attribute or CSS)`
+          : 'no width, height or aspect ratio that reserves its space',
+      });
     }
   }
   return offenderProduct(offenders, {
@@ -354,15 +443,16 @@ function buildDimensionsProduct(elements) {
         ? 'image has no width or height attribute'
         : 'images have no width or height attribute',
     explain: n =>
-      `${n} of ${seen.size} content images lack a width or height attribute, so the browser cannot reserve the space before the file arrives and the layout shifts. Set both, even if CSS resizes the image.`,
+      `${n} of ${seen.size} content images have no width and height (by attribute or CSS, or one of them plus an aspect ratio), so the browser cannot reserve the space before the file arrives and the layout shifts.`,
   });
 }
 
 /**
  * @param {any[] | null | undefined} elements ImageElements
+ * @param {string} [pageUrl] The audited page; images from another site are only notes.
  * @return {Product}
  */
-function buildOversizedProduct(elements) {
+function buildOversizedProduct(elements, pageUrl) {
   if (!Array.isArray(elements)) return notApplicable('The page images were not collected.');
   const imgs = usable(elements).filter(
     el => !el.isCss && isContentElement(el) && !/\.svg(\?|$)/i.test(el.src) && el.naturalDimensions
@@ -383,7 +473,8 @@ function buildOversizedProduct(elements) {
         url: el.src,
         problem: `${natural} px wide, shown at ${Math.round(shown)} px (${(natural / shown).toFixed(
           1
-        )}x)`,
+        )}x)${isFirstParty(el.src, pageUrl) ? '' : ', served by another site'}`,
+        note: !isFirstParty(el.src, pageUrl),
       });
     }
   }
@@ -446,9 +537,10 @@ function buildLegacyFormatProduct(records) {
 
 /**
  * @param {any[] | null | undefined} records
+ * @param {string} [pageUrl] The audited page; a failing image from another site is only a note.
  * @return {Product}
  */
-function buildFailedImagesProduct(records) {
+function buildFailedImagesProduct(records, pageUrl) {
   const images = imageRecords(records);
   if (!images) return notApplicable('The network log was not collected.');
   if (images.length === 0) return notApplicable('The page loaded no images.');
@@ -460,7 +552,11 @@ function buildFailedImagesProduct(records) {
     const status = Number(r.statusCode);
     if (status >= 400) {
       seen.add(r.url);
-      offenders.push({url: r.url, problem: `answered ${status}`});
+      offenders.push({
+        url: r.url,
+        problem: `answered ${status}${isFirstParty(r.url, pageUrl) ? '' : ' (another site)'}`,
+        note: !isFirstParty(r.url, pageUrl),
+      });
     } else if (
       r.failed &&
       !/ABORTED|BLOCKED|CANCEL/i.test(String(r.localizedFailDescription || ''))
@@ -468,7 +564,10 @@ function buildFailedImagesProduct(records) {
       seen.add(r.url);
       offenders.push({
         url: r.url,
-        problem: `no response (${clip(String(r.localizedFailDescription || 'failed'), 80)})`,
+        problem: `no response (${clip(String(r.localizedFailDescription || 'failed'), 80)})${
+          isFirstParty(r.url, pageUrl) ? '' : ' (another site)'
+        }`,
+        note: !isFirstParty(r.url, pageUrl),
       });
     }
   }
@@ -476,7 +575,7 @@ function buildFailedImagesProduct(records) {
     pass: `All ${images.length} image requests succeeded`,
     fail: offenders.length === 1 ? 'image failed to load' : 'images failed to load',
     explain: n =>
-      `${n} of ${images.length} image requests came back as an error (4xx or 5xx) or got no answer. Broken images hurt users and image search; fix or remove them.`,
+      `${n} of ${images.length} image requests came back as an error (4xx or 5xx) or got no answer. Broken images hurt users and image search; fix or remove them. Images served by another site (an ad or a widget) are only listed as notes.`,
   });
 }
 

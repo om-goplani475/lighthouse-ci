@@ -63,11 +63,13 @@ describe('buildAltQualityProduct', () => {
       expect.stringMatching(/126 characters/),
     ]);
   });
-  it('fails the same alt text on three different images, not on two', () => {
+  it('only notes the same alt text on three different images, not on two', () => {
     const three = ['a', 'b', 'c'].map(n =>
       alt({src: `https://example.com/${n}.jpg`, alt: 'Our product'})
     );
-    expect(run(three).score).toBe(0);
+    const repeated = run(three);
+    expect(repeated.score).toBe(1);
+    expect(repeated.details.items[0].problem).toMatch(/^note: the same alt text/);
     expect(run(three.slice(0, 2)).score).toBe(1);
     expect(run([three[0], three[0], three[0]]).score).toBe(1); // one source
   });
@@ -174,9 +176,20 @@ describe('buildDimensionsProduct', () => {
       el({src: 'https://example.com/b.jpg', attributeWidth: '', attributeHeight: null}),
     ]);
     expect(p.details.items.map((/** @type {any} */ i) => i.problem)).toEqual([
-      'no height attribute',
-      'no width or height attribute',
+      'no height (attribute or CSS)',
+      'no width or height (attribute or CSS)',
     ]);
+  });
+  it('accepts CSS sizes and an aspect ratio, as core unsized-images does', () => {
+    const css = (/** @type {any} */ rules, over = {}) =>
+      el({attributeWidth: null, attributeHeight: null, cssEffectiveRules: rules, ...over});
+    expect(run([css({width: '300px', height: '200px', aspectRatio: null})]).score).toBe(1);
+    expect(run([css({width: '100%', height: 'auto', aspectRatio: '3 / 2'})]).score).toBe(1);
+    expect(run([css({width: 'auto', height: 'auto', aspectRatio: null})]).score).toBe(0);
+    // fixed and absolute images are out of the flow; unknown CSS rules are not guessed
+    expect(
+      run([css({width: 'auto', height: 'auto'}, {computedStyles: {position: 'fixed'}})]).score
+    ).toBe(1);
   });
   it('passes sized, small and CSS images; is not applicable with none to judge', () => {
     expect(run([el()]).score).toBe(1);
@@ -186,8 +199,9 @@ describe('buildDimensionsProduct', () => {
 });
 
 describe('buildOversizedProduct', () => {
-  const run = (/** @type {any[]} */ els) => lib.buildOversizedProduct(els);
-  it('fails an image over 2x wider and 100 px wider than shown', () => {
+  const run = (/** @type {any[]} */ els, /** @type {string} */ page) =>
+    lib.buildOversizedProduct(els, page);
+  it('fails an image over 3x wider and 100 px wider than shown', () => {
     const p = run([el({naturalDimensions: {width: 1200, height: 800}})]);
     expect(p.score).toBe(0);
     expect(p.details.items[0].problem).toBe('1200 px wide, shown at 300 px (4.0x)');
@@ -201,6 +215,25 @@ describe('buildOversizedProduct', () => {
       run([el({src: 'https://example.com/a.svg', naturalDimensions: {width: 5000, height: 5000}})])
         .notApplicable
     ).toBe(true);
+  });
+  it('passes an image at 2.5x, normal for a 2x asset', () => {
+    expect(run([el({naturalDimensions: {width: 750, height: 500}})]).score).toBe(1);
+  });
+  it('only notes an oversized image served by another site', () => {
+    const ad = el({
+      src: 'https://ads.tracker.net/b.jpg',
+      naturalDimensions: {width: 1200, height: 800},
+    });
+    const page = 'https://www.example.com/';
+    const p = run([ad], page);
+    expect(p.score).toBe(1);
+    expect(p.details.items[0].problem).toMatch(/^note: .*served by another site/);
+    // a CDN subdomain of the same site is first party
+    const cdn = el({
+      src: 'https://cdn.example.com/b.jpg',
+      naturalDimensions: {width: 1200, height: 800},
+    });
+    expect(run([cdn], page).score).toBe(0);
   });
   it('skips images with no natural size', () => {
     expect(run([el({naturalDimensions: undefined})]).notApplicable).toBe(true);
@@ -263,6 +296,20 @@ describe('network based audits', () => {
     expect(lib.buildFailedImagesProduct([rec()]).displayValue).toBe(
       'All 1 image requests succeeded'
     );
+  });
+  it('failed images from another site are only notes', () => {
+    const page = 'https://www.example.com/';
+    const third = lib.buildFailedImagesProduct(
+      [rec({url: 'https://ads.tracker.net/a.gif', statusCode: 404})],
+      page
+    );
+    expect(third.score).toBe(1);
+    expect(third.details.items[0].problem).toBe('note: answered 404 (another site)');
+    const own = lib.buildFailedImagesProduct(
+      [rec({url: 'https://cdn.example.com/a.gif', statusCode: 404})],
+      page
+    );
+    expect(own.score).toBe(0);
   });
   it('are not applicable without records or images', () => {
     expect(lib.buildFailedImagesProduct(null).notApplicable).toBe(true);
