@@ -11,7 +11,7 @@ const UIStrings = {
   title: 'The declared published and modified dates are consistent',
   failureTitle: 'The declared published and modified dates contradict each other',
   description:
-    'Reads the published and modified dates the page declares (article:published_time-style meta tags and JSON-LD datePublished and dateModified) and fails only on a contradiction: a modified date before the published date, a date in the future, or two different published (or modified) dates. A day of tolerance covers time zones. The age of the page is shown for information. Not applicable when the page declares no date.',
+    'Reads the published and modified dates the page declares (article:published_time-style meta tags and the JSON-LD datePublished and dateModified of the main Article or WebPage; a Review or Event in the same page is ignored) and fails only on a contradiction: a modified date before the published date, a date in the future, or two different published (or modified) dates. A day of tolerance covers time zones. The age of the page is shown for information. Not applicable when the page declares no date.',
 };
 
 class ContentDates extends Audit {

@@ -134,3 +134,41 @@ describe('buildContentDatesProduct', () => {
     ).toBe(1);
   });
 });
+
+describe('main entity and the generic date tag', () => {
+  const graph = (/** @type {any[]} */ nodes) => [{content: JSON.stringify({'@graph': nodes})}];
+
+  it('reads only the main entity, so a Review in the same page cannot contradict the Article', () => {
+    const p = run(
+      content(),
+      graph([
+        {'@type': 'Review', datePublished: '2025-03-01'},
+        {'@type': 'Article', datePublished: '2024-02-01', dateModified: '2024-06-01'},
+      ])
+    );
+    expect(p.score).toBe(1);
+    expect(p.displayValue).toBe('Last modified 2024-06-01 (856 days ago)');
+  });
+
+  it('falls back to the first entity with a date when none is an article', () => {
+    const {dates} = collectDates(
+      content(),
+      graph([{'@type': 'Recipe', datePublished: '2026-01-01'}])
+    );
+    expect(dates.map(d => d.source)).toEqual(['JSON-LD Recipe datePublished']);
+  });
+
+  it('shows <meta name="date"> but does not judge it against the other dates', () => {
+    const p = run(
+      content([meta('article:published_time', '2026-01-01'), meta('date', '2026-08-01')])
+    );
+    expect(p.score).toBe(1);
+    expect(JSON.stringify(p.details)).toMatch(/date \(not judged\)/);
+  });
+
+  it('is not applicable when the only date is the generic tag', () => {
+    const p = run(content([meta('date', '2026-08-01')]));
+    expect(p.notApplicable).toBe(true);
+    expect(p.explanation).toMatch(/generic date tag/);
+  });
+});
