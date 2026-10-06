@@ -1,6 +1,6 @@
 # Phase 17: CI/DevOps and webhook platform
 
-Status: **slices 1-3 built** on branch `phase-17-ci-devops`. Build mode: full pipeline, in slices; each slice is tested, then committed on approval.
+Status: **slices 1-4 built** on branch `phase-17-ci-devops`. Build mode: full pipeline, in slices; each slice is tested, then committed on approval.
 
 ## Goal
 
@@ -24,7 +24,7 @@ Other repositories do not install `@lhci/cli` or run Chrome. They send a webhook
 1. **Project config and presets** *(done)* (`src/service/project-config.js`): presets `seo:recommended`, `seo:strict`, `ecommerce`, `blog`, `internal-portal`, `minimal`; validation; resolution to assertions. *(this slice)*
 2. **Webhook verification** *(done)* (`src/service/webhook-signature.js`, `webhook-payload.js`, `host-allow-list.js`): HMAC check, replay window, GitHub/GitLab payload normalisation to `{repo, prNumber, sha, url}`.
 3. **Storage and routes** *(done)* (`packages/server/src/seo/`): tables `seo_projects`, `seo_runs`, `seo_webhook_logs`; routes; queue; three lines in `server.js`.
-4. **Runner**: executes `collect` for the URL with the resolved config, runs Phase 16 summary and compare against the baseline.
+4. **Runner** *(done)*: executes `collect` for the URL with the resolved config, runs Phase 16 summary and compare against the baseline.
 5. **Dispatcher**: PR comment (GitHub first, GitLab second), Slack/Teams alerts.
 6. **Dashboard** (server UI, new route directory): on-demand run, rules editor, webhook log, run history.
 7. **Docs, QA against a real run, security review.**
@@ -44,4 +44,15 @@ Other repositories do not install `@lhci/cli` or run Chrome. They send a webhook
 - **Loading ESM from CommonJS:** the server is CommonJS and `@lhci/seo-audits` is ESM, so `seo/load-deps.js` uses a dynamic `import()`. Checked in plain Node 24 and 18.20.8.
 - **Routes** (management ones need the LHCI project's `x-lhci-admin-token`): `PUT|GET|DELETE /api/v1/seo/projects/:id/config`, `POST .../rotate-secret`, `GET .../runs`, `GET .../runs/:runId`, `GET .../webhook-logs`, `POST .../runs` (on-demand); public `POST /api/v1/webhooks/:id`, which needs a valid signature. The secret is returned once, on create or rotate.
 - **Limits:** queue of 20 waiting jobs with 1 worker; 10 accepted deliveries per project per 10 minutes; a 10-minute run timeout; a restart closes unfinished runs as failed. A repeated delivery id is answered `200 duplicate` (GitHub's "Redeliver" button reuses the id, so a manual redelivery inside 10 minutes is ignored).
-- **Known gap for slice 4 (security):** the allow-list and `safe-fetch` guard the service's own requests, but **Chrome** will load the target itself. The runner must resolve the host and refuse private, loopback and link-local addresses *before* launching Chrome, and again for redirects, or an allowed hostname that points at an internal address would be audited. Until slice 4 the runner is not installed, and a queued run fails with "the audit runner is not installed on this server".
+- **Known gap for slice 4 (security):** closed in slice 4, below.
+
+## Slice 4 as built: the guard proxy and the runner
+
+- **`src/service/guard-proxy.js`**: a forward proxy on 127.0.0.1 that Chrome is forced through (`--proxy-server`, `--proxy-bypass-list=<-loopback>`). Chrome leaves name resolution to the proxy, which resolves every host itself, refuses any private or reserved address (never honouring `LHCI_SEO_ALLOW_PRIVATE_NETWORK`), and connects to the address it checked, so redirects, subresources and DNS rebinding are all covered. HTTPS passes as an opaque CONNECT tunnel. Only ports 80, 443, 8080 and 8443 are allowed. It lives for one run. `blocked` lists address refusals (reported on the run); `denied` lists port refusals (mostly Chrome's own background traffic, such as Google's push service on 5228).
+- **Checked live with real Chrome:** a page on `127.0.0.1` (on an allowed port) was refused and its server saw 0 requests; `https://web.dev/` audited normally through the proxy (57 audits, no runtime error).
+- **`src/service/run-audit.js`**: re-checks the URL against the allow-list, resolves its host to public addresses only, starts the proxy, runs `lhci collect` as a child process in its own process group (killed on timeout or abort), scores the report with the project's severities (`off` audits are not scored), and compares it with the baseline. The child's environment is built from an allow-list (no database or cloud credentials, never the private-network opt-in); each run has its own temp folder and its own crawl cache, so a later push never sees an earlier push's pages. Operators can add Chrome flags with `LHCI_SEO_SERVICE_CHROME_FLAGS` (for example `--no-sandbox` in a container); any flag that could undo the proxy is dropped and the guard flags are placed last.
+- **`src/service/run-result.js`**: stores a run as plain data (every audit result, about 60 small rows) and revives it for comparison; damaged data counts as "no baseline".
+- **Baseline:** the latest finished run of the same path on the base branch (a pull request is compared with `baseBranch`; a base-branch run with its own previous run). The host is ignored because preview hosts change per pull request. For this to work, the base branch must also send events (a `deployment_status` or `lhci` delivery with `branch: main`).
+- **Real end-to-end run** (real server, signed webhook, queue, runner, Chrome, `web.dev`): done in about 2 minutes while the machine was busy; a second run on a `feat` branch with `baseBranch: main` came back with a comparison (delta 0); a private URL was refused with 422.
+- **Server wiring:** `load-deps.js` builds the real runner; `@lhci/cli` was added to the server's dependencies (no cycle; `yarn install --frozen-lockfile` passes).
+- **Not covered:** a hostile page cannot be stopped from using Chrome's CPU for the whole run timeout (10 minutes); the queue and rate limits bound how many such runs happen. A site that serves different content to the proxy's address cannot be told apart from one that does not.
