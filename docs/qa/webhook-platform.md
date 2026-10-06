@@ -14,6 +14,10 @@ Design: `docs/phases/phase-17-webhook-platform.md`. What was checked on 2026-10-
 | Outbound sender, real TLS | `api.github.com` answered over TLS; `localhost` and `127.0.0.1` refused | `outbound.test.js` |
 | Server upstream behaviour | the existing sqlite and basic-auth server suites still pass with the service mounted; `yarn install --frozen-lockfile` passes | `npx jest packages/server/test/sqlite-server` |
 
+## Trying the baseline comparison without GitHub
+
+`packages/seo-audits/src/service/send-test-webhook.js` (see the README) sends signed deliveries in the CI-job form. Send one with `--branch main`, wait for it to finish, then one with `--branch feat --base-branch main --pr 5`: the second run's score carries a change against the first in the dashboard's Runs tab and on the run page. These deliveries use the CI-job form, so they never post a pull request comment (that needs a GitHub or GitLab delivery); Slack and Teams alerts do work with them.
+
 ## Not verified (needs you)
 
 1. **A real pull request comment** on GitHub and on GitLab with a real token: the requests are tested against fakes of the documented APIs. Create a token that can comment, store it under *Rules and destinations*, open a pull request that sends a webhook, and check that **one** comment appears and is edited (not duplicated) by a second push.
