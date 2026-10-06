@@ -522,6 +522,20 @@ As the other cross-page audits, `product-pages-in-sitemap` and `product-category
 
 **The crawl snapshot now records structured data.** Each crawled page carries its `entities` (a bounded projection of its JSON-LD: identity, address, phone, hours, geo, `sameAs`, product identifiers, offers and variants; `lib/structured-facts.js`), so cross-page audits can compare pages. The snapshot version is now 3 (an old cache is simply not used) and the crawler's per-page body cap rose from 512 KiB to 2 MiB, because structured data often sits at the end of a heavy page (one real product page had its JSON-LD at byte 824,767 of 841,717).
 
+### Local business audits (Phase 18)
+
+Five audits for businesses with a physical location. `local-business-values` judges the audited page's own `LocalBusiness` markup (the type and its common subtypes: Restaurant, Dentist, Store, HairSalon and so on); the others read the entities the crawl recorded for every crawled page. A page with no local business markup is **not applicable**. All are advice (a partial score, the `warn` tier) or a report.
+
+| Audit | What it checks |
+|---|---|
+| `local-business-values` | Google's documented formats: a phone number of 7 to 15 digits (a missing country code is only a note); opening hours as weekday names and 24-hour times (or the compact `Mo-Fr 09:00-17:00` form); geo coordinates in range, not `0, 0`, with at least 5 decimal places; a `priceRange` under 100 characters; a full `PostalAddress` (street, locality, country). Missing properties are left to `structured-data-schema-properties` |
+| `local-nap-consistency` | one business (the same `@id`) shown with two phone numbers or two addresses, or two pages with the same name that agree on one of phone and address and differ on the other. Phone numbers match with or without a country code or a leading trunk `0` (`020 7946 0958` is `+44 20 7946 0958`) |
+| `local-name-consistency` | the same business (same `@id`, phone or address) named differently, or the same name written differently (`Acme Diner` and `Acme Diner Inc.`) |
+| `local-pages-report` | informational: the crawled pages that carry a local business, with name, address and phone |
+| `local-pages-in-sitemap` | crawled local business pages that no sitemap lists (judged only when the sitemap was read in full) |
+
+A site with several locations is expected to show different addresses and phones for different locations, so the same name at a different address **and** a different phone is never flagged. As the other cross-page audits, the consistency and sitemap audits judge the audited page and list the others. Consistency of name, address and phone is our judgement (standard local SEO practice), not a Google requirement. Checked live on 2026-10-06 on a purpose-built site with known defects (one `@id` with two phone numbers, a renamed copy, coarse geo, an invalid weekday and time, a page missing from the sitemap, and a legitimate second location): every defect was reported and the second location was not. A `local` preset promotes the new category to errors.
+
 ### Soft-404 check (`soft-not-found`)
 
 - **`soft-not-found`** (Phase 5) — does the site answer a URL that does not exist with a normal page? A
@@ -1098,6 +1112,11 @@ informational audits are reports and cannot be asserted at all). 57 are scored (
 | 18 | `content-security-policy-report` | informational | none (informational audits cannot be asserted) |
 | 18 | `referrer-policy` | pass, 0.5 warning | `warn` |
 | 18 | `x-content-type-options` | pass, 0.5 warning | `warn` |
+| 18 | `local-business-values` | pass, 0.5 warning | `warn` |
+| 18 | `local-nap-consistency` | pass, 0.5 warning | `warn` |
+| 18 | `local-name-consistency` | pass, 0.5 warning | `warn` |
+| 18 | `local-pages-in-sitemap` | pass, 0.5 warning | `warn` |
+| 18 | `local-pages-report` | informational | none (informational audits cannot be asserted) |
 | 18 | `faceted-navigation-explosion` | pass, 0.5 warning | `warn` |
 | 18 | `product-category-linking` | pass, 0.5 warning | `warn` |
 | 18 | `product-identifiers` | pass, 0.5 warning | `warn` |
