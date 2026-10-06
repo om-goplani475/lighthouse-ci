@@ -21,6 +21,7 @@ import BaseGatherer from 'lighthouse/core/gather/base-gatherer.js';
  *   h1: string[],
  *   text: string,
  *   textTruncated: boolean,
+ *   proseText: string,
  *   hiddenWords: number,
  *   hiddenSamples: Array<{reason: string, text: string}>,
  *   metaDates: Array<{key: string, value: string}>,
@@ -50,6 +51,19 @@ function collectPageContent() {
   const raw = (root && root.innerText) || '';
   const text = raw.slice(0, MAX_TEXT);
 
+  // The same text without code samples (pre, code, kbd, samp), for the placeholder check: a tutorial that shows
+  // `{{ name }}` or "your text here" in a code block is not leftover filler.
+  let proseText = text;
+  if (root) {
+    const clone = /** @type {HTMLElement} */ (root.cloneNode(true));
+    for (const el of Array.from(
+      clone.querySelectorAll('pre, code, kbd, samp, script, style, noscript, template')
+    )) {
+      el.remove();
+    }
+    proseText = (clone.textContent || '').slice(0, MAX_TEXT);
+  }
+
   // Text hidden by styling tricks (not by display:none or an accordion, which are ordinary).
   let hiddenWords = 0;
   /** @type {Array<{reason: string, text: string}>} */
@@ -60,6 +74,20 @@ function collectPageContent() {
       if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return bg;
     }
     return 'rgb(255, 255, 255)';
+  };
+  // A slide in a carousel sits far off-screen inside a container that clips it; that is a widget, not a trick.
+  // The body and html are skipped: many pages clip horizontal overflow there.
+  const clippedByAncestor = (/** @type {Element} */ el) => {
+    for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+      const o = getComputedStyle(n);
+      if (
+        /hidden|clip|scroll|auto/.test(o.overflowX) ||
+        /hidden|clip|scroll|auto/.test(o.overflowY)
+      ) {
+        return true;
+      }
+    }
+    return false;
   };
   let seen = 0;
   for (const el of Array.from(document.body.querySelectorAll('*'))) {
@@ -83,8 +111,9 @@ function collectPageContent() {
     if (parseFloat(s.fontSize) <= 2) reason = 'a font size of 2 px or less';
     else if (parseFloat(s.textIndent) <= -999) {
       reason = 'pushed off the left edge with a negative indent';
-    } else if (rect.right < -500 || rect.bottom < -500) reason = 'positioned off the screen';
-    else if (s.color === bgOf(el)) reason = 'the same colour as its background';
+    } else if ((rect.right < -500 || rect.bottom < -500) && !clippedByAncestor(el)) {
+      reason = 'positioned off the screen';
+    } else if (s.color === bgOf(el)) reason = 'the same colour as its background';
     else if (parseFloat(s.opacity) === 0) reason = 'fully transparent';
     if (reason) {
       hiddenWords += own.split(' ').length;
@@ -122,6 +151,7 @@ function collectPageContent() {
       .map(h => clip(h.textContent || '', 200)),
     text,
     textTruncated: raw.length > MAX_TEXT,
+    proseText,
     hiddenWords,
     hiddenSamples,
     metaDates,

@@ -5,7 +5,8 @@
  *
  * The pure result builder for the `placeholder-content` audit: leftover filler text on the page. Fails on a clear
  * mistake only (chosen with the developer): "lorem ipsum" filler, template prompts such as "your text here", and
- * template tags that were never filled in (`{{ name }}`). Words such as "coming soon" or "sample" are not matched,
+ * template tags that were never filled in (`{{ name }}`). Code samples (`pre`, `code`, `kbd`, `samp`) are not read:
+ * a tutorial showing a template tag is not leftover filler. The title is still read. Words such as "coming soon" or "sample" are not matched,
  * because they are ordinary text. A page that is itself about lorem ipsum or a template tool would be flagged:
  * that is accepted and noted in the description. No I/O, never throws.
  */
@@ -52,7 +53,8 @@ function around(text, index) {
  */
 function buildPlaceholderProduct(content) {
   if (!hasContent(content)) return notApplicable('The page content was not collected.');
-  const text = `${content.title || ''}\n${content.text}`.slice(0, MAX_SCAN_CHARS);
+  const body = typeof content.proseText === 'string' ? content.proseText : content.text;
+  const text = `${content.title || ''}\n${body}`.slice(0, MAX_SCAN_CHARS);
   if (text.trim() === '') return notApplicable('The page has no text to check.');
   /** @type {Array<Record<string, string>>} */
   const rows = [];

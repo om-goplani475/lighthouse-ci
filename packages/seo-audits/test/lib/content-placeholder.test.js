@@ -68,3 +68,20 @@ describe('buildPlaceholderProduct', () => {
     expect(Date.now() - start).toBeLessThan(1500);
   });
 });
+
+describe('code samples', () => {
+  it('reads the text without code samples when the gatherer supplies it', () => {
+    const p = run({
+      title: 'Templating guide',
+      text: 'Write {{ message }} in your template.',
+      proseText: 'Write  in your template.',
+    });
+    expect(p.score).toBe(1);
+  });
+
+  it('still reads proseText and the title, and falls back to text for an older artifact', () => {
+    expect(run({title: 'ok', text: 'x', proseText: 'Lorem ipsum dolor'}).score).toBe(0);
+    expect(run({title: 'Lorem ipsum', text: 'x', proseText: 'fine'}).score).toBe(0);
+    expect(run({title: 'ok', text: 'Lorem ipsum dolor'}).score).toBe(0);
+  });
+});

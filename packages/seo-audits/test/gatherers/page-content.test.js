@@ -17,6 +17,7 @@ describe('PageContent gatherer', () => {
       h1: [],
       text: 'x',
       textTruncated: false,
+      proseText: 'x',
       hiddenWords: 0,
       hiddenSamples: [],
       metaDates: [],
