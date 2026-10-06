@@ -1,6 +1,6 @@
 # Phase 17: CI/DevOps and webhook platform
 
-Status: **slices 1-5 built** on branch `phase-17-ci-devops`. Build mode: full pipeline, in slices; each slice is tested, then committed on approval.
+Status: **slices 1-6 built** on branch `phase-17-ci-devops`. Build mode: full pipeline, in slices; each slice is tested, then committed on approval.
 
 ## Goal
 
@@ -26,7 +26,7 @@ Other repositories do not install `@lhci/cli` or run Chrome. They send a webhook
 3. **Storage and routes** *(done)* (`packages/server/src/seo/`): tables `seo_projects`, `seo_runs`, `seo_webhook_logs`; routes; queue; three lines in `server.js`.
 4. **Runner** *(done)*: executes `collect` for the URL with the resolved config, runs Phase 16 summary and compare against the baseline.
 5. **Dispatcher** *(done)*: PR comment (GitHub first, GitLab second), Slack/Teams alerts.
-6. **Dashboard** (server UI, new route directory): on-demand run, rules editor, webhook log, run history.
+6. **Dashboard** *(done)* (server UI, new route directory): on-demand run, rules editor, webhook log, run history.
 7. **Docs, QA against a real run, security review.**
 
 ## Security notes (carried into each slice)
@@ -66,3 +66,17 @@ Other repositories do not install `@lhci/cli` or run Chrome. They send a webhook
 - **Alerts** go to Slack and/or Teams for a **new critical regression**: an error-tier audit from a fixed list (`robots-directives-conflict`, `indexability-conflicts`, `robots-txt-crawler-access`, `canonical-conflicts`, `canonical-https`, `redirect-loop`, `sitemap-valid`, `mixed-content`, `ssl-certificate-expiry`; a project can pick its own list) that fails now and did not in the baseline, **or** a page whose Lighthouse `is-crawlable` score fell from 1 to 0 (an accidental `noindex` or robots block; `indexability-verdict` is informational, so the runner records Lighthouse's own `is-crawlable` and `http-status-code` as signals). Needs a baseline: on a first audit nothing is "new", so a site that was already broken does not page anyone. By default only runs that are not pull requests alert (`alerts.includePullRequests` turns it on). Teams gets a legacy MessageCard for `webhook.office.com` and an Adaptive Card for Workflows hosts.
 - **Server:** a new table `seo_notifications` (secrets, stored like the webhook secret, never returned) and routes `GET|PUT /api/v1/seo/projects/:id/notifications` (admin token; a patch merges, `null` removes, the merged result is validated too). Dispatch happens after a run is saved as done; a failure is logged (`comment-posted`, `comment-failed`, `alert-sent`, `alert-failed`) and **never changes the run's status**. One retry on a network error, 429 or 5xx; at most 60 s for all sending.
 - **Not verified:** posting to a real GitHub or GitLab pull request and sending to a real Slack or Teams webhook. That needs your tokens and webhook URLs; the requests are tested against fakes of the documented APIs. A GitHub App installation token works as the token; GitHub App registration itself is not built.
+
+## Slice 6 as built: the dashboard
+
+New screens in `packages/server/src/ui/` (new files plus two small edits: two routes in `app.jsx`, one sidebar icon in `page-sidebar.jsx`; no upstream component was changed):
+
+- **`/app/projects/:slug/seo`** (a "travel_explore" icon beside each project in the sidebar). Needs the project admin token, kept in `localStorage` per project exactly as the existing project settings page does; it asks for one when missing or refused. A project that has not set the service up gets a setup form (provider, allowed hosts, default URL); the webhook address and **secret are shown once**, then never again.
+  - **Runs:** run an audit now (the host must be on the allow-list, otherwise the server's reason is shown), and the last 25 runs with status, score, grade and change since the baseline. It refreshes every 3 s while a run is queued or running.
+  - **Webhook log:** every delivery and what was done with it (queued, ignored, duplicate, rejected, rate limited, comment posted, alert sent...).
+  - **Rules and destinations:** preset, a severity (`error`, `warn`, `off`) per category and per audit with the effective severity shown, hosts, default URL, rotate secret; tokens and Slack/Teams webhook URLs for comments and alerts (never shown back: an empty field keeps the stored value, a checkbox removes it); turn the service off.
+- **`/app/seo/:projectId/runs/:runId`**: one run (the page the pull request comment links to via `LHCI_SEO_PUBLIC_URL`): status, page, commit, score with the change, categories and the new, fixed and remaining issues.
+- **API additions:** `GET /api/v1/seo/projects/:id/meta` (presets, categories, scored audits, effective severities) and, in the run list, each finished run's `score`, `grade` and `delta` (read from the stored result, so the list is limited to 25 by the page).
+- **Safety:** all text, including anything that came from the audited page, is rendered by Preact (escaped); no `dangerouslySetInnerHTML`. A page URL becomes a link only when it is http(s). Requests never throw: a missing or refused token, a validation problem (every problem listed), a busy server and a network failure are each shown as what they are.
+- **Checked in real Chrome against the real server** (puppeteer, a fresh database): no token asks for the token; an off-list URL is refused with the server's message; **a run started from the page audited `web.dev` in 1m48s and showed 91.4 (A)**; the run page, webhook log (the rejected delivery) and settings rendered; saving a preset through the page changed it on the server; a stored Slack URL was accepted and its secret part is not on the page; no console or page errors.
+- **Not done / known:** the run list reads each finished run's stored report to get its score, which is fine at 25 rows but would want a stored score column if the list grows; the UI has no automated screenshot test (the existing screenshot suites fail on this machine for font reasons), so the screens were checked by hand in Chrome and the logic behind them is unit tested.
