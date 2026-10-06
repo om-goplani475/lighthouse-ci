@@ -201,7 +201,7 @@ describe('buildDimensionsProduct', () => {
 describe('buildOversizedProduct', () => {
   const run = (/** @type {any[]} */ els, /** @type {string} */ page) =>
     lib.buildOversizedProduct(els, page);
-  it('fails an image over 3x wider and 100 px wider than shown', () => {
+  it('fails an image over 3.5x wider and 100 px wider than shown', () => {
     const p = run([el({naturalDimensions: {width: 1200, height: 800}})]);
     expect(p.score).toBe(0);
     expect(p.details.items[0].problem).toBe('1200 px wide, shown at 300 px (4.0x)');
@@ -216,8 +216,9 @@ describe('buildOversizedProduct', () => {
         .notApplicable
     ).toBe(true);
   });
-  it('passes an image at 2.5x, normal for a 2x asset', () => {
+  it('passes an image at 2.5x and at 3x, normal for 2x and 3x assets', () => {
     expect(run([el({naturalDimensions: {width: 750, height: 500}})]).score).toBe(1);
+    expect(run([el({naturalDimensions: {width: 903, height: 600}})]).score).toBe(1);
   });
   it('only notes an oversized image served by another site', () => {
     const ad = el({

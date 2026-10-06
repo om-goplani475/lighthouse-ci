@@ -11,7 +11,7 @@ const UIStrings = {
   title: 'Images are not much larger than they are shown',
   failureTitle: 'Some images are far larger than they are shown',
   description:
-    'Fails when a raster content img is more than 3x wider than it is displayed and at least 100 px wider. A simpler rule than core image-size-responsive, which also depends on the device pixel ratio. SVG is not judged, and an image served by another site is only a note.',
+    'Fails when a raster content img is more than 3.5x wider than it is displayed (3x assets for 3x-density phones are normal) and at least 100 px wider. A simpler rule than core image-size-responsive, which also depends on the device pixel ratio. SVG is not judged, and an image served by another site is only a note.',
 };
 
 class ImageOversized extends Audit {

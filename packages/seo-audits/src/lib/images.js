@@ -23,7 +23,8 @@ import {Audit} from 'lighthouse/core/audits/audit.js';
 const MIN_CONTENT_PX = 50;
 const MAX_ALT_CHARS = 125;
 const MIN_REPEATED_ALT = 3;
-const OVERSIZE_FACTOR = 3;
+// 3x assets are normal for 3x-density phones (700 px for a 233 px slot), so only more than 3.5x counts.
+const OVERSIZE_FACTOR = 3.5;
 const OVERSIZE_MIN_EXTRA_PX = 100;
 const LEGACY_MIN_BYTES = 10 * 1024;
 const LEGACY_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/gif']);

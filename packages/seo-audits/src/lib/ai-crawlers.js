@@ -6,7 +6,11 @@
  * The pure result builder for the informational `ai-crawler-summary` audit: which AI crawlers and AI-related
  * robots.txt tokens the site's robots.txt allows on the audited page. Blocking an AI crawler is a legitimate
  * choice, so this only reports and never fails. It reads the same `RobotsTxt` artifact as the Phase 4 crawler
- * audit and the same parsers, with a longer list. Vendor names change: the list is data to keep current. No I/O,
+ * audit and the same parsers, with a longer list. Vendor names change: the list is data to keep current. Checked
+ * against the vendors' own pages on 2026-10-06: OpenAI (GPTBot, OAI-SearchBot, ChatGPT-User; also OAI-AdsBot, not listed),
+ * Anthropic (ClaudeBot, Claude-User, Claude-SearchBot), Perplexity (PerplexityBot, Perplexity-User), Google-Extended (a
+ * robots.txt token only) and Applebot-Extended. Not re-checked: CCBot, Bytespider, Amazonbot, Meta-ExternalAgent,
+ * DuckAssistBot. No I/O,
  * never throws.
  */
 
@@ -20,7 +24,11 @@ import {parseRobotsTxt, robotsTxtState} from './robots-txt.js';
 const AI_CRAWLERS = [
   {name: 'GPTBot', operator: 'OpenAI', purpose: 'model training'},
   {name: 'OAI-SearchBot', operator: 'OpenAI', purpose: 'search results'},
-  {name: 'ChatGPT-User', operator: 'OpenAI', purpose: 'a user asked ChatGPT to open the page'},
+  {
+    name: 'ChatGPT-User',
+    operator: 'OpenAI',
+    purpose: 'a user asked ChatGPT to open the page (OpenAI: robots.txt may not apply)',
+  },
   {name: 'ClaudeBot', operator: 'Anthropic', purpose: 'model training'},
   {name: 'Claude-SearchBot', operator: 'Anthropic', purpose: 'search results'},
   {name: 'Claude-User', operator: 'Anthropic', purpose: 'a user asked Claude to open the page'},
@@ -28,7 +36,7 @@ const AI_CRAWLERS = [
   {
     name: 'Perplexity-User',
     operator: 'Perplexity',
-    purpose: 'a user asked Perplexity to open the page',
+    purpose: 'a user asked Perplexity to open the page (generally ignores robots.txt)',
   },
   {
     name: 'Google-Extended',
@@ -48,7 +56,7 @@ const AI_CRAWLERS = [
 ];
 
 const NOTE =
-  'Blocking an AI crawler is a legitimate choice (some sites do, some want to be cited). Allowing a crawler does not guarantee it visits. Vendors rename their crawlers: check each vendor documentation for the current names.';
+  'Blocking an AI crawler is a legitimate choice (some sites do, some want to be cited). Allowing a crawler does not guarantee it visits. The user-initiated fetchers (ChatGPT-User, Perplexity-User) may ignore robots.txt, so a rule for them is not a control. Vendors rename their crawlers: check each vendor documentation for the current names.';
 
 /**
  * @param {{status: number | null, content: string | null} | null | undefined} robotsTxt
