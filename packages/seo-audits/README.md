@@ -549,6 +549,19 @@ Four audits for publishers. `article-values` judges the audited page's article m
 
 All three sitemap audits are **not applicable** when no news sitemap was found, and say so when a sitemap file could not be read (for example a declared `http://` address that redirects to https: the sitemap gatherer does not follow redirects) instead of claiming there is none. A `news` preset promotes the new category to errors. Checked live on 2026-10-06: a purpose-built publisher with flawed markup and a mixed news sitemap (every defect reported), and the real New York Times news sitemap (637 entries: valid, with `en-US` notes; this first scored 0 for `en-US`, which is why that is now only a note).
 
+### Video audits (Phase 18)
+
+Four audits for pages and sites with video. Sources: Google's video structured data and video sitemap documentation, read 2026-10-06.
+
+| Audit | Level | What it checks |
+|---|---|---|
+| `video-structured-data-values` | warn | each `VideoObject`: `uploadDate` and `expires` in ISO 8601, `duration` as an ISO 8601 duration (`PT1M30S`), unique `name` and `description` among the videos of the page. Relative addresses, no `contentUrl`/`embedUrl` and no description are notes. Missing required properties are left to `structured-data-schema-properties` |
+| `video-sitemap-valid` | **error** | each `video:video` entry: `thumbnail_loc`, `title`, `description`, and `content_loc` or `player_loc` present; description at most 2,048 characters; duration 1 to 28,800 seconds; rating 0.0 to 5.0; at most 32 tags; W3C dates; absolute addresses; the video address is not the page's own `<loc>` |
+| `video-discoverability` | warn | the rendered page embeds a video (a `<video>` with a source, or a YouTube, Vimeo, Dailymotion, Wistia, JW Player, Brightcove, Twitch, Loom, Vidyard or Streamable player) but has no `VideoObject` markup (JSON-LD or Microdata). A decorative background video (autoplay with muted or loop, no controls) is not counted. No extra request |
+| `video-thumbnail-reachable` | warn | the `thumbnailUrl` of each `VideoObject` (at most 5, one status request each, no body, no redirect followed, 5 s): a 404, 410 or a host that does not exist is a defect; a refusal (401, 403, 406, 429), a 5xx or a timeout is a note. A thumbnail on another site is requested with public addresses only, even with `LHCI_SEO_ALLOW_PRIVATE_NETWORK` set |
+
+`video-sitemap-valid` is not applicable when no video entries were found among the sitemaps read, and says so when a sitemap file could not be read (a sitemap index's children beyond the gatherer's 10-file budget, or a declared `http://` address that redirects) instead of claiming there is none. A `video` preset promotes the new category to errors. Checked live on 2026-10-06: a purpose-built video site (an unmarked YouTube embed, a video with bad markup and a dead same-site thumbnail next to a live cross-site one, a decorative background video, a video sitemap with four defects: every result was as designed) and a real New York Times video sitemap file (93 videos, no problem reported).
+
 ### Soft-404 check (`soft-not-found`)
 
 - **`soft-not-found`** (Phase 5) — does the site answer a URL that does not exist with a normal page? A
@@ -1125,6 +1138,10 @@ informational audits are reports and cannot be asserted at all). 57 are scored (
 | 18 | `content-security-policy-report` | informational | none (informational audits cannot be asserted) |
 | 18 | `referrer-policy` | pass, 0.5 warning | `warn` |
 | 18 | `x-content-type-options` | pass, 0.5 warning | `warn` |
+| 18 | `video-discoverability` | pass, 0.5 warning | `warn` |
+| 18 | `video-sitemap-valid` | pass or fail | `error` |
+| 18 | `video-structured-data-values` | pass, 0.5 warning | `warn` |
+| 18 | `video-thumbnail-reachable` | pass, 0.5 warning | `warn` |
 | 18 | `article-values` | pass, 0.5 warning | `warn` |
 | 18 | `news-sitemap-freshness` | pass, 0.5 warning | `warn` |
 | 18 | `news-sitemap-report` | informational | none (informational audits cannot be asserted) |
