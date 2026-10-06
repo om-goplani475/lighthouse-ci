@@ -57,4 +57,18 @@ async function resolveInsecureRecords(artifacts, context) {
     .map(record => ({url: record.url, resourceType: record.resourceType || 'Unknown'}));
 }
 
-export {resolveMainDocumentSecurity, resolveInsecureRecords};
+/**
+ * The response headers of the main document, for the security-header audits (no new gatherer, no request).
+ * @param {{DevtoolsLog: unknown, URL: unknown}} artifacts
+ * @param {import('lighthouse/types/audit.js').default.Context} context
+ * @return {Promise<{finalUrl: string, headers: Array<{name: string, value: string}>}>}
+ */
+async function resolveMainDocumentHeaders(artifacts, context) {
+  const mainResource = await MainResource.request(
+    {devtoolsLog: artifacts.DevtoolsLog, URL: artifacts.URL},
+    context
+  );
+  return {finalUrl: mainResource.url, headers: mainResource.responseHeaders || []};
+}
+
+export {resolveMainDocumentSecurity, resolveInsecureRecords, resolveMainDocumentHeaders};

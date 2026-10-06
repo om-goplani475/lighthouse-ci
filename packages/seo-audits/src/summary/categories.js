@@ -168,6 +168,10 @@ const CATEGORIES = [
       'amp-check',
     ],
   },
+  {
+    name: 'Security headers',
+    audits: ['x-content-type-options', 'referrer-policy', 'content-security-policy-report'],
+  },
 ];
 
 /**

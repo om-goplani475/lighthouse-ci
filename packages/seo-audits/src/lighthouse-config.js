@@ -152,6 +152,9 @@ const config = {
     './audits/url-case-variants.js',
     './audits/url-trailing-slash-variants.js',
     './audits/url-normalization.js',
+    './audits/x-content-type-options.js',
+    './audits/referrer-policy.js',
+    './audits/content-security-policy-report.js',
   ],
   categories: {
     'seo-extended': {
@@ -256,6 +259,9 @@ const config = {
         {id: 'url-case-variants', weight: 1},
         {id: 'url-trailing-slash-variants', weight: 1},
         {id: 'url-normalization', weight: 1},
+        {id: 'x-content-type-options', weight: 0.5},
+        {id: 'referrer-policy', weight: 0.5},
+        {id: 'content-security-policy-report', weight: 1},
       ],
     },
   },

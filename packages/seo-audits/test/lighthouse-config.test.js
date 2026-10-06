@@ -12,6 +12,8 @@ const {exec} = require('child_process');
 
 const execAsync = promisify(exec);
 
+const {CATEGORIES} = require('../src/summary/categories.js');
+
 const CONFIG_PATH = path.join(__dirname, '../src/lighthouse-config.js');
 
 /**
@@ -62,7 +64,7 @@ describe('seo-audits lighthouse-config', () => {
     expect(artifactIds).toContain('IndexabilitySignals');
     expect(artifactIds).toContain('SiteCrawl');
 
-    // And all fifty-nine of this fork's audits are actually added, not just defaults preserved.
+    // And this fork's audits are actually added, not just defaults preserved.
     expect(auditIds).toContain('structured-data-json-ld');
     expect(auditIds).toContain('structured-data-schema-properties');
     expect(auditIds).toContain('structured-data-rich-result-eligibility');
@@ -173,111 +175,15 @@ describe('seo-audits lighthouse-config', () => {
     expect(auditIds.filter(id => /-\d/.test(id))).toEqual([]);
   }, 30000);
 
-  it('adds the seo-extended category with all fifty-nine audits, without touching the core seo category', async () => {
+  it('adds the seo-extended category with every audit in summary/categories.js, without touching the core seo category', async () => {
     const {categories} = await resolveConfig();
 
     expect(categories['seo-extended']).toBeDefined();
-    expect(categories['seo-extended'].auditRefs.map(ref => ref.id).sort()).toEqual([
-      'ai-crawler-summary',
-      'amp-check',
-      'anchor-text-diversity',
-      'answer-structure',
-      'author-entity-signals',
-      'broken-external-links',
-      'broken-images',
-      'broken-internal-links',
-      'canonical-conflicts',
-      'canonical-https',
-      'content-dates',
-      'core-web-vitals-field',
-      'crawl-coverage',
-      'crawl-depth',
-      'dead-end-pages',
-      'descriptive-anchor-text',
-      'device-content-parity',
-      'document-h1-count',
-      'document-title-quality',
-      'duplicate-content',
-      'duplicate-descriptions',
-      'duplicate-titles',
-      'favicon-presence',
-      'favicon-quality',
-      'h1-title-relevance',
-      'hidden-text',
-      'hreflang-alternate-status',
-      'hreflang-canonical',
-      'hreflang-codes',
-      'hreflang-locale-meta',
-      'hreflang-return-links',
-      'hreflang-sitemap-consistency',
-      'hreflang-x-default',
-      'hsts-quality',
-      'hydration-errors',
-      'image-alt-quality',
-      'image-dimensions-attributes',
-      'image-filename-quality',
-      'image-lazy-above-fold',
-      'image-legacy-formats',
-      'image-oversized',
-      'indexability-conflicts',
-      'indexability-verdict',
-      'internal-link-counts',
-      'internal-redirect-chains',
-      'js-head-signals',
-      'js-internal-links',
-      'js-visible-content',
-      'keyword-alignment',
-      'llms-txt-structure',
-      'manifest-icons',
-      'meta-description-identical-to-title',
-      'mixed-content',
-      'open-graph-canonical-match',
-      'open-graph-completeness',
-      'open-graph-image-reachable',
-      'orphan-pages',
-      'paginated-canonical',
-      'pagination-links',
-      'pagination-trap',
-      'pixel-width-truncation',
-      'placeholder-content',
-      'raw-rendered-diff',
-      'readability-score',
-      'redirect-chain-length',
-      'redirect-loop',
-      'redirecting-internal-links',
-      'render-blocking-report',
-      'rendering-mode',
-      'request-weight-report',
-      'robots-directives-conflict',
-      'robots-directives-report',
-      'robots-txt-crawler-access',
-      'robots-txt-rule-conflicts',
-      'robots-txt-sitemap-declared',
-      'sitemap-duplicate-urls',
-      'sitemap-indexability',
-      'sitemap-limits',
-      'sitemap-robots-crossref',
-      'sitemap-url-status',
-      'sitemap-valid',
-      'social-preview-content',
-      'soft-not-found',
-      'ssl-certificate-expiry',
-      'structured-data-deprecated-properties',
-      'structured-data-json-ld',
-      'structured-data-rich-result-eligibility',
-      'structured-data-schema-properties',
-      'structured-data-type-conflicts',
-      'thin-content',
-      'twitter-card-completeness',
-      'url-case-variants',
-      'url-encoding',
-      'url-length',
-      'url-normalization',
-      'url-query-parameters',
-      'url-session-tracking',
-      'url-trailing-slash-variants',
-      'url-variant-consistency',
-    ]);
+    // The list of audits is kept in one place, summary/categories.js (a test there checks it against the config both
+    // ways); this one only checks that the category the config builds carries exactly that list.
+    const expected = CATEGORIES.flatMap(c => c.audits).sort();
+    expect(categories['seo-extended'].auditRefs.map(ref => ref.id).sort()).toEqual(expected);
+    expect(expected.length).toBeGreaterThan(90);
     expect(categories['seo']).toBeDefined();
   }, 30000);
 });

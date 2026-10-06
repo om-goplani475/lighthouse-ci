@@ -340,5 +340,17 @@
     {
       "minScore": 1
     }
+  ],
+  "x-content-type-options": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "referrer-policy": [
+    "warn",
+    {
+      "minScore": 1
+    }
   ]
 }
