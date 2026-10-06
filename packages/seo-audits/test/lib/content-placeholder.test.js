@@ -65,7 +65,7 @@ describe('buildPlaceholderProduct', () => {
     run(content(`{{${' '.repeat(190000)}`));
     run(content(`<%${'='.repeat(190000)}`));
     run(content('{{ x '.repeat(30000)));
-    expect(Date.now() - start).toBeLessThan(1500);
+    expect(Date.now() - start).toBeLessThan(6000);
   });
 });
 

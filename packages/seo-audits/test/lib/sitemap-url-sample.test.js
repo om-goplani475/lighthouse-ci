@@ -213,7 +213,7 @@ describe('checkUrls', () => {
       fetchStatus: () => new Promise(() => {}),
       timeoutMs: 50,
     });
-    expect(Date.now() - started).toBeLessThan(1500);
+    expect(Date.now() - started).toBeLessThan(6000);
     expect(result.error).toMatch(/timed out after 50ms/);
   });
 

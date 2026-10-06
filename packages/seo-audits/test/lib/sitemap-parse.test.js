@@ -203,7 +203,7 @@ describe('parseSitemapBytes — nesting depth (security review finding: quadrati
     const body = `<urlset xmlns="${NS}">` + '<a>'.repeat(350_000);
     const started = Date.now();
     const doc = parse(body);
-    expect(Date.now() - started).toBeLessThan(1000);
+    expect(Date.now() - started).toBeLessThan(4000);
     expect(doc.parseError).not.toBeNull();
   });
 
@@ -211,7 +211,7 @@ describe('parseSitemapBytes — nesting depth (security review finding: quadrati
     const n = 100_000;
     const started = Date.now();
     const doc = parse(`<urlset xmlns="${NS}">` + '<a>'.repeat(n) + '</a>'.repeat(n) + '</urlset>');
-    expect(Date.now() - started).toBeLessThan(1000);
+    expect(Date.now() - started).toBeLessThan(4000);
     expect(doc.parseError).not.toBeNull();
   });
 

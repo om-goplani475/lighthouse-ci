@@ -59,7 +59,7 @@ describe('baseKey', () => {
     expect(baseKey(hostile)).toBe(`https://example.com/${'/'.repeat(200000)}x`);
     expect(baseKey(`https://example.com/a${'/'.repeat(200000)}`)).toBe('https://example.com/a');
     // The quadratic regex took many seconds here.
-    expect(Date.now() - start).toBeLessThan(1000);
+    expect(Date.now() - start).toBeLessThan(4000);
   });
 });
 

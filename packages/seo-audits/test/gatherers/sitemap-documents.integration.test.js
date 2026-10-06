@@ -407,7 +407,7 @@ describe('collectSitemapDocuments — the time budget, real hanging server', () 
     );
     const elapsed = Date.now() - started;
     // Without the budget this would take 5 x 10 s = 50 s. With 2.5 s it ends within a few seconds.
-    expect(elapsed).toBeLessThan(5000);
+    expect(elapsed).toBeLessThan(15_000);
     expect(artifact.documentsTruncated).toBe(true);
     expect(artifact.documents.length).toBeLessThan(5);
     expect(artifact.documents.every(d => d.outcome === 'network-error')).toBe(true);

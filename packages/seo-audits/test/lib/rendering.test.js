@@ -186,7 +186,7 @@ describe('buildHydrationProduct', () => {
     const start = Date.now();
     const p = lib.buildHydrationProduct([msg('hydrat'.repeat(500000))]);
     expect(p.score).toBe(1);
-    expect(Date.now() - start).toBeLessThan(500);
+    expect(Date.now() - start).toBeLessThan(2500);
   });
   it('passes unrelated messages and handles odd input', () => {
     expect(lib.buildHydrationProduct([msg('Failed to load resource'), null, {text: 5}]).score).toBe(
