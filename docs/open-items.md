@@ -98,9 +98,13 @@ CI pins Node 18. The Phase 5, Phase 6 and Phase 7 crawler suites were run there;
 Phase 8 (so far the crawler extension) were not. `nvm use 18 && npx jest packages/seo-audits`. **Pass when** all 75 suites pass. The risky spots are
 `server.closeAllConnections()` (Node 18.2+) and the crawler's integration test, which waits for a real 10 s budget.
 
-### F. Verify the other nine structured-data types against Google's live documentation
+### G. Calibration of 2026-10-06 needs a real-site check
 
-`Article`, `Product` and `Recipe` were checked on 2026-10-06. `BreadcrumbList`, `Review`, `Event`, `JobPosting`, `VideoObject`, `Organization`, `LocalBusiness`, `FAQPage` and `HowTo` still carry the original required lists, which may be stricter than Google's (move extras to `recommended` in `rules/google/structured-data/2026-10.json`). Also `BreadcrumbList` should leave `singularTypes` (several trails are allowed) and the FAQ eligibility text should mention the authoritative-site exception.
+The tiers, warn scores and thresholds were set from the review and unit tests plus one planted-site `lhci collect`/`assert` run. Run the A6 spot check on real sites (a multilingual site, a language-chooser `x-default`, a developer-docs site, a news site with JSON-LD, a retail home page with a carousel) and look for audits that still fire on healthy pages.
+
+### F. Verify the structured-data types against Google's live documentation (DONE 2026-10-06)
+
+All types were checked against the live Google pages. Changes: `Article`, `Organization` have no required property; `Product` needs a name plus offers, review or aggregateRating; `Recipe` needs name and image; `VideoObject` description is recommended; `LocalBusiness` address sub-properties are recommended; a breadcrumb's last item needs no `item`; `BreadcrumbList` left `singularTypes`; the FAQ and HowTo eligibility text carries Google's nuance. Not re-checked: `Review` (already matched) and the `FAQPage`/`HowTo` shapes (no longer shown).
 
 ### A6. Spot-check the new audits (Phases 7 and 9) on a few real sites (optional)
 

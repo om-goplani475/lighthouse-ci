@@ -16,7 +16,7 @@ rationale and the agent pipeline this package was built through.
 - **`structured-data-schema-properties`** — for JSON-LD blocks whose `@type` is one of the 12 types
   Google documents rich-result guidance for (`Product`, `Article`, `BreadcrumbList`, `Recipe`,
   `Review`, `Event`, `JobPosting`, `VideoObject`, `Organization`, `LocalBusiness`, `FAQPage`, `HowTo`),
-  fails only on a property Google **requires** (a `required` entry written `a|b` means "at least one": a Product needs a name plus `offers`, `review` or `aggregateRating`) and lists the properties Google only **recommends** as notes (Article has no required property). Verified against Google's live documentation on 2026-10-06 for `Article`, `Product` and `Recipe`; the other nine types still need the same check (see `docs/open-items.md`). Checks that the properties are present, including specific nested
+  fails only on a property Google **requires** (a `required` entry written `a|b` means "at least one": a Product needs a name plus `offers`, `review` or `aggregateRating`) and lists the properties Google only **recommends** as notes (Article has no required property). Every type was checked against Google's live documentation on 2026-10-06 (`Organization` and `Article` have no required property; a `VideoObject` needs `name`, `thumbnailUrl` and `uploadDate`; a breadcrumb's last item needs no `item`). Checks that the properties are present, including specific nested
   sub-object properties (e.g. `Product.offers.price`, `Event.location.address`), **and, for a
   handful of properties where it's unambiguous, that a *present* property's value is well-formed**
   (Phase 2 item 4) — e.g. `Product.offers.price` parses as a number, `Product.offers.priceCurrency`
@@ -891,7 +891,7 @@ module.exports = {
   ci: {
     collect: {
       settings: {
-        configPath: require.resolve('@lhci/seo-audits/lighthouse-config.js'),
+        configPath: require.resolve('@lhci/seo-audits/src/lighthouse-config.js'),
       },
     },
   },
@@ -914,6 +914,29 @@ Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
+### Three tiers and the recommended assertions
+
+Since the calibration of 2026-10-06 each audit belongs to one of three tiers (see `docs/open-items.md` and the review for the reasoning):
+
+| Tier | What it means | How it shows |
+|---|---|---|
+| **Error** | Objectively broken or contradictory, and Google documents it | score 0 or 1, weight 1 |
+| **Warn** | Best practice with real but moderate impact (a long redirect chain, a link to a 301, a missing `<h1>`, text or links only after JavaScript, generic anchor text) | **score 0.5**, weight 0.5 |
+| **Informational** | Advice, a heuristic or a report (thin content, click depth, link counts, anchor diversity, query parameters, duplicate descriptions, image file names and formats, `llms.txt`, HSTS strength, manifest icons, and others) | never scored; lhci cannot assert on it |
+
+`src/recommended-assertions.json` is a ready-made `assertions` object: the error tier at `error` (`minScore: 1`), the warn tier at `warn`, `ssl-certificate-expiry` at `error` with `minScore: 0.5` (0.5 means 15 days or fewer left), and no informational audit. A test keeps it in step with the audits (every scored audit is listed, no informational one is):
+
+```js
+module.exports = {
+  ci: {
+    collect: {settings: {configPath: require.resolve('@lhci/seo-audits/src/lighthouse-config.js')}},
+    assert: {assertions: require('@lhci/seo-audits/src/recommended-assertions.json')},
+  },
+};
+```
+
+Override single entries by spreading it: `assertions: {...require('...'), 'url-length': ['off', {}]}`. The hand-written block under "Assertion severity" below predates the tiers; prefer the file.
+
 ### Assertion severity
 
 None of the fifty-nine audits are part of this fork's shared `all`/`recommended` presets
@@ -924,7 +947,7 @@ guarantee. Set severity yourself in your own `.lighthouserc.js`:
 ```js
 module.exports = {
   ci: {
-    collect: {settings: {configPath: require.resolve('@lhci/seo-audits/lighthouse-config.js')}},
+    collect: {settings: {configPath: require.resolve('@lhci/seo-audits/src/lighthouse-config.js')}},
     assert: {
       assertions: {
         'structured-data-json-ld': ['error', {}], // or 'warn'
