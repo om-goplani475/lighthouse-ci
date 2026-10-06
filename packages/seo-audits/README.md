@@ -536,6 +536,19 @@ Five audits for businesses with a physical location. `local-business-values` jud
 
 A site with several locations is expected to show different addresses and phones for different locations, so the same name at a different address **and** a different phone is never flagged. As the other cross-page audits, the consistency and sitemap audits judge the audited page and list the others. Consistency of name, address and phone is our judgement (standard local SEO practice), not a Google requirement. Checked live on 2026-10-06 on a purpose-built site with known defects (one `@id` with two phone numbers, a renamed copy, coarse geo, an invalid weekday and time, a page missing from the sitemap, and a legitimate second location): every defect was reported and the second location was not. A `local` preset promotes the new category to errors.
 
+### News audits (Phase 18)
+
+Four audits for publishers. `article-values` judges the audited page's article markup; the three news-sitemap audits read the sitemaps the sitemap gatherer already fetched (it now also reads the Google News and video extensions of each `<url>`; at most 1,001 news entries and 2,000 videos are kept per file). Sources: Google's article markup, paywalled content and Google News sitemap documentation, read 2026-10-06.
+
+| Audit | Level | What it checks |
+|---|---|---|
+| `article-values` | warn | for each `Article`, `NewsArticle` or `BlogPosting`: `datePublished`/`dateModified` in ISO 8601 and not modified before published (a missing timezone is a note); authors one each, `Person` or `Organization` (never `Thing`), name only (no "by" or "posted by"); paywall markup with `isAccessibleForFree` and a `hasPart` whose `cssSelector` is one `.class` selector. A headline over 110 characters (**our** note: Google gives no limit, only "long titles may be truncated"), and a missing author, image or headline are notes. Google documents no NewsArticle-only fields, so the whole family is judged the same way |
+| `news-sitemap-valid` | **error** | an entry missing `news:publication` (`name`, `language`), `news:publication_date` or `news:title`; a language that is not a language tag; a date not in an accepted form; more than 1,000 news entries. A language-region tag such as `en-US` (used by a major publisher, not called invalid by Google) and a title that contains the publication name are notes |
+| `news-sitemap-freshness` | warn | Google asks for only the last two days: warns when a tenth or more of the entries are older (a single late entry among hundreds is listed, not judged; our threshold) |
+| `news-sitemap-report` | informational | entries, sitemaps, publications, languages, newest and oldest date |
+
+All three sitemap audits are **not applicable** when no news sitemap was found, and say so when a sitemap file could not be read (for example a declared `http://` address that redirects to https: the sitemap gatherer does not follow redirects) instead of claiming there is none. A `news` preset promotes the new category to errors. Checked live on 2026-10-06: a purpose-built publisher with flawed markup and a mixed news sitemap (every defect reported), and the real New York Times news sitemap (637 entries: valid, with `en-US` notes; this first scored 0 for `en-US`, which is why that is now only a note).
+
 ### Soft-404 check (`soft-not-found`)
 
 - **`soft-not-found`** (Phase 5) — does the site answer a URL that does not exist with a normal page? A
@@ -1112,6 +1125,10 @@ informational audits are reports and cannot be asserted at all). 57 are scored (
 | 18 | `content-security-policy-report` | informational | none (informational audits cannot be asserted) |
 | 18 | `referrer-policy` | pass, 0.5 warning | `warn` |
 | 18 | `x-content-type-options` | pass, 0.5 warning | `warn` |
+| 18 | `article-values` | pass, 0.5 warning | `warn` |
+| 18 | `news-sitemap-freshness` | pass, 0.5 warning | `warn` |
+| 18 | `news-sitemap-report` | informational | none (informational audits cannot be asserted) |
+| 18 | `news-sitemap-valid` | pass or fail | `error` |
 | 18 | `local-business-values` | pass, 0.5 warning | `warn` |
 | 18 | `local-nap-consistency` | pass, 0.5 warning | `warn` |
 | 18 | `local-name-consistency` | pass, 0.5 warning | `warn` |
