@@ -179,6 +179,42 @@ async function createSeoStore(sequelize) {
     },
 
     /**
+     * The latest finished run of the same page on a branch, for comparing a new run against. Preview hosts change per
+     * pull request, so the page is matched by path, not by host.
+     * @param {{projectId: string, branch: string | null, url: string, excludeRunId?: string}} criteria
+     * @return {Promise<{id: string, summary: any} | null>}
+     */
+    async latestDone({projectId, branch, url, excludeRunId}) {
+      const pathOf = (/** @type {string} */ u) => {
+        try {
+          return new URL(u).pathname.replace(/(.)\/+$/, '$1');
+        } catch (_) {
+          return null;
+        }
+      };
+      const wanted = pathOf(url);
+      if (wanted === null) return null;
+      const where = {
+        projectId,
+        status: 'done',
+        branch: branch || null,
+        ...(excludeRunId && {id: {[Sequelize.Op.ne]: excludeRunId}}),
+      };
+      const rows = await Run.findAll({where, order: [['createdAt', 'DESC']], limit: 50});
+      for (const row of rows) {
+        const run = row.toJSON();
+        if (pathOf(run.url) !== wanted) continue;
+        try {
+          const result = JSON.parse(run.result);
+          if (result && result.summary) return {id: run.id, summary: result.summary};
+        } catch (_) {
+          // an unreadable result is skipped; the next older run may be fine
+        }
+      }
+      return null;
+    },
+
+    /**
      * Runs left `queued` or `running` by a server that stopped: the in-memory queue is gone, so they can never finish.
      * @return {Promise<number>} How many were closed.
      */

@@ -11,11 +11,12 @@
 /** @return {Promise<import('./seo-routes.js').SeoDeps>} */
 async function loadSeoDeps() {
   const base = '@lhci/seo-audits/src/service';
-  const [signature, payload, hosts, config] = await Promise.all([
+  const [signature, payload, hosts, config, runner] = await Promise.all([
     import(`${base}/webhook-signature.js`),
     import(`${base}/webhook-payload.js`),
     import(`${base}/host-allow-list.js`),
     import(`${base}/project-config.js`),
+    import(`${base}/run-audit.js`),
   ]);
   return {
     verifyWebhook: signature.verifyWebhook,
@@ -24,6 +25,11 @@ async function loadSeoDeps() {
     checkAuditUrl: hosts.checkAuditUrl,
     validateAllowList: hosts.validateAllowList,
     validateConfig: config.validateConfig,
+    runAudit: runner.createRunAudit({
+      recommended: require('@lhci/seo-audits/src/recommended-assertions.json'),
+      lhciCli: require.resolve('@lhci/cli/src/cli.js'),
+      lighthouseConfig: require.resolve('@lhci/seo-audits/src/lighthouse-config.js'),
+    }),
   };
 }
 

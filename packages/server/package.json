@@ -20,6 +20,7 @@
     "start:storybook": "storybook dev -p 6006"
   },
   "dependencies": {
+    "@lhci/cli": "0.1.0",
     "@lhci/seo-audits": "0.1.0",
     "@lhci/utils": "0.1.0",
     "bluebird": "^3.7.2",

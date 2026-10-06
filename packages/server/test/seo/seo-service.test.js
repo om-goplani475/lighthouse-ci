@@ -86,7 +86,8 @@ async function startService(limits, runAudit) {
     `seo-service-${process.pid}-${Math.random().toString(36).slice(2)}.sqlite`
   );
   const storageMethod = await openStorage(dbPath);
-  const deps = {...(await loadSeoDeps()), ...(runAudit && {runAudit})};
+  // Never the real runner (it would start Chrome): a test gets the fake it passes, or no runner at all.
+  const deps = {...(await loadSeoDeps()), runAudit};
   const service = await createSeoService({storageMethod}, deps, limits);
   const app = express();
   app.use('/api/v1/webhooks', service.webhooks);
@@ -507,6 +508,98 @@ describe('SEO webhook service', () => {
       });
       expect(await t.service.store.failOrphans()).toBe(1);
       expect((await t.service.store.getRun(run.id)).status).toBe('failed');
+    });
+  });
+
+  describe('baseline lookup', () => {
+    it('gives a run the latest finished run of the same path on the base branch, and ignores other paths and branches', async () => {
+      const baselines = [];
+      t = await startService({}, async input => {
+        baselines.push(
+          await input.findBaseline({
+            projectId: input.run.projectId,
+            branch: input.run.branch,
+            baseBranch: input.run.baseBranch,
+            url: input.run.url,
+            excludeRunId: input.run.id,
+          })
+        );
+        return {summary: {marker: input.run.sha[0]}};
+      });
+      const secret = await t.setUp();
+      const send = async (n, extra) => {
+        const body = eventBody({sha: String(n).repeat(40), ...extra});
+        const res = await t.api.post(
+          t.hook,
+          undefined,
+          signLhci(secret, body, Date.now() + n * 1000),
+          body
+        );
+        await t.service.queue.idle();
+        return res;
+      };
+      await send(1, {
+        branch: 'main',
+        baseBranch: undefined,
+        url: 'https://main.stage.example.org/',
+      });
+      await send(2, {
+        branch: 'main',
+        baseBranch: undefined,
+        url: 'https://main.stage.example.org/other',
+      });
+      await send(3, {branch: 'dev', baseBranch: undefined});
+      // a pull request: compared with main, same path "/", different host
+      await send(4, {branch: 'feat', baseBranch: 'main', url: 'https://pr-9.stage.example.org/'});
+      // the next main run is compared with the previous main run, not with itself
+      await send(5, {
+        branch: 'main',
+        baseBranch: undefined,
+        url: 'https://main.stage.example.org/',
+      });
+      expect(baselines.map(b => (b ? b.summary.marker : null))).toEqual([
+        null,
+        null,
+        null,
+        '1',
+        '1',
+      ]);
+    });
+
+    it('does not use a failed run as a baseline', async () => {
+      let calls = 0;
+      t = await startService({}, async input => {
+        calls++;
+        if (calls === 1) throw new Error('boom');
+        return {
+          summary: {
+            n: calls,
+            seen: await input.findBaseline({
+              projectId: input.run.projectId,
+              branch: 'main',
+              baseBranch: null,
+              url: input.run.url,
+              excludeRunId: input.run.id,
+            }),
+          },
+        };
+      });
+      const secret = await t.setUp();
+      for (const n of [1, 2]) {
+        const body = eventBody({sha: String(n).repeat(40), branch: 'main', baseBranch: undefined});
+        const res = await t.api.post(
+          t.hook,
+          undefined,
+          signLhci(secret, body, Date.now() + n * 1000),
+          body
+        );
+        await t.service.queue.idle();
+        if (n === 2) {
+          expect(
+            (await t.api.get(`${t.base}/runs/${res.json.runId}`, t.admin)).json.result.summary.seen
+          ).toBeNull();
+        }
+      }
     });
   });
 

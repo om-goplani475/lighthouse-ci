@@ -33,7 +33,7 @@ const JOB_TIMEOUT_MS = 10 * 60 * 1000;
  *   checkAuditUrl: (url: string, hosts: string[]) => any,
  *   validateAllowList: (list: unknown) => string[],
  *   validateConfig: (config: any) => string[],
- *   runAudit?: (input: {run: any, project: any, config: any, allowedHosts: string[], signal: AbortSignal}) => Promise<unknown>,
+ *   runAudit?: (input: any) => Promise<unknown>,
  * }} SeoDeps
  */
 
@@ -104,6 +104,9 @@ async function createSeoService(context, deps, limits = {}) {
           config: parseJson(project.config, {}),
           allowedHosts: parseJson(project.allowedHosts, []),
           signal: controller.signal,
+          // Compare with the latest finished run on the base branch (or, for a base-branch run, its own branch).
+          findBaseline: (/** @type {any} */ criteria) =>
+            store.latestDone({...criteria, branch: criteria.baseBranch || criteria.branch}),
         }),
         aborted,
       ]);
