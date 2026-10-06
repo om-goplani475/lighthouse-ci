@@ -26,6 +26,7 @@ import {
   auditedPageProblem,
   sitemapCoverageProduct,
   isIndexablePage,
+  normalizeName,
 } from './vertical-common.js';
 
 /** @typedef {import('./structured-facts.js').Entity} Entity */
@@ -46,24 +47,6 @@ const DAYS = new Set([
 ]);
 const DAY_ABBREVIATIONS = new Set(['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']);
 const TIME = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
-const LEGAL_WORDS = new Set([
-  'inc',
-  'incorporated',
-  'llc',
-  'ltd',
-  'limited',
-  'gmbh',
-  'co',
-  'corp',
-  'corporation',
-  'company',
-  'plc',
-  'sa',
-  'srl',
-  'bv',
-  'ag',
-  'the',
-]);
 
 /** @param {string} value @return {string} */
 function dayToken(value) {
@@ -305,18 +288,6 @@ function addressKey(e) {
       .replace(/[^a-z0-9]+/g, ' ')
       .trim() || null
   );
-}
-
-/** @param {string | null} name @return {string} A name without case, accents, punctuation and legal-form words. */
-function normalizeName(name) {
-  return (name || '')
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .split(' ')
-    .filter(w => w && !LEGAL_WORDS.has(w))
-    .join(' ');
 }
 
 /**

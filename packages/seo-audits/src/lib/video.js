@@ -23,6 +23,7 @@ import {
   table,
   unreadSitemapsNote,
   parseIsoDate,
+  probeStatuses,
 } from './vertical-common.js';
 
 /** @typedef {import('./structured-facts.js').Entity} Entity */
@@ -456,65 +457,38 @@ function videoDiscoverabilityProduct(rendered, entities) {
  * @return {Promise<Product>}
  */
 async function videoThumbnailProduct(entities, pageUrl, fetchStatus, siteOf) {
-  const thumbs = [
-    ...new Set(entities.flatMap(e => (e.video ? e.video.thumbnailUrls : [])).filter(absoluteUrl)),
-  ];
-  if (thumbs.length === 0) return notApplicable('The page has no video thumbnailUrl to check.');
-  /** @type {Array<{url: string, result: string, severity: 'problem' | 'note'}>} */
-  const rows = [];
-  let pageSite = '';
-  try {
-    pageSite = siteOf(new URL(pageUrl).hostname);
-  } catch (_) {
-    pageSite = '';
+  const thumbs = entities.flatMap(e => (e.video ? e.video.thumbnailUrls : [])).filter(absoluteUrl);
+  if (new Set(thumbs).size === 0) {
+    return notApplicable('The page has no video thumbnailUrl to check.');
   }
-  for (const url of thumbs.slice(0, MAX_THUMBNAILS)) {
-    let firstParty = false;
-    try {
-      firstParty = !!pageSite && siteOf(new URL(url).hostname) === pageSite;
-    } catch (_) {
-      firstParty = false;
-    }
-    try {
-      const {status} = await fetchStatus(url, firstParty);
-      if (status >= 200 && status < 300) continue;
-      if (status === 404 || status === 410) {
-        rows.push({url, result: `answered ${status}: the image is gone.`, severity: 'problem'});
-      } else {
-        rows.push({
-          url,
-          result: `answered ${status} (a bot-protected or briefly failing server can do this; not judged).`,
-          severity: 'note',
-        });
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (/ENOTFOUND|ECONNREFUSED|EAI_AGAIN/.test(message)) {
-        rows.push({url, result: `could not be reached (${clip(message)}).`, severity: 'problem'});
-      } else rows.push({url, result: `could not be checked (${clip(message)}).`, severity: 'note'});
-    }
-  }
+  const {rows, checked, notChecked} = await probeStatuses({
+    urls: thumbs,
+    pageUrl,
+    max: MAX_THUMBNAILS,
+    fetchStatus,
+    siteOf,
+  });
   const problems = rows.filter(r => r.severity === 'problem');
-  const extra =
-    thumbs.length > MAX_THUMBNAILS
-      ? ` (${count(thumbs.length - MAX_THUMBNAILS, 'more thumbnail')} not checked)`
-      : '';
+  const extra = notChecked > 0 ? ` (${count(notChecked, 'more thumbnail')} not checked)` : '';
   if (rows.length === 0) {
-    return {
-      score: 1,
-      displayValue: `${count(
-        Math.min(thumbs.length, MAX_THUMBNAILS),
-        'thumbnail'
-      )} reachable${extra}`,
-    };
+    return {score: 1, displayValue: `${count(checked, 'thumbnail')} reachable${extra}`};
   }
+  /** @param {import('./vertical-common.js').ProbeRow} r @return {string} */
+  const describe = r =>
+    r.kind === 'gone'
+      ? `answered ${r.status}: the image is gone.`
+      : r.kind === 'missing-host'
+      ? `could not be reached (${r.message}).`
+      : r.kind === 'status'
+      ? `answered ${r.status} (a bot-protected or briefly failing server can do this; not judged).`
+      : `could not be checked (${r.message}).`;
   const columns = [
     {key: 'url', heading: 'Thumbnail'},
     {key: 'result', heading: 'Result'},
   ];
   const tableRows = rows.map(r => ({
     url: clip(r.url),
-    result: r.severity === 'note' ? `Note: ${r.result}` : r.result,
+    result: r.severity === 'note' ? `Note: ${describe(r)}` : describe(r),
   }));
   if (problems.length === 0) {
     return {
@@ -527,7 +501,7 @@ async function videoThumbnailProduct(entities, pageUrl, fetchStatus, siteOf) {
     score: 0.5,
     displayValue: count(problems.length, 'broken thumbnail'),
     explanation: `${problems
-      .map(p => `${p.url} ${p.result}`)
+      .map(p => `${p.url} ${describe(p)}`)
       .slice(0, 3)
       .join(' ')} Google needs a crawlable thumbnail to show the video.`,
     details: table(columns, tableRows),

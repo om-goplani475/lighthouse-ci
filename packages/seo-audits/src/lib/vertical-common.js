@@ -46,7 +46,9 @@ function clip(text) {
 function count(n, noun) {
   if (n === 1) return `${n} ${noun}`;
   // entry -> entries, but day -> days
-  return /[^aeiou]y$/i.test(noun) ? `${n} ${noun.slice(0, -1)}ies` : `${n} ${noun}s`;
+  if (/[^aeiou]y$/i.test(noun)) return `${n} ${noun.slice(0, -1)}ies`;
+  // address -> addresses, match -> matches, but page -> pages
+  return /(s|x|z|ch|sh)$/i.test(noun) ? `${n} ${noun}es` : `${n} ${noun}s`;
 }
 
 /**
@@ -247,7 +249,99 @@ function parseIsoDate(value) {
   return Number.isNaN(ms) ? bad : {ok: true, ms, hasTime, hasZone: zone !== undefined};
 }
 
+/**
+ * @typedef {{url: string, kind: 'gone' | 'missing-host' | 'status' | 'failed', status: number | null, message: string, severity: 'problem' | 'note'}} ProbeRow
+ */
+
+/**
+ * Requests the status of up to `max` URLs, one at a time, and keeps only those that are not a 2xx. The package's probe-refusal
+ * policy: a 404 or 410, or a host that does not exist or refuses the connection, is a defect (`problem`); any other status
+ * (401, 403, 406, 429, 5xx...) or failure (a timeout, a private address) is only a note, because bot protection and brief
+ * failures look the same.
+ * @param {{
+ *   urls: string[], pageUrl: string, max: number,
+ *   fetchStatus: (url: string, firstParty: boolean) => Promise<{status: number}>,
+ *   siteOf: (host: string) => string,
+ * }} input `firstParty` tells the fetcher the URL is on the audited page's own site.
+ * @return {Promise<{rows: ProbeRow[], checked: number, notChecked: number}>}
+ */
+async function probeStatuses({urls, pageUrl, max, fetchStatus, siteOf}) {
+  const unique = [...new Set(urls)];
+  /** @type {ProbeRow[]} */
+  const rows = [];
+  let pageSite = '';
+  try {
+    pageSite = siteOf(new URL(pageUrl).hostname);
+  } catch (_) {
+    pageSite = '';
+  }
+  const toCheck = unique.slice(0, Math.max(0, max));
+  for (const url of toCheck) {
+    let firstParty = false;
+    try {
+      firstParty = !!pageSite && siteOf(new URL(url).hostname) === pageSite;
+    } catch (_) {
+      firstParty = false;
+    }
+    try {
+      const {status} = await fetchStatus(url, firstParty);
+      if (status >= 200 && status < 300) continue;
+      rows.push({
+        url,
+        kind: status === 404 || status === 410 ? 'gone' : 'status',
+        status,
+        message: '',
+        severity: status === 404 || status === 410 ? 'problem' : 'note',
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const missing = /ENOTFOUND|ECONNREFUSED|EAI_AGAIN/.test(message);
+      rows.push({
+        url,
+        kind: missing ? 'missing-host' : 'failed',
+        status: null,
+        message: clip(message),
+        severity: missing ? 'problem' : 'note',
+      });
+    }
+  }
+  return {rows, checked: toCheck.length, notChecked: Math.max(0, unique.length - toCheck.length)};
+}
+
+const LEGAL_WORDS = new Set([
+  'inc',
+  'incorporated',
+  'llc',
+  'ltd',
+  'limited',
+  'gmbh',
+  'co',
+  'corp',
+  'corporation',
+  'company',
+  'plc',
+  'sa',
+  'srl',
+  'bv',
+  'ag',
+  'the',
+]);
+
+/** @param {string | null} name @return {string} A name without case, accents, punctuation and legal-form words. */
+function normalizeName(name) {
+  return (name || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(' ')
+    .filter(w => w && !LEGAL_WORDS.has(w))
+    .join(' ');
+}
+
 export {
+  normalizeName,
+  probeStatuses,
   parseIsoDate,
   unreadSitemapsNote,
   MAX_ROWS,
