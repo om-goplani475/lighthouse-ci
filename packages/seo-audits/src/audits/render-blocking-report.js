@@ -11,7 +11,7 @@ import {buildRenderBlockingProduct} from '../lib/page-weight.js';
 const UIStrings = {
   title: 'Render-blocking resources in the head',
   description:
-    'Informational: lists the external scripts without async or defer and the stylesheets in the page head, which stop the browser from painting until they are fetched, with their sizes and where they are served from. Heavy blocking resources slow rendering for users and for search engines that render the page. Google documents no threshold, so this never fails. Read from the HTML (an approximation: the preload scanner is not modelled).',
+    'Informational: lists the external scripts without async or defer and the stylesheets in the page head, which stop the browser from painting until they are fetched, with their sizes and where they are served from. Heavy blocking resources delay the first paint for visitors and slow the rendering step of search engines that render the page; this is about page speed, not about whether the page can be crawled or indexed. Google documents no threshold, so this never fails. Read from the HTML (an approximation: the preload scanner is not modelled).',
 };
 
 class RenderBlockingReport extends Audit {

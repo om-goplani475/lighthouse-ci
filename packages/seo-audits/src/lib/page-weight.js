@@ -10,7 +10,7 @@
  * Reads the raw HTML and the page-load network log; makes no request. No I/O, never throws.
  *
  * "Render-blocking" here is read from the HTML: an external `<script src>` in the head with no `async`, `defer` or
- * `type=module`, and a `<link rel=stylesheet>` in the head that applies to screens. It is an approximation of what
+ * `type=module`, and a `<link rel=stylesheet>` in the head that is not print-only or speech-only (a media query such as `(min-width: 800px)` is counted: it blocks whenever it matches). It is an approximation of what
  * the browser does (it does not model the preload scanner or `<link rel=preload>`).
  */
 
@@ -80,7 +80,9 @@ function blockingResourcesOf(html, pageUrl) {
         } else if (name === 'link' && attrs.href) {
           const rel = (attrs.rel || '').toLowerCase().split(/\s+/);
           const media = (attrs.media || '').toLowerCase().trim();
-          const appliesToScreen = media === '' || media === 'all' || /\bscreen\b/.test(media);
+          // Only a print or speech stylesheet is skipped; a bare media query such as (min-width: 800px) can match a screen.
+          const appliesToScreen =
+            media === '' || /\b(screen|all)\b/.test(media) || !/\b(print|speech)\b/.test(media);
           const url = normalizeUrl(attrs.href.trim(), pageUrl);
           if (rel.includes('stylesheet') && !('disabled' in attrs) && appliesToScreen && url) {
             found.push({url, kind: 'stylesheet'});

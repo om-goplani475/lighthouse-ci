@@ -24,6 +24,16 @@ const rec = (
 ) => ({url, transferSize, resourceType});
 
 describe('blockingResourcesOf', () => {
+  it('counts a bare media-query stylesheet as blocking and skips print and speech ones', () => {
+    const found = blockingResourcesOf(
+      '<link rel="stylesheet" href="/w.css" media="(min-width: 800px)">' +
+        '<link rel="stylesheet" href="/p.css" media="print and (color)">' +
+        '<link rel="stylesheet" href="/v.css" media="speech">',
+      'https://example.com/'
+    );
+    expect(found.map(f => f.url)).toEqual(['https://example.com/w.css']);
+  });
+
   it('finds sync scripts and screen stylesheets in the head, resolving URLs', () => {
     const found = blockingResourcesOf(
       page(
