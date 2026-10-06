@@ -407,3 +407,136 @@ describe('targetEntry (xhtml:link alternates of one page)', () => {
     expect(many.targetEntry && many.targetEntry.alternatesTruncated).toBe(true);
   });
 });
+
+describe('news and video extensions', () => {
+  const {parseSitemapBytes: parse, LIMITS: L} = require('../../src/lib/sitemap-parse.js');
+  const NS =
+    'xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1"';
+  const doc = body =>
+    parse({
+      url: 'https://example.com/sitemap.xml',
+      source: 'declared',
+      parentUrl: null,
+      status: 200,
+      body: Buffer.from(`<?xml version="1.0"?><urlset ${NS}>${body}</urlset>`),
+    });
+
+  it('reads a news entry with its publication, date and title, in any element order', () => {
+    const d = doc(
+      `<url><news:news><news:title>Big story</news:title><news:publication><news:language>en</news:language><news:name>The Times</news:name></news:publication><news:publication_date>2026-10-06T08:00:00+00:00</news:publication_date></news:news><loc>https://example.com/story</loc></url>`
+    );
+    expect(d.news).toEqual([
+      {
+        loc: 'https://example.com/story',
+        publicationName: 'The Times',
+        language: 'en',
+        publicationDate: '2026-10-06T08:00:00+00:00',
+        title: 'Big story',
+      },
+    ]);
+    expect(d.entryCount).toBe(1);
+    expect(d.locs).toEqual(['https://example.com/story']);
+    expect(d.videos).toEqual([]);
+  });
+
+  it('keeps missing news tags as null, so an audit can say which is missing', () => {
+    const d = doc(
+      '<url><loc>https://example.com/a</loc><news:news><news:publication><news:name>X</news:name></news:publication></news:news></url>'
+    );
+    expect(d.news[0]).toEqual({
+      loc: 'https://example.com/a',
+      publicationName: 'X',
+      language: null,
+      publicationDate: null,
+      title: null,
+    });
+  });
+
+  it('reads every video of a url, with its fields and tag count', () => {
+    const d = doc(`<url><loc>https://example.com/watch</loc>
+      <video:video><video:thumbnail_loc>https://example.com/t.jpg</video:thumbnail_loc><video:title>One</video:title><video:description>Desc</video:description><video:content_loc>https://example.com/v.mp4</video:content_loc><video:duration>120</video:duration><video:rating>4.5</video:rating><video:publication_date>2026-10-01</video:publication_date><video:tag>a</video:tag><video:tag>b</video:tag></video:video>
+      <video:video><video:title>Two</video:title><video:player_loc>https://example.com/p</video:player_loc></video:video></url>`);
+    expect(d.videos).toHaveLength(2);
+    expect(d.videos[0]).toEqual({
+      loc: 'https://example.com/watch',
+      thumbnailLoc: 'https://example.com/t.jpg',
+      title: 'One',
+      description: 'Desc',
+      contentLoc: 'https://example.com/v.mp4',
+      playerLoc: null,
+      duration: '120',
+      rating: '4.5',
+      publicationDate: '2026-10-01',
+      expirationDate: null,
+      tags: 2,
+    });
+    expect(d.videos[1]).toMatchObject({
+      title: 'Two',
+      playerLoc: 'https://example.com/p',
+      thumbnailLoc: null,
+      tags: 0,
+    });
+  });
+
+  it('ignores extension elements in the wrong namespace and in a sitemap index, and plain sitemaps have none', () => {
+    const plain = doc('<url><loc>https://example.com/a</loc></url>');
+    expect(plain.news).toEqual([]);
+    expect(plain.videos).toEqual([]);
+    const wrong = parse({
+      url: 'u',
+      source: 'declared',
+      parentUrl: null,
+      status: 200,
+      body: Buffer.from(
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://example.com/other"><url><loc>https://example.com/a</loc><news:news><news:title>x</news:title></news:news></url></urlset>'
+      ),
+    });
+    expect(wrong.news).toEqual([]);
+    const index = parse({
+      url: 'u',
+      source: 'declared',
+      parentUrl: null,
+      status: 200,
+      body: Buffer.from(
+        `<sitemapindex ${NS}><sitemap><loc>https://example.com/s.xml</loc></sitemap></sitemapindex>`
+      ),
+    });
+    expect(index.news).toEqual([]);
+  });
+
+  it('is bounded: at most 1,001 news entries and 2,000 videos, and text is clipped', () => {
+    const news = Array.from(
+      {length: 1100},
+      (_, i) =>
+        `<url><loc>https://example.com/${i}</loc><news:news><news:title>t${i}</news:title></news:news></url>`
+    ).join('');
+    const d = doc(news);
+    expect(d.news).toHaveLength(1001);
+    expect(d.newsTruncated).toBe(true);
+    const videos = Array.from(
+      {length: 2100},
+      (_, i) =>
+        `<url><loc>https://example.com/${i}</loc><video:video><video:title>t</video:title></video:video></url>`
+    ).join('');
+    const v = doc(videos);
+    expect(v.videos).toHaveLength(2000);
+    expect(v.videosTruncated).toBe(true);
+    const long = doc(
+      `<url><loc>https://example.com/a</loc><video:video><video:description>${'x'.repeat(
+        50000
+      )}</video:description></video:video></url>`
+    );
+    expect(long.videos[0].description.length).toBeLessThanOrEqual(2100);
+    expect(L.MAX_ENTRIES_STORED).toBeGreaterThan(1000);
+  });
+
+  it('survives malformed extension XML and a video outside any url', () => {
+    expect(() =>
+      doc('<url><loc>https://example.com/a</loc><video:video><video:title>unclosed</url>')
+    ).not.toThrow();
+    const stray = doc(
+      '<video:video><video:title>stray</video:title></video:video><url><loc>https://example.com/a</loc></url>'
+    );
+    expect(stray.videos).toEqual([]);
+  });
+});

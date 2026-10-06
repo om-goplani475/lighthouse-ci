@@ -24,6 +24,19 @@ const MAX_LIST = 20;
 const MAX_OFFERS = 10;
 const MAX_VARIANTS = 20;
 const MAX_TYPES = 5;
+const ARTICLE_TYPES = new Set([
+  'Article',
+  'NewsArticle',
+  'BlogPosting',
+  'ReportageNewsArticle',
+  'AnalysisNewsArticle',
+  'OpinionNewsArticle',
+  'ReviewNewsArticle',
+  'BackgroundNewsArticle',
+  'LiveBlogPosting',
+  'TechArticle',
+  'SocialMediaPosting',
+]);
 
 /**
  * @typedef {{
@@ -44,13 +57,24 @@ const MAX_TYPES = 5;
  *   productGroupID: string | null, variesBy: string[], variantCount: number, variants: Variant[],
  *   isVariantOf: string | null, offers: Offer[], hasImage: boolean,
  * }} ProductFacts
+ * @typedef {{type: string | null, name: string | null, url: string | null, hasSameAs: boolean}} Author
+ * @typedef {{
+ *   headline: string | null, datePublished: string | null, dateModified: string | null, authors: Author[],
+ *   publisher: string | null, hasImage: boolean, isAccessibleForFree: string | null,
+ *   paywallParts: Array<{isAccessibleForFree: string | null, cssSelector: string | null}>,
+ * }} ArticleFacts
+ * @typedef {{
+ *   name: string | null, description: string | null, thumbnailUrls: string[], uploadDate: string | null,
+ *   duration: string | null, contentUrl: string | null, embedUrl: string | null, expires: string | null,
+ * }} VideoFacts
  * @typedef {{
  *   types: string[], id: string | null, name: string | null, url: string | null,
  *   address: Address | null, telephone: string | null, email: string | null,
  *   geo: {latitude: string | null, longitude: string | null} | null,
  *   openingHours: string[], openingHoursSpecification: Array<{dayOfWeek: string[], opens: string | null, closes: string | null}>,
  *   priceRange: string | null, sameAs: string[], logo: string | null,
- *   identifiers: Record<string, string>, product: ProductFacts | null,
+ *   identifiers: Record<string, string>, product: ProductFacts | null, article: ArticleFacts | null,
+ *   video: VideoFacts | null,
  * }} Entity
  */
 
@@ -240,6 +264,69 @@ function productOf(node, ids) {
 }
 
 /**
+ * @param {unknown} v
+ * @return {string | null} Like `text`, but also reads a JSON boolean (`false` is "false", never absent).
+ */
+function flag(v) {
+  return typeof v === 'boolean' ? String(v) : text(v);
+}
+
+/**
+ * @param {Record<string, unknown>} node
+ * @param {Map<string, Record<string, unknown>>} ids
+ * @return {ArticleFacts}
+ */
+function articleOf(node, ids) {
+  const authors = list(node.author).map(a => {
+    const d = deref(a, ids);
+    if (typeof d === 'string') return {type: null, name: text(d), url: null, hasSameAs: false};
+    if (!isObject(d)) return {type: null, name: null, url: null, hasSameAs: false};
+    return {
+      type: types(d['@type'])[0] || null,
+      name: text(d.name),
+      url: urlOf(d.url, ids),
+      hasSameAs: list(d.sameAs).length > 0,
+    };
+  });
+  return {
+    headline: text(node.headline),
+    datePublished: text(node.datePublished),
+    dateModified: text(node.dateModified),
+    authors,
+    publisher: nameOf(node.publisher, ids),
+    hasImage: list(node.image).some(i => !!urlOf(i, ids)),
+    isAccessibleForFree: flag(node.isAccessibleForFree),
+    paywallParts: list(node.hasPart)
+      .map(p => deref(p, ids))
+      .filter(isObject)
+      .map(p => ({
+        isAccessibleForFree: flag(p.isAccessibleForFree),
+        cssSelector: text(p.cssSelector),
+      })),
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} node
+ * @param {Map<string, Record<string, unknown>>} ids
+ * @return {VideoFacts}
+ */
+function videoOf(node, ids) {
+  return {
+    name: text(node.name),
+    description: text(node.description),
+    thumbnailUrls: list(node.thumbnailUrl)
+      .map(u => urlOf(u, ids))
+      .filter(/** @return {t is string} */ t => !!t),
+    uploadDate: text(node.uploadDate),
+    duration: text(node.duration),
+    contentUrl: urlOf(node.contentUrl, ids),
+    embedUrl: urlOf(node.embedUrl, ids),
+    expires: text(node.expires),
+  };
+}
+
+/**
  * @param {Record<string, unknown>} node
  * @param {Map<string, Record<string, unknown>>} ids
  * @return {Entity}
@@ -285,6 +372,8 @@ function entityOf(node, ids) {
     logo: urlOf(node.logo, ids),
     identifiers,
     product: isProduct ? productOf(node, ids) : null,
+    article: entityTypes.some(t => ARTICLE_TYPES.has(t)) ? articleOf(node, ids) : null,
+    video: entityTypes.includes('VideoObject') ? videoOf(node, ids) : null,
   };
 }
 
@@ -428,6 +517,7 @@ function isProduct(entity) {
 }
 
 export {
+  ARTICLE_TYPES,
   projectEntities,
   entitiesFromArtifact,
   hasType,

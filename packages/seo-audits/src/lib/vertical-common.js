@@ -44,7 +44,9 @@ function clip(text) {
  * @return {string}
  */
 function count(n, noun) {
-  return `${n} ${noun}${n === 1 ? '' : 's'}`;
+  if (n === 1) return `${n} ${noun}`;
+  // entry -> entries, but day -> days
+  return /[^aeiou]y$/i.test(noun) ? `${n} ${noun.slice(0, -1)}ies` : `${n} ${noun}s`;
 }
 
 /**
@@ -184,7 +186,34 @@ function sitemapCoverageProduct(artifact, sitemaps, isTarget, noun) {
   return product;
 }
 
+/**
+ * @param {import('./sitemap-parse.js').SitemapDocumentsArtifact | null | undefined} sitemaps
+ * @return {string} A sentence saying how many sitemap files could not be read and why, or '' when all were. Used so that
+ *   "no such sitemap was found" is never said when one may exist behind a file that could not be read.
+ */
+function unreadSitemapsNote(sitemaps) {
+  const docs = (sitemaps && sitemaps.documents) || [];
+  const unread = docs.filter(d => d.outcome !== 'ok');
+  if (unread.length === 0 && !(sitemaps && sitemaps.documentsTruncated)) return '';
+  const redirects = unread.filter(d => d.outcome === 'redirect').length;
+  const parts = [];
+  if (unread.length) {
+    parts.push(
+      `${count(unread.length, 'sitemap file')} could not be read${
+        redirects
+          ? ` (${redirects} answered with a redirect, which the audits do not follow: declare the final address in robots.txt)`
+          : ''
+      }`
+    );
+  }
+  if (sitemaps && sitemaps.documentsTruncated) {
+    parts.push('the sitemap has more files than the audits read');
+  }
+  return ` ${parts.join('; ')}, so one may exist that was not seen.`;
+}
+
 export {
+  unreadSitemapsNote,
   MAX_ROWS,
   MAX_CELL_CHARS,
   clip,

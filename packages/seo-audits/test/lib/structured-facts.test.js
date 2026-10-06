@@ -287,3 +287,86 @@ describe('projectEntities: bounds against a hostile page', () => {
     ).not.toThrow();
   });
 });
+
+describe('projectEntities: article and video facts', () => {
+  it('reads an article with its headline, dates, authors, publisher, image and paywall parts', () => {
+    const [a] = projectEntities([
+      block({
+        '@type': 'NewsArticle',
+        headline: 'Big story',
+        datePublished: '2026-10-06T08:00:00+00:00',
+        dateModified: '2026-10-06T09:00:00Z',
+        author: [
+          {'@type': 'Person', name: 'Ann Lee', url: 'https://x.example/ann'},
+          'Bob Roe',
+          {'@type': 'Organization', name: 'Desk', sameAs: ['https://x.example/desk']},
+        ],
+        publisher: {'@type': 'Organization', name: 'The Times'},
+        image: ['https://x.example/a.jpg'],
+        isAccessibleForFree: false,
+        hasPart: [{'@type': 'WebPageElement', isAccessibleForFree: false, cssSelector: '.paywall'}],
+      }),
+    ]);
+    expect(a.article).toMatchObject({
+      headline: 'Big story',
+      datePublished: '2026-10-06T08:00:00+00:00',
+      dateModified: '2026-10-06T09:00:00Z',
+      publisher: 'The Times',
+      hasImage: true,
+      isAccessibleForFree: 'false',
+    });
+    expect(a.article.authors).toEqual([
+      {type: 'Person', name: 'Ann Lee', url: 'https://x.example/ann', hasSameAs: false},
+      {type: null, name: 'Bob Roe', url: null, hasSameAs: false},
+      {type: 'Organization', name: 'Desk', url: null, hasSameAs: true},
+    ]);
+    expect(a.article.paywallParts).toEqual([
+      {isAccessibleForFree: 'false', cssSelector: '.paywall'},
+    ]);
+  });
+
+  it('knows the article family, and gives other types no article facts', () => {
+    for (const type of ['Article', 'BlogPosting', 'NewsArticle', 'OpinionNewsArticle']) {
+      expect(projectEntities([block({'@type': type})])[0].article).not.toBeNull();
+    }
+    expect(projectEntities([block({'@type': 'Organization'})])[0].article).toBeNull();
+  });
+
+  it('reads a video with its dates, duration, urls and thumbnails', () => {
+    const [v] = projectEntities([
+      block({
+        '@type': 'VideoObject',
+        name: 'Intro',
+        description: 'About',
+        thumbnailUrl: ['https://x.example/t.jpg', {url: 'https://x.example/t2.jpg'}],
+        uploadDate: '2026-10-01T10:00:00+00:00',
+        duration: 'PT1M30S',
+        contentUrl: 'https://x.example/v.mp4',
+        embedUrl: 'https://x.example/embed',
+        expires: '2027-01-01',
+      }),
+    ]);
+    expect(v.video).toEqual({
+      name: 'Intro',
+      description: 'About',
+      thumbnailUrls: ['https://x.example/t.jpg', 'https://x.example/t2.jpg'],
+      uploadDate: '2026-10-01T10:00:00+00:00',
+      duration: 'PT1M30S',
+      contentUrl: 'https://x.example/v.mp4',
+      embedUrl: 'https://x.example/embed',
+      expires: '2027-01-01',
+    });
+    expect(projectEntities([block({'@type': 'Article'})])[0].video).toBeNull();
+  });
+
+  it('survives odd author, hasPart and thumbnail values', () => {
+    expect(() =>
+      projectEntities([
+        block({'@type': 'Article', author: 5, hasPart: 'x', image: null, publisher: []}),
+      ])
+    ).not.toThrow();
+    expect(() =>
+      projectEntities([block({'@type': 'VideoObject', thumbnailUrl: {}, contentUrl: 5})])
+    ).not.toThrow();
+  });
+});

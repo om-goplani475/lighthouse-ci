@@ -56,12 +56,29 @@ class StopParsing extends Error {}
 const SITEMAP_NAMESPACE = 'http://www.sitemaps.org/schemas/sitemap/0.9';
 const CHUNK_BYTES = 64 * 1024;
 const XHTML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
+const NEWS_NAMESPACE = 'http://www.google.com/schemas/sitemap-news/0.9';
+const VIDEO_NAMESPACE = 'http://www.google.com/schemas/sitemap-video/1.1';
 const MAX_TARGET_ALTERNATES = 100;
+// Sitemap extensions (Google News and video): kept per `<url>`, bounded. Google allows 1,000 news entries per sitemap, so
+// 1,001 are kept to be able to say "more than 1,000".
+const MAX_NEWS_ENTRIES = 1_001;
+const MAX_VIDEO_ENTRIES = 2_000;
+const MAX_EXTENSION_TEXT = 2_100;
 
 /**
  * The `<url>` entry of one chosen page (the audited URL), with the `<xhtml:link rel="alternate" hreflang>`
  * alternates listed under it. Only recorded for the page asked for, so a huge sitemap never grows the artifact.
  * @typedef {{alternates: Array<{hreflang: string, href: string}>, alternatesTruncated: boolean}} SitemapTargetEntry
+ */
+/**
+ * The Google News extension of one `<url>`: `<news:news>` with its publication, date and title. Absent values are null.
+ * @typedef {{loc: string | null, publicationName: string | null, language: string | null, publicationDate: string | null, title: string | null}} SitemapNewsEntry
+ * The Google video extension of one `<video:video>` inside a `<url>`. `tags` counts the `<video:tag>` elements.
+ * @typedef {{
+ *   loc: string | null, thumbnailLoc: string | null, title: string | null, description: string | null,
+ *   contentLoc: string | null, playerLoc: string | null, duration: string | null, rating: string | null,
+ *   publicationDate: string | null, expirationDate: string | null, tags: number,
+ * }} SitemapVideoEntry
  */
 /**
  * @typedef {{message: string, line: number, column: number}} SitemapParseError
@@ -91,7 +108,12 @@ const MAX_TARGET_ALTERNATES = 100;
  *   invalidLocs: InvalidLoc[],
  *   invalidLocCount: number,
  *   targetEntry: SitemapTargetEntry | null,
+ *   news?: SitemapNewsEntry[],
+ *   newsTruncated?: boolean,
+ *   videos?: SitemapVideoEntry[],
+ *   videosTruncated?: boolean,
  * }} SitemapDocument
+ * The extension fields are absent on a document made before they existed; readers treat absent as empty.
  */
 /**
  * @typedef {{
@@ -180,6 +202,10 @@ function emptyDocument(base) {
     invalidLocs: [],
     invalidLocCount: 0,
     targetEntry: null,
+    news: [],
+    newsTruncated: false,
+    videos: [],
+    videosTruncated: false,
   };
 }
 
@@ -205,8 +231,73 @@ function parseXmlInto(xml, doc, target = null) {
   const stack = [];
   let locText = '';
   let inLoc = false;
+  // The `<url>` being read, for the news and video extensions, and the one leaf element whose text is being collected.
+  /** @type {{loc: string | null, news: Omit<SitemapNewsEntry, 'loc'> | null, videos: Array<Omit<SitemapVideoEntry, 'loc'>>} | null} */
+  let entry = null;
+  /** @type {{depth: number, local: string, set: (text: string) => void, buffer: string} | null} */
+  let leaf = null;
 
   doc.kind = null;
+
+  /**
+   * @param {string} local
+   * @param {string} uri
+   */
+  function extensionOpen(local, uri) {
+    const depth = stack.length;
+    if (!entry) return;
+    if (uri === NEWS_NAMESPACE) {
+      if (depth === 2 && local === 'news') {
+        entry.news = {publicationName: null, language: null, publicationDate: null, title: null};
+      } else if (entry.news) {
+        const news = entry.news;
+        if (depth === 4 && stack[3].local === 'publication' && local === 'name') {
+          leaf = {depth, local, buffer: '', set: t => (news.publicationName = t)};
+        } else if (depth === 4 && stack[3].local === 'publication' && local === 'language') {
+          leaf = {depth, local, buffer: '', set: t => (news.language = t)};
+        } else if (depth === 3 && stack[2].local === 'news' && local === 'publication_date') {
+          leaf = {depth, local, buffer: '', set: t => (news.publicationDate = t)};
+        } else if (depth === 3 && stack[2].local === 'news' && local === 'title') {
+          leaf = {depth, local, buffer: '', set: t => (news.title = t)};
+        }
+      }
+    } else if (uri === VIDEO_NAMESPACE) {
+      if (depth === 2 && local === 'video') {
+        entry.videos.push({
+          thumbnailLoc: null,
+          title: null,
+          description: null,
+          contentLoc: null,
+          playerLoc: null,
+          duration: null,
+          rating: null,
+          publicationDate: null,
+          expirationDate: null,
+          tags: 0,
+        });
+      } else if (depth === 3 && stack[2].local === 'video' && entry.videos.length) {
+        const video = entry.videos[entry.videos.length - 1];
+        /** @type {Record<string, keyof typeof video>} */
+        const fields = {
+          thumbnail_loc: 'thumbnailLoc',
+          title: 'title',
+          description: 'description',
+          content_loc: 'contentLoc',
+          player_loc: 'playerLoc',
+          duration: 'duration',
+          rating: 'rating',
+          publication_date: 'publicationDate',
+          expiration_date: 'expirationDate',
+        };
+        if (local === 'tag') {
+          leaf = {depth, local, buffer: '', set: () => (video.tags += 1)};
+        } else if (fields[local]) {
+          const key = /** @type {Exclude<keyof typeof video, 'tags'>} */ (fields[local]);
+          leaf = {depth, local, buffer: '', set: t => (video[key] = t)};
+        }
+      }
+    }
+  }
 
   parser.on('error', err => {
     if (stopped) return;
@@ -254,6 +345,13 @@ function parseXmlInto(xml, doc, target = null) {
       inLoc = true;
       locText = '';
     }
+    if (doc.kind === 'urlset') {
+      if (stack.length === 1 && local === 'url' && uri === SITEMAP_NAMESPACE) {
+        entry = {loc: null, news: null, videos: []};
+      } else if (entry) {
+        extensionOpen(local, uri);
+      }
+    }
     if (targetKey && doc.kind === 'urlset') {
       if (stack.length === 1 && local === 'url' && uri === SITEMAP_NAMESPACE) {
         urlAlternates = [];
@@ -284,7 +382,9 @@ function parseXmlInto(xml, doc, target = null) {
 
   /** @param {string} text */
   const onText = text => {
-    if (!stopped && inLoc) locText += text;
+    if (stopped) return;
+    if (inLoc) locText += text;
+    if (leaf && leaf.buffer.length < MAX_EXTENSION_TEXT) leaf.buffer += text;
   };
   parser.on('text', onText);
   parser.on('cdata', onText);
@@ -292,6 +392,26 @@ function parseXmlInto(xml, doc, target = null) {
   parser.on('closetag', tag => {
     if (stopped) return;
     stack.pop();
+    if (leaf && tag.local === leaf.local && stack.length === leaf.depth) {
+      leaf.set(leaf.buffer.trim().slice(0, MAX_EXTENSION_TEXT));
+      leaf = null;
+    }
+    if (entry && tag.local === 'url' && stack.length === 1) {
+      const done = entry;
+      entry = null;
+      if (done.news && (doc.news || []).length < MAX_NEWS_ENTRIES) {
+        /** @type {SitemapNewsEntry[]} */ (doc.news).push({loc: done.loc, ...done.news});
+      } else if (done.news) {
+        doc.newsTruncated = true;
+      }
+      for (const v of done.videos) {
+        if ((doc.videos || []).length < MAX_VIDEO_ENTRIES) {
+          /** @type {SitemapVideoEntry[]} */ (doc.videos).push({loc: done.loc, ...v});
+        } else {
+          doc.videosTruncated = true;
+        }
+      }
+    }
     if (
       targetKey &&
       tag.local === 'url' &&
@@ -307,6 +427,7 @@ function parseXmlInto(xml, doc, target = null) {
 
     const value = locText.trim();
     if (targetKey && doc.kind === 'urlset') urlLoc = value;
+    if (entry && doc.kind === 'urlset') entry.loc = value.slice(0, 2048);
     doc.entryCount += 1;
     const problem = locProblem(value);
     if (problem) {
@@ -414,4 +535,12 @@ function parseSitemapBytes(
   return doc;
 }
 
-export {LIMITS, SITEMAP_NAMESPACE, locProblem, emptyDocument, parseSitemapBytes};
+export {
+  LIMITS,
+  SITEMAP_NAMESPACE,
+  NEWS_NAMESPACE,
+  VIDEO_NAMESPACE,
+  locProblem,
+  emptyDocument,
+  parseSitemapBytes,
+};
