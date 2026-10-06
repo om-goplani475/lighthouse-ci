@@ -196,7 +196,8 @@ async function runCLI(args, overrides = {}) {
  */
 async function runWizardCLI(args, inputs, overrides = {}) {
   const {env: extraEnvVars, cwd, inputWaitCondition = 'Which wizard'} = overrides;
-  const env = getCleanEnvironment(extraEnvVars);
+  // Node 24 prints DEP0169 for `url.parse()` calls inside sqlite3's node-pre-gyp, which these tests would read as an error.
+  const env = getCleanEnvironment({NODE_OPTIONS: '--no-deprecation', ...extraEnvVars});
   const wizardProcess = spawn('node', [CLI_PATH, 'wizard', ...args], {
     cwd,
     env,
