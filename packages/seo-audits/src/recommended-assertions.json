@@ -1,0 +1,344 @@
+{
+  "structured-data-json-ld": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "robots-directives-conflict": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "canonical-https": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "open-graph-image-reachable": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "robots-txt-crawler-access": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "sitemap-valid": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "sitemap-limits": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "sitemap-robots-crossref": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "mixed-content": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "redirect-loop": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "indexability-conflicts": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "canonical-conflicts": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "duplicate-content": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "broken-external-links": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "broken-internal-links": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "url-session-tracking": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "url-case-variants": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "url-trailing-slash-variants": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "url-encoding": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "url-length": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "hydration-errors": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "paginated-canonical": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "placeholder-content": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "js-head-signals": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "hreflang-codes": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "hreflang-canonical": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "dead-end-pages": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "ssl-certificate-expiry": [
+    "error",
+    {
+      "minScore": 0.5
+    }
+  ],
+  "structured-data-schema-properties": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "structured-data-type-conflicts": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "document-title-quality": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "document-h1-count": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "open-graph-completeness": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "open-graph-canonical-match": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "twitter-card-completeness": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "sitemap-url-status": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "sitemap-indexability": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "soft-not-found": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "url-variant-consistency": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "redirect-chain-length": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "duplicate-titles": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "orphan-pages": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "redirecting-internal-links": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "internal-redirect-chains": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "descriptive-anchor-text": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "content-dates": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "hreflang-return-links": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "hreflang-alternate-status": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "core-web-vitals-field": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "js-internal-links": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "js-visible-content": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "device-content-parity": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "image-alt-quality": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "image-lazy-above-fold": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "image-dimensions-attributes": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "image-oversized": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "broken-images": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ]
+}
