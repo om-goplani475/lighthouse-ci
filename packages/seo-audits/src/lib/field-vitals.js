@@ -10,6 +10,8 @@
  * Shift are judged at the 75th percentile (the value Google uses). The audit fails only when one of them is
  * "poor" (LCP over 4 s, INP over 500 ms, CLS over 0.25). "Needs improvement" is shown, never failed. First
  * Contentful Paint and Time to First Byte are shown for information only. Missing data is "not applicable".
+ * Data for the whole site (CrUX had none for this URL) describes other pages, so a poor site-wide result is shown
+ * as a note and never fails this page.
  */
 
 import {Audit} from 'lighthouse/core/audits/audit.js';
@@ -124,6 +126,21 @@ function buildFieldVitalsProduct(artifact) {
   const displayValue = `${summary.join(', ')} (${artifact.source === 'origin' ? 'site' : 'URL'}, ${
     artifact.formFactor === 'DESKTOP' ? 'desktop' : 'phone'
   })`;
+  if (poor.length > 0 && artifact.source === 'origin') {
+    rows.push({
+      metric: 'Note',
+      p75: '',
+      result: `${poor.join(
+        ' and '
+      )} is poor across the site, but CrUX has no data for this URL, so this page is not failed`,
+      good: '',
+    });
+    return {
+      score: 1,
+      displayValue: `${displayValue}; poor site-wide: ${poor.join(', ')} (not failed)`,
+      details: Audit.makeTableDetails(headings, rows),
+    };
+  }
   if (poor.length > 0) {
     return {
       score: 0,

@@ -79,13 +79,18 @@ describe('buildFieldVitalsProduct', () => {
     ]);
   });
 
-  it('judges what is there when INP is missing, and says when the data is from the origin or desktop', () => {
+  it('does not fail the page for poor site-wide data, and says so', () => {
     const p = run(art({lcp: m(5000), cls: m(0.01)}, {source: 'origin', formFactor: 'DESKTOP'}));
-    expect(p.score).toBe(0);
-    expect(p.explanation).toMatch(
-      /the whole site \(no data for this URL\), desktop visitors, 2026-09-08 to 2026-10-05/
+    expect(p.score).toBe(1);
+    expect(p.displayValue).toMatch(
+      /\(site, desktop\); poor site-wide: Largest Contentful Paint 5\.0 s \(not failed\)$/
     );
-    expect(p.displayValue).toMatch(/\(site, desktop\)$/);
+    expect(JSON.stringify(p.details)).toMatch(/CrUX has no data for this URL/);
+  });
+
+  it('still judges a good or needs-improvement site result, and fails a poor URL result', () => {
+    expect(run(art({lcp: m(2000)}, {source: 'origin'})).score).toBe(1);
+    expect(run(art({lcp: m(5000), cls: m(0.01)}, {source: 'url'})).score).toBe(0);
   });
 
   it('is not applicable without data, with the reason', () => {

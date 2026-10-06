@@ -11,7 +11,7 @@ const UIStrings = {
   title: 'Real-user Core Web Vitals are not poor',
   failureTitle: 'Real-user Core Web Vitals are poor',
   description:
-    'Reads real-visitor (field) data from the Chrome UX Report (CrUX), which a lab run cannot see. Judges Largest Contentful Paint, Interaction to Next Paint and Cumulative Layout Shift at the 75th percentile against Google published thresholds, and fails only when one is poor (LCP over 4 s, INP over 500 ms, CLS over 0.25); needs improvement is shown, not failed. OFF unless LHCI_SEO_CRUX_API_KEY is set: then each run sends the page origin and path (no query string, never a private address) to Google, with the key in a header. Not applicable without a key or when CrUX has no data.',
+    'Reads real-visitor (field) data from the Chrome UX Report (CrUX), which a lab run cannot see. Judges Largest Contentful Paint, Interaction to Next Paint and Cumulative Layout Shift at the 75th percentile against Google published thresholds, and fails only when one is poor (LCP over 4 s, INP over 500 ms, CLS over 0.25); needs improvement is shown, not failed. When CrUX has no data for the URL and falls back to the whole site, a poor result is shown as a note and the page is not failed. OFF unless LHCI_SEO_CRUX_API_KEY is set: then each run sends the page origin and path (no query string, never a private address) to Google, with the key in a header. Not applicable without a key or when CrUX has no data.',
 };
 
 class CoreWebVitalsField extends Audit {
