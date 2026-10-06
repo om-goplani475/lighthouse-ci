@@ -10,8 +10,8 @@
  * against the vendors' own pages on 2026-10-06: OpenAI (GPTBot, OAI-SearchBot, OAI-AdsBot, ChatGPT-User), Anthropic
  * (ClaudeBot, Claude-User, Claude-SearchBot), Perplexity (PerplexityBot, Perplexity-User), Google-Extended (a robots.txt
  * token only), Applebot-Extended, CCBot, Amazon (Amazonbot, Amzn-SearchBot, Amzn-User), Meta (Meta-ExternalAgent,
- * Meta-ExternalFetcher) and DuckAssistBot. Not verified: Bytespider (ByteDance publishes no reachable vendor page; it
- * is documented only by third parties). The user-initiated fetchers (ChatGPT-User, Perplexity-User, Amzn-User,
+ * Meta-ExternalFetcher) and DuckAssistBot. ByteDance's Bytespider is deliberately not listed: it has no vendor documentation to check
+ * the name and behaviour against. The user-initiated fetchers (ChatGPT-User, Perplexity-User, Amzn-User,
  * Meta-ExternalFetcher) may ignore robots.txt. No I/O, never throws.
  */
 
@@ -51,7 +51,6 @@ const AI_CRAWLERS = [
     purpose: 'a token that controls use for Apple AI (not a crawler)',
   },
   {name: 'CCBot', operator: 'Common Crawl', purpose: 'a public web archive used to train models'},
-  {name: 'Bytespider', operator: 'ByteDance', purpose: 'model training'},
   {
     name: 'Amazonbot',
     operator: 'Amazon',
