@@ -15,7 +15,9 @@
  * @return {string | undefined}
  */
 function twitterContent(metaElements, name) {
-  return metaElements.find(meta => meta.name === name && meta.content)?.content;
+  // Twitter documents `name`, but some sites write `property`; scrapers read both.
+  return metaElements.find(meta => (meta.name === name || meta.property === name) && meta.content)
+    ?.content;
 }
 
 /**
@@ -24,7 +26,10 @@ function twitterContent(metaElements, name) {
  * @return {string | undefined}
  */
 function ogContent(metaElements, property) {
-  return metaElements.find(meta => meta.property === property && meta.content)?.content;
+  // The protocol says `property`, but some sites (MDN, for one) write `name`, and scrapers read both.
+  return metaElements.find(
+    meta => (meta.property === property || meta.name === property) && meta.content
+  )?.content;
 }
 
 /**

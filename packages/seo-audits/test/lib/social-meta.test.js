@@ -29,8 +29,9 @@ describe('ogContent', () => {
     expect(ogContent([{property: 'og:title', content: 'Widget'}], 'og:title')).toBe('Widget');
   });
 
-  it('does not match on name — og: tags use property, not name', () => {
-    expect(ogContent([{name: 'og:title', content: 'Widget'}], 'og:title')).toBeUndefined();
+  it('also matches an og: tag written with name (some sites do), and ignores other names', () => {
+    expect(ogContent([{name: 'og:title', content: 'Widget'}], 'og:title')).toBe('Widget');
+    expect(ogContent([{name: 'title', content: 'Widget'}], 'og:title')).toBeUndefined();
   });
 });
 

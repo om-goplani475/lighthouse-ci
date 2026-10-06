@@ -93,6 +93,12 @@ describe('open-graph-completeness audit', () => {
     expect(result.score).toBe(0);
   });
 
+  it('reads og tags written with name= instead of property=, as MDN does', () => {
+    const tags = FULL_TAGS.map(tag => ({name: tag.property, content: tag.content}));
+    const result = runAudit(tags);
+    expect(result.score).toBe(1);
+  });
+
   it('is never notApplicable — every page is evaluated', () => {
     const result = runAudit([]);
     expect(result.notApplicable).toBeUndefined();

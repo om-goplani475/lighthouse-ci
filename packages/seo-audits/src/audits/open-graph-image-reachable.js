@@ -41,12 +41,12 @@ class OpenGraphImageReachable extends Audit {
    * the real network or reimplementing safe-fetch.js's own already-tested logic (same reasoning
    * as manifest-icons.js's equivalent method doc), so it's verified only by the live `lhci
    * collect` run.
-   * @param {{MetaElements: Array<{content?: string, property?: string}>}} artifacts
+   * @param {{MetaElements: Array<{content?: string, property?: string, name?: string}>}} artifacts
    * @return {Promise<import('lighthouse/types/audit.js').default.Product>}
    */
   static async audit(artifacts) {
     const ogImage = artifacts.MetaElements.find(
-      meta => meta.property === 'og:image' && meta.content
+      meta => (meta.property === 'og:image' || meta.name === 'og:image') && meta.content
     )?.content;
 
     if (!ogImage) {

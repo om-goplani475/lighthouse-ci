@@ -55,14 +55,14 @@ class OpenGraphCanonicalMatch extends Audit {
 
   /**
    * @param {{
-   *   MetaElements: Array<{content?: string, property?: string}>,
+   *   MetaElements: Array<{content?: string, property?: string, name?: string}>,
    *   LinkElements: Array<{rel: string, href: string | null, source: string}>,
    * }} artifacts
    * @return {import('lighthouse/types/audit.js').default.Product}
    */
   static audit(artifacts) {
     const ogUrl = artifacts.MetaElements.find(
-      meta => meta.property === 'og:url' && meta.content
+      meta => (meta.property === 'og:url' || meta.name === 'og:url') && meta.content
     )?.content;
     const canonicalHref = artifacts.LinkElements.find(
       link => link.rel === 'canonical' && link.source !== 'body' && link.href

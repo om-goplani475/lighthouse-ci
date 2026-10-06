@@ -41,7 +41,7 @@ const RECOMMENDED_PROPERTIES = ['og:type', 'og:url', 'og:description', 'og:site_
  */
 function contentValuesFor(metaElements, property) {
   return metaElements
-    .filter(meta => meta.property === property)
+    .filter(meta => meta.property === property || meta.name === property)
     .map(meta => (meta.content || '').trim())
     .filter(Boolean);
 }

@@ -57,7 +57,9 @@ function collectPixelWidth(titleFont, descriptionFont) {
     // the *first* <title> element per the HTML spec, so a page with more than one needs this
     // separate count to even be detectable — document-title-quality's "multiple <title>
     // elements" check is why this field exists.
-    titleElementCount: document.querySelectorAll('title').length,
+    // An inline SVG can carry its own <title> (an accessible name); only document titles count.
+    titleElementCount: Array.from(document.querySelectorAll('title')).filter(t => !t.closest('svg'))
+      .length,
   };
 }
 /* c8 ignore stop */

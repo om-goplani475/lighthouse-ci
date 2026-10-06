@@ -161,7 +161,11 @@ function buildEntitySignalsProduct(jsonLd, metaElements, linkElements) {
     }
   }
   const ogSite = metaElements.find(
-    m => m && m.property === 'og:site_name' && typeof m.content === 'string' && m.content.trim()
+    m =>
+      m &&
+      (m.property === 'og:site_name' || m.name === 'og:site_name') &&
+      typeof m.content === 'string' &&
+      m.content.trim()
   );
   if (ogSite) siteNames.push({name: ogSite.content.trim().slice(0, 100), source: 'og:site_name'});
   const distinct = new Set(siteNames.map(s => normName(s.name)).filter(Boolean));
