@@ -41,8 +41,11 @@ jobs:
         continue-on-error: true
         run: |
           start=$(date +%s)
-          node packages/cli/src/cli.js autorun --config=.github/seo-audit/lighthouserc.js
+          status=0
+          node packages/cli/src/cli.js autorun --config=.github/seo-audit/lighthouserc.js || status=$?
+          # record the time even when assertions failed (the shell stops at the first failing command otherwise)
           echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
+          exit $status
       - name: Cache directory mode and request cost
         if: always()
         run: |
@@ -50,7 +53,9 @@ jobs:
           echo "collect+assert took ${{ steps.audit.outputs.seconds }} s"
       - name: Summary
         if: always()
-        run: node .github/seo-audit/summarize.mjs .lighthouseci >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          node .github/seo-audit/summarize.mjs .lighthouseci >> "$GITHUB_STEP_SUMMARY"
+          node packages/seo-audits/src/summary/cli.js .lighthouseci >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -83,13 +88,16 @@ jobs:
         continue-on-error: true
         run: |
           start=$(date +%s)
-          lhci autorun --config=.github/seo-audit/lighthouserc.js
+          status=0
+          lhci autorun --config=.github/seo-audit/lighthouserc.js || status=$?
           echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
+          exit $status
       - name: Summary
         if: always()
         run: |
           echo "collect+assert took ${{ steps.audit.outputs.seconds }} s" >> "$GITHUB_STEP_SUMMARY"
           node .github/seo-audit/summarize.mjs .lighthouseci >> "$GITHUB_STEP_SUMMARY"
+          node packages/seo-audits/src/summary/cli.js .lighthouseci >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
