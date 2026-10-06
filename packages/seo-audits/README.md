@@ -16,7 +16,7 @@ rationale and the agent pipeline this package was built through.
 - **`structured-data-schema-properties`** — for JSON-LD blocks whose `@type` is one of the 12 types
   Google documents rich-result guidance for (`Product`, `Article`, `BreadcrumbList`, `Recipe`,
   `Review`, `Event`, `JobPosting`, `VideoObject`, `Organization`, `LocalBusiness`, `FAQPage`, `HowTo`),
-  checks that Google's required/recommended properties are present, including specific nested
+  fails only on a property Google **requires** (a `required` entry written `a|b` means "at least one": a Product needs a name plus `offers`, `review` or `aggregateRating`) and lists the properties Google only **recommends** as notes (Article has no required property). Verified against Google's live documentation on 2026-10-06 for `Article`, `Product` and `Recipe`; the other nine types still need the same check (see `docs/open-items.md`). Checks that the properties are present, including specific nested
   sub-object properties (e.g. `Product.offers.price`, `Event.location.address`), **and, for a
   handful of properties where it's unambiguous, that a *present* property's value is well-formed**
   (Phase 2 item 4) — e.g. `Product.offers.price` parses as a number, `Product.offers.priceCurrency`

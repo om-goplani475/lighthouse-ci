@@ -619,3 +619,7 @@ Fewer false positives in six scored audits, found by the second review. `hreflan
 ## 2026-10-06 — calibration, round 2
 
 `llms-txt-structure` is now **informational** (llms.txt is an unratified proposal); remove it from `assertions` if you had it (informational audits cannot be asserted on score). The crawler stores at most 40,000 characters of link URLs per page, which closes security Finding 10; normal pages are unaffected. Absolute time limits in the test suite were loosened so a busy CI runner no longer fails them. No migration.
+
+## 2026-10-06 — calibration, Part A fixes (first review, section 3.1)
+
+Four scored audits were wrong, not just strict. `image-lazy-above-fold` no longer reports a lazy carousel slide that sits to the right of (or left of) the screen. `broken-internal-links` does not judge 401, 403 and 429 (bot protection or a rate limit) and says how many it skipped. `js-head-signals` now fails only when JavaScript changes the noindex or the canonical; a title or description that JavaScript sets is a note (its title changed to "Canonical and robots are the same without JavaScript"). `structured-data-schema-properties` fails only on properties Google requires (Article has none; a Product needs a name plus offers, review or aggregateRating; a Recipe needs name and image) and lists recommended ones as notes; the ruleset gains `recommended` and `a|b` alternatives. Existing assertions keep working; some pages that failed now pass.
