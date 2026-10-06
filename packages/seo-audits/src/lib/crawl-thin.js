@@ -139,6 +139,8 @@ function buildThinContentProduct(artifact) {
     : '';
   return {
     score: thin ? 0 : 1,
+    numericValue: audited.wordCount,
+    numericUnit: 'unitless',
     displayValue: `${audited.wordCount} ${audited.wordCount === 1 ? 'word' : 'words'}`,
     explanation: thin
       ? `The audited page has ${audited.wordCount} words of visible text in its HTML, under the ${THIN_WORD_COUNT} this audit treats as thin. Add substantive content, or noindex the page if it is not meant to rank.${otherNote}`

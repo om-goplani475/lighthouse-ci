@@ -19,7 +19,7 @@ import {Audit} from 'lighthouse/core/audits/audit.js';
 /** @typedef {import('./crawl-snapshot.js').SiteCrawlArtifact} SiteCrawlArtifact */
 /** @typedef {import('lighthouse/types/audit.js').default.Product} Product */
 /** @typedef {{severity: 'fail' | 'note', detail: string}} UrlFinding */
-/** @typedef {{id: string, subject: string, check: (url: URL) => UrlFinding[], passText: string, failText: string}} UrlRule */
+/** @typedef {{id: string, subject: string, check: (url: URL) => UrlFinding[], passText: string, failText: string, measure?: (url: URL) => number}} UrlRule */
 
 const MAX_URL_LENGTH = 115;
 // 115 is a readability convention, not a Google limit, so it is a note. Only an extreme length (browsers and
@@ -65,6 +65,17 @@ const TRACKING_PARAMS = new Set([
 ]);
 
 /**
+ * @param {UrlRule} rule
+ * @param {URL} url
+ * @return {{numericValue?: number, numericUnit?: 'unitless'}} The measured size, for the rules that have one.
+ */
+function numeric(rule, url) {
+  return rule.measure
+    ? {numericValue: rule.measure(url), numericUnit: /** @type {const} */ ('unitless')}
+    : {};
+}
+
+/**
  * @param {string} text
  * @param {number} [max]
  * @return {string}
@@ -100,6 +111,7 @@ const RULES = {
     subject: 'URL length',
     passText: 'is within the length limit',
     failText: 'is too long',
+    measure: url => url.pathname.length + url.search.length,
     check(url) {
       const length = url.pathname.length + url.search.length;
       if (length > EXTREME_URL_LENGTH) {
@@ -125,6 +137,7 @@ const RULES = {
     subject: 'query parameters',
     passText: 'has few query parameters',
     failText: 'has too many query parameters',
+    measure: url => Array.from(url.searchParams.keys()).length,
     check(url) {
       const count = Array.from(url.searchParams.keys()).length;
       return count > MAX_PARAMS
@@ -244,7 +257,11 @@ function buildUrlRuleProduct(artifact, rule) {
   const failed = auditedFindings.some(f => f.severity === 'fail');
   const scope = compared > 1 ? ` (${compared} URLs checked)` : '';
   if (rows.length === 0) {
-    return {score: 1, displayValue: `No problem found${scope}`};
+    return /** @type {Product} */ ({
+      score: 1,
+      ...numeric(rule, audited),
+      displayValue: `No problem found${scope}`,
+    });
   }
 
   /** @type {import('lighthouse/types/audit.js').default.Details.Table['headings']} */
@@ -258,8 +275,9 @@ function buildUrlRuleProduct(artifact, rule) {
   if (rows.length > shown.length) {
     items.push({url: `${rows.length - shown.length} more not shown`, problem: '', page: ''});
   }
-  return {
+  return /** @type {Product} */ ({
     score: failed ? 0 : 1,
+    ...numeric(rule, audited),
     displayValue: failed
       ? `The audited URL ${rule.failText}`
       : `The audited URL ${rule.passText}${
@@ -272,7 +290,7 @@ function buildUrlRuleProduct(artifact, rule) {
           .join('; ')}.`
       : undefined,
     details: Audit.makeTableDetails(headings, items),
-  };
+  });
 }
 
 export {

@@ -254,6 +254,8 @@ function buildLinkCountsProduct(artifact) {
   ].filter(Boolean);
   return {
     score: failing ? 0 : 1,
+    numericValue: out,
+    numericUnit: 'unitless',
     displayValue: `${completeness.complete ? inbound : `${inbound}+`} in, ${out} out`,
     explanation: failing
       ? `The audited page's internal link counts are unusual: ${problems.join('; ')}.${
@@ -412,6 +414,8 @@ function buildCrawlDepthProduct(artifact) {
     : '';
   return {
     score: tooDeep ? 0 : 1,
+    numericValue: depth,
+    numericUnit: 'unitless',
     displayValue: depth === 0 ? 'The homepage' : `${count(depth, 'click')} from the homepage`,
     explanation: tooDeep
       ? `The audited page is ${depth} clicks from the homepage, deeper than the ${MAX_DEPTH} this audit allows. Pages buried that deep are crawled less often and get less internal authority. Link to it from a page nearer the homepage.${otherNote}`

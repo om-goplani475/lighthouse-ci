@@ -495,6 +495,8 @@ function certificateProduct(result) {
   if (result.state === 'expiring-soon') {
     return {
       score: 0.5,
+      numericValue: days,
+      numericUnit: 'unitless',
       displayValue,
       warnings: [
         `${who} expires on ${isoDate(
@@ -504,7 +506,7 @@ function certificateProduct(result) {
       details,
     };
   }
-  return {score: 1, displayValue, details};
+  return {score: 1, numericValue: days, numericUnit: 'unitless', displayValue, details};
 }
 
 export {

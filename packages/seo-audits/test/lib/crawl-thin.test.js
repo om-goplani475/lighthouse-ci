@@ -46,6 +46,7 @@ describe('buildThinContentProduct', () => {
     );
     expect(product.score).toBe(0);
     expect(product.displayValue).toBe('40 words');
+    expect(product.numericValue).toBe(40);
     expect(product.explanation).toMatch(/40 words/);
     expect(product.details.items[0]).toMatchObject({
       words: 40,

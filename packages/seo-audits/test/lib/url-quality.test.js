@@ -34,6 +34,12 @@ const page = (url, over = {}) => ({url, finalUrl: url, extraction: 'ok', status:
 const run = (a, rule) => buildUrlRuleProduct(a, RULES[rule]);
 
 describe('url-length', () => {
+  it('exposes the measured length and parameter count as numericValue', () => {
+    expect(run(artifact('https://example.com/about'), 'length').numericValue).toBe(6);
+    expect(run(artifact('https://example.com/a?x=1&y=2'), 'params').numericValue).toBe(2);
+    expect(run(artifact('https://example.com/a'), 'session').numericValue).toBeUndefined();
+  });
+
   it('passes a short URL', () => {
     const p = run(artifact('https://example.com/about'), 'length');
     expect(p.score).toBe(1);

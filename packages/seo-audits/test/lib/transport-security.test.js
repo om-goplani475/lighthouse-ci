@@ -462,7 +462,11 @@ describe('certificateProduct', () => {
 
   it('passes with days remaining and no warning', () => {
     const p = product(60 * DAY);
-    expect(p).toMatchObject({score: 1, displayValue: '60 days remaining'});
+    expect(p).toMatchObject({
+      score: 1,
+      displayValue: '60 days remaining',
+      numericValue: 60,
+    });
     expect(p.warnings).toBeUndefined();
     expect(/** @type {any} */ (p.details).items[0]).toMatchObject({
       subject: 'example.com',
