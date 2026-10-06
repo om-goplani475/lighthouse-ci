@@ -259,6 +259,7 @@ const page = (/** @type {any} */ over = {}) => ({
   links: [],
   externalLinks: [],
   pagination: {next: [], prev: []},
+  entities: [],
   depth: 0,
   source: 'audited',
   extraction: 'ok',
@@ -298,9 +299,9 @@ describe('isSnapshot', () => {
   });
 
   it('rejects a wrong or missing version', () => {
-    // A version 1 cache file (before Phase 8) is not read as version 2: the site is crawled again.
+    // A version 1 cache file (before Phase 8) is not read as the current version: the site is crawled again.
     expect(isSnapshot(snapshot({version: 1}))).toBe(false);
-    expect(isSnapshot(snapshot({version: 3}))).toBe(false);
+    expect(isSnapshot(snapshot({version: 4}))).toBe(false);
     expect(isSnapshot(snapshot({version: undefined}))).toBe(false);
   });
 

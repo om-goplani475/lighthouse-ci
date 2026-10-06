@@ -29,6 +29,7 @@ const page = (url, over = {}) => ({
   canonicals: [],
   links: [],
   pagination: {next: [], prev: []},
+  entities: [],
   ...over,
 });
 /** @param {string} url @param {any} [over] */

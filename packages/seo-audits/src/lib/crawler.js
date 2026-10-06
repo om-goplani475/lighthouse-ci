@@ -405,6 +405,7 @@ function toPage(entry) {
     links: [],
     externalLinks: [],
     pagination: {next: [], prev: []},
+    entities: [],
     depth: entry.depth,
     source: entry.source,
     extraction: 'skipped-status',

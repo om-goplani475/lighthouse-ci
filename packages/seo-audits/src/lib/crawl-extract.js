@@ -20,6 +20,7 @@
  */
 
 import {createHash} from 'crypto';
+import {projectEntities} from './structured-facts.js';
 import {Parser} from 'htmlparser2';
 import {
   normalizeUrl,
@@ -49,9 +50,14 @@ import {
  *   links: CrawlLink[],
  *   externalLinks: CrawlExternalLink[],
  *   pagination: CrawlPagination,
+ *   entities: import('./structured-facts.js').Entity[],
  * }} PageExtract
  */
 
+// JSON-LD is read from <script type="application/ld+json"> before the usual "script text is not content" skip; a block
+// longer than this is cut and then ignored by `projectEntities` (it would not parse).
+const MAX_LD_BLOCK_CHARS = 200_001;
+const MAX_LD_BLOCKS = 10;
 const MAX_H1_CHARS = 300;
 const MAX_ANCHOR_BUFFER_CHARS = MAX_ANCHOR_CHARS * 4;
 const MAX_ROBOTS_METAS = 20;
@@ -124,6 +130,7 @@ function emptyExtract() {
     links: [],
     externalLinks: [],
     pagination: {next: [], prev: []},
+    entities: [],
   };
 }
 
@@ -177,6 +184,10 @@ function parse(html, pageUrl) {
   const h1 = [];
   let h1Depth = 0;
   let h1Buffer = '';
+  /** The JSON-LD script being read, and the texts of the finished ones. @type {{text: string} | null} */
+  let ldScript = null;
+  /** @type {string[]} */
+  const ldBlocks = [];
   /** @type {CrawlLink[]} */
   const links = [];
   const seenLinks = new Set();
@@ -268,6 +279,13 @@ function parse(html, pageUrl) {
   const parser = new Parser(
     {
       onopentag(name, attrs) {
+        if (
+          name === 'script' &&
+          /ld\+json/i.test(attrs.type || '') &&
+          ldBlocks.length < MAX_LD_BLOCKS
+        ) {
+          ldScript = {text: ''};
+        }
         const hidden =
           NOT_VISIBLE.has(name) || Object.prototype.hasOwnProperty.call(attrs, 'hidden');
         const head = name === 'head';
@@ -344,6 +362,10 @@ function parse(html, pageUrl) {
       },
 
       ontext(text) {
+        if (ldScript) {
+          if (ldScript.text.length < MAX_LD_BLOCK_CHARS) ldScript.text += text;
+          return;
+        }
         if (inTitle) {
           if (titleBuffer.length < MAX_TEXT_CHARS * 2) titleBuffer += text;
           return;
@@ -355,6 +377,10 @@ function parse(html, pageUrl) {
       },
 
       onclosetag(name) {
+        if (name === 'script' && ldScript) {
+          ldBlocks.push(ldScript.text);
+          ldScript = null;
+        }
         const entry = stack.pop();
         if (!entry) return;
         if (entry.hidden) hiddenDepth--;
@@ -402,6 +428,7 @@ function parse(html, pageUrl) {
     links,
     externalLinks,
     pagination,
+    entities: projectEntities(ldBlocks),
   };
 }
 

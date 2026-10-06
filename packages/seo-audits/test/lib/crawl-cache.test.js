@@ -34,7 +34,7 @@ const KEY = cacheKey({
 
 /** @param {number} [createdAt] */
 const snapshot = (createdAt = Date.now(), requests = 1) => ({
-  version: 2,
+  version: 3,
   origin: 'https://example.com',
   createdAt: new Date(createdAt).toISOString(),
   bounds: {pages: 50, depth: 3, budgetMs: 120000, robots: 'honour', userAgent: USER_AGENT},
@@ -209,7 +209,7 @@ describe('writeSnapshot and readSnapshot', () => {
       'null',
       '[]',
       '"a string"',
-      JSON.stringify({version: 2}),
+      JSON.stringify({version: 3}),
       JSON.stringify({...snapshot(), version: 1}),
       JSON.stringify({...snapshot(), pages: 'x'}),
       JSON.stringify({...snapshot(), createdAt: 'yesterday'}),
@@ -272,7 +272,7 @@ describe('atomic writes under concurrency', () => {
     const script = `
       import {writeSnapshot} from ${JSON.stringify(modulePath)};
       const [dir, key, id] = process.argv.slice(1);
-      const snap = n => ({version: 2, origin: 'https://example.com', createdAt: new Date().toISOString(),
+      const snap = n => ({version: 3, origin: 'https://example.com', createdAt: new Date().toISOString(),
         bounds: {pages: 50, depth: 3, budgetMs: 1, robots: 'honour', userAgent: 'x'}, robots: {state: 'present'},
         seeds: {audited: 1, home: 0, links: 0, sitemap: 0}, sitemapUrls: [], pages: [], skipped: [{url: 'x', reason: 'failed', detail: 'p'.repeat(200000)}],
         stats: {requests: n, elapsedMs: 1, truncatedByBudget: false, overPageCap: false, cutByDepth: false}});
@@ -305,7 +305,7 @@ describe('atomic writes under concurrency', () => {
       if (read === null) missing++;
       else {
         valid++;
-        expect(read.version).toBe(2);
+        expect(read.version).toBe(3);
         expect(read.skipped[0].detail).toHaveLength(200000);
       }
       await new Promise(resolve => setImmediate(resolve));

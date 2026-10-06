@@ -484,3 +484,63 @@ describe('never throws, and stays fast on hostile input at the 512 KiB cap', () 
     );
   });
 });
+
+describe('JSON-LD entities', () => {
+  const ld = (/** @type {object} */ obj, attrs = 'type="application/ld+json"') =>
+    `<script ${attrs}>${JSON.stringify(obj)}</script>`;
+
+  it('captures entities from head and body scripts, in order, and leaves the visible text and links alone', () => {
+    const withLd = run(
+      doc(
+        ld({'@type': 'Organization', name: 'Acme', sameAs: ['https://x.example/a']}),
+        `<p>Hello world</p><a href="/a">A</a>${ld({'@type': 'Product', name: 'Shoe', sku: 'S1'})}`
+      )
+    );
+    const without = run(doc('', '<p>Hello world</p><a href="/a">A</a>'));
+    expect(withLd.entities.map(e => [e.types[0], e.name])).toEqual([
+      ['Organization', 'Acme'],
+      ['Product', 'Shoe'],
+    ]);
+    expect(withLd.entities[1].product.sku).toBe('S1');
+    expect(withLd.textHash).toBe(without.textHash);
+    expect(withLd.wordCount).toBe(without.wordCount);
+    expect(withLd.links).toEqual(without.links);
+  });
+
+  it('accepts a type attribute with a charset or different case, and ignores other scripts', () => {
+    const r = run(
+      doc(
+        ld({'@type': 'Thing', name: 'one'}, 'type="Application/LD+JSON; charset=utf-8"') +
+          '<script type="application/json">{"@type":"Thing","name":"nope"}</script>' +
+          '<script>var x = {"@type":"Thing","name":"also nope"}</script>',
+        ''
+      )
+    );
+    expect(r.entities.map(e => e.name)).toEqual(['one']);
+  });
+
+  it('survives invalid JSON, an empty block, an unterminated script, and entities in the text of a hidden element', () => {
+    expect(run(doc('<script type="application/ld+json">{not json</script>', '')).entities).toEqual(
+      []
+    );
+    expect(run(doc('<script type="application/ld+json"></script>', '')).entities).toEqual([]);
+    expect(() =>
+      run(`<html><head><script type="application/ld+json">{"@type":"Thing"`)
+    ).not.toThrow();
+    const r = run(doc('', `<template>${ld({'@type': 'Thing', name: 'in a template'})}</template>`));
+    expect(r.entities.length).toBeLessThanOrEqual(1); // a template's script is still a script; only the count is bounded
+  });
+
+  it('reads at most ten blocks, and never lets a huge block grow without bound', () => {
+    const many = Array.from({length: 15}, (_, i) => ld({'@type': 'Thing', name: `t${i}`})).join('');
+    expect(run(doc(many, '')).entities.length).toBeLessThanOrEqual(10);
+    const huge = `<script type="application/ld+json">{"@type":"Thing","name":"${'x'.repeat(
+      2_000_000
+    )}"}</script>`;
+    expect(run(doc(huge, '')).entities).toEqual([]);
+  });
+
+  it('has an empty list for an empty extract', () => {
+    expect(emptyExtract().entities).toEqual([]);
+  });
+});

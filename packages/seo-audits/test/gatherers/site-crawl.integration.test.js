@@ -62,7 +62,7 @@ beforeAll(async () => {
   await new Promise(resolve => spy.listen(0, '127.0.0.1', resolve));
   spyPort = /** @type {any} */ (spy.address()).port;
 
-  const hugeNested = '<div>'.repeat(120_000); // ~600 KB: over the 512 KiB body cap
+  const hugeNested = '<div>'.repeat(500_000); // ~2.5 MB: over the 2 MiB body cap
   site = http.createServer((req, res) => {
     const p = /** @type {string} */ (req.url).split('?')[0];
     hits.push({url: p, userAgent: req.headers['user-agent']});
@@ -260,7 +260,7 @@ describe('a real crawl of a local site', () => {
     const started = Date.now();
     const huge = byPath(await crawl())['/huge'];
     expect(huge).toMatchObject({status: 200, truncated: true, extraction: 'ok'});
-    expect(huge.bytes).toBeLessThanOrEqual(512 * 1024);
+    expect(huge.bytes).toBeLessThanOrEqual(2 * 1024 * 1024);
     expect(Date.now() - started).toBeLessThan(30_000);
   });
 
@@ -311,7 +311,7 @@ describe('the on-disk cache, for real', () => {
     const again = await crawl();
     expect(again.state).toBe('crawled');
     expect(hits.length).toBeGreaterThan(before);
-    expect(JSON.parse(fs.readFileSync(path.join(cacheDir, files[0]), 'utf8')).version).toBe(2);
+    expect(JSON.parse(fs.readFileSync(path.join(cacheDir, files[0]), 'utf8')).version).toBe(3);
   });
 
   it('does not use a cache directory that is open to other users', async () => {

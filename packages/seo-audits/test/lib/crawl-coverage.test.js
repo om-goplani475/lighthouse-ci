@@ -35,6 +35,7 @@ const page = (over = {}) => {
     links: [],
     externalLinks: [],
     pagination: {next: [], prev: []},
+    entities: [],
     depth: 0,
     source: 'audited',
     extraction: 'ok',
@@ -46,7 +47,7 @@ const page = (over = {}) => {
 };
 /** @param {any} over */
 const snapshot = (over = {}) => ({
-  version: 2,
+  version: 3,
   origin: 'https://example.com',
   createdAt: '2026-10-01T00:00:00.000Z',
   bounds: {pages: 50, depth: 3, budgetMs: 120000, robots: 'honour', userAgent: 'x'},

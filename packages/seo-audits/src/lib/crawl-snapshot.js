@@ -44,6 +44,7 @@ import {pickEvenly} from './sitemap-url-sample.js';
  *   links: CrawlLink[],
  *   externalLinks: CrawlExternalLink[],
  *   pagination: CrawlPagination,
+ *   entities: import('./structured-facts.js').Entity[],
  *   depth: number,
  *   source: 'audited' | 'home' | 'link' | 'sitemap',
  *   extraction: ExtractionState,
@@ -52,7 +53,7 @@ import {pickEvenly} from './sitemap-url-sample.js';
  * @typedef {{url: string, reason: SkipReason, detail: string | null}} CrawlSkip
  * @typedef {'present' | 'absent' | 'unavailable' | 'ignored'} CrawlRobotsState
  * @typedef {{
- *   version: 2,
+ *   version: 3,
  *   origin: string,
  *   createdAt: string,
  *   bounds: {pages: number, depth: number, budgetMs: number, robots: 'honour' | 'ignore', userAgent: string},
@@ -82,8 +83,13 @@ import {pickEvenly} from './sitemap-url-sample.js';
  * }} SiteCrawlArtifact
  */
 
-const SNAPSHOT_VERSION = 2;
-const MAX_BODY_BYTES = 512 * 1024;
+// 3: each page also carries its `entities` (structured-facts.js). The version is part of the cache key, so a version 2
+// cache is simply not used.
+const SNAPSHOT_VERSION = 3;
+// 2 MiB, up from 512 KiB (Phase 18): structured data often sits at the end of a heavy page (a real product page had its
+// JSON-LD at byte 824,767 of 841,717). The extractor is linear, so the cost is only download time on large pages, which the
+// time budget and the page cap bound.
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
 const MAX_TEXT_CHARS = 1_000;
 const MAX_LINKS_PER_PAGE = 200;
 const MAX_ANCHOR_CHARS = 100;
@@ -240,6 +246,7 @@ function isPage(value) {
     typeof value.wordCount === 'number' &&
     Array.isArray(value.links) &&
     Array.isArray(value.externalLinks) &&
+    Array.isArray(value.entities) &&
     isRecord(value.pagination) &&
     Array.isArray(value.pagination.next) &&
     Array.isArray(value.pagination.prev) &&
