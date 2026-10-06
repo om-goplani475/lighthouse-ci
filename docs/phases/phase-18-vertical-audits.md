@@ -82,4 +82,23 @@ Read from the main document's response headers Lighthouse already has.
 - **C. Local: built** (5 audits, 23 unit tests, checked live on a purpose-built site). Shared helpers for the cross-page audits moved to `lib/vertical-common.js`. The unit tests found that national phone numbers with a leading trunk `0` (`020 7946 0958`) did not match their international form (`+44 20 7946 0958`): fixed, since it would have reported false inconsistencies for most non-US businesses. A `local` preset was added.
 - **D. News: built** (4 audits, 23 + 6 + 2 unit tests, checked live on a purpose-built publisher and on the real New York Times news sitemap). Corrections found on the way: **Google documents no 110-character headline limit** (my design cited one from memory; it is now a labelled note of ours), and it documents no NewsArticle-only fields, so `news-article-values` became `article-values` covering the whole article family. The sitemap parser now reads the news and video extensions. Real data showed that a major publisher writes `news:language` as `en-US`, which first scored 0: now a note. `count()` pluralised "entry" as "entrys": fixed. When a declared sitemap could not be read (the Guardian's `http://` address redirects), the audits now say so instead of "no news sitemap". A `news` preset was added.
 - **E. Video: built** (4 audits, 24 unit tests, checked live on a purpose-built site and on a real 93-video New York Times sitemap file: no false positives). The thumbnail probe reuses the SSRF-protected status helpers (first-party thumbnails use the page's lookup; thumbnails on other sites are public-only) and the package's probe-refusal policy (only 404/410/missing host are defects). The ISO date parser moved to `vertical-common.js`; `siteOf` is now exported from `images.js`. A `video` preset was added.
-- F: not built yet. Each vertical is built, QA'd against a real site, documented here, and committed after one approval.
+- **F. Entity: built** (4 audits, 20 unit tests, checked live on a purpose-built site and real addresses). The shared bounded status probe moved to `vertical-common.js` (`probeStatuses`, used by video and entity); `normalizeName` moved there too. **A security defect was found in this slice by testing and fixed before the branch was merged** (see below). New environment variable `LHCI_SEO_SAMEAS_MAX_CHECKS` (default 8, 0 to 20).
+
+## Status of the branch
+
+All six verticals are built and committed: **26 new audits** (125 in all: 79 scored, 31 of them error tier and 48 warn tier, and 46 informational), the shared structured-facts projection, the crawl snapshot v3, the news and video sitemap extension parsing, and the `ecommerce`, `local`, `news` and `video` presets. Not part of this branch, as agreed: monitoring (scheduled crawl diffs), reporting (exports, history), template detection and AI-generated fixes.
+
+### Defects found by live checks and tests, all fixed in the branch
+
+| Found by | Defect |
+|---|---|
+| a real product page (Allbirds) | the crawler read only 512 KiB, so JSON-LD at byte 824,767 was missed: cap raised to 2 MiB |
+| a real product page (Allbirds) | variants written as bare pointers were flagged: pointers are no longer judged |
+| a real shop that refused the crawler (403) | "no product pages" was claimed: the audits now say why the audited page could not be used |
+| a real small category (2 products) | a category threshold of 5 product links was too high: now 3 |
+| a unit test | national phone numbers with a trunk `0` did not match their international form |
+| the real New York Times news sitemap | `news:language` `en-US` scored an error: now a note |
+| the real New York Times news sitemap | one late entry among 637 warned: now only from a tenth of the entries |
+| the real Guardian | a declared `http://` sitemap that redirects was reported as "no news sitemap": the audits now say a file could not be read |
+| unit tests | `count()` pluralised "entry" as "entrys" and "address" as "addresss" |
+| a test of the probe against internal addresses | **security: the thumbnail and `sameAs` probes reached `127.0.0.1` and tried `10.x` and `169.254.169.254`** (see `security-findings.md`): `safeFetchPublicStatus` added, the audits use it, with regression tests | Each vertical is built, QA'd against a real site, documented here, and committed after one approval.

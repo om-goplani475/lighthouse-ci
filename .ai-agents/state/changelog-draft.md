@@ -670,3 +670,15 @@ The LHCI server can now audit URLs for other repositories. A repository sends a 
 
 New: `packages/seo-audits/src/service/` (project config, webhook signature, payload, host allow-list, guard proxy, runner, outbound sender, comment and alert text, notifier), `packages/server/src/seo/` (tables `seo_projects`, `seo_notifications`, `seo_runs`, `seo_webhook_logs`; queue; routes under `/api/v1/webhooks` and `/api/v1/seo`), and the dashboard screens in `packages/server/src/ui/routes/seo/`. Upstream files changed: `server.js` (mount, 8 lines), `package.json` (two workspace dependencies), `app.jsx` (two routes), `page-sidebar.jsx` (one icon). New variables: `LHCI_SEO_SERVICE`, `LHCI_SEO_PUBLIC_URL`, `LHCI_SEO_SERVICE_CHROME_FLAGS`. See `docs/phases/phase-17-webhook-platform.md`, `docs/qa/webhook-platform.md` and the README.
 
+## 2026-10-07 — vertical audits (Phase 18)
+
+**26 new audits** (125 in all: 79 scored, 46 informational) in six groups, each with a category in the summary, recommended severities and, for four of them, a preset (`ecommerce`, `local`, `news`, `video`):
+
+- **Security headers (3):** `x-content-type-options`, `referrer-policy`, `content-security-policy-report`.
+- **E-commerce (6):** `product-identifiers`, `product-offer-values` (error tier), `product-variants`, `faceted-navigation-explosion`, `product-pages-in-sitemap`, `product-category-linking`.
+- **Local business (5):** `local-business-values`, `local-nap-consistency`, `local-name-consistency`, `local-pages-report`, `local-pages-in-sitemap`.
+- **News (4):** `article-values`, `news-sitemap-valid` (error tier), `news-sitemap-freshness`, `news-sitemap-report`.
+- **Video (4):** `video-structured-data-values`, `video-sitemap-valid` (error tier), `video-discoverability`, `video-thumbnail-reachable`.
+- **Entity (4):** `entity-same-as-values`, `entity-same-as-reachable`, `entity-identity-consistency`, `entity-disambiguation`.
+
+**Changes that affect existing behaviour:** the crawl snapshot is version 3 (each crawled page records its structured-data `entities`; an old cache is simply not used); the crawler's per-page body cap is 2 MiB, up from 512 KiB, because structured data often sits at the end of a heavy page; the sitemap gatherer's documents now also carry the Google News and video extension entries. New variable: `LHCI_SEO_SAMEAS_MAX_CHECKS` (default 8; `0` switches the `sameAs` probe off). New requests, to other sites: up to 8 `sameAs` addresses and up to 5 video thumbnails per run, status only. See `docs/phases/phase-18-vertical-audits.md`, `docs/qa/vertical-audits.md` and the README.

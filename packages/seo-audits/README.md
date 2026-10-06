@@ -562,6 +562,19 @@ Four audits for pages and sites with video. Sources: Google's video structured d
 
 `video-sitemap-valid` is not applicable when no video entries were found among the sitemaps read, and says so when a sitemap file could not be read (a sitemap index's children beyond the gatherer's 10-file budget, or a declared `http://` address that redirects) instead of claiming there is none. A `video` preset promotes the new category to errors. Checked live on 2026-10-06: a purpose-built video site (an unmarked YouTube embed, a video with bad markup and a dead same-site thumbnail next to a live cross-site one, a decorative background video, a video sitemap with four defects: every result was as designed) and a real New York Times video sitemap file (93 videos, no problem reported).
 
+### Entity audits (Phase 18)
+
+Four audits on how an organization, a business or a person is identified in the page's JSON-LD (`Organization` and its subtypes, local businesses and `Person`), and across the crawled pages. Source: Google's organization structured data documentation, read 2026-10-06: there are no required properties; `name`, `url`, `logo` and `sameAs` (profile pages on other sites) are recommended, and identifiers (`iso6523Code`, `leiCode`, `duns`, `naics`) help tell an organization apart. The consistency and probe rules are our judgement.
+
+| Audit | Level | What it checks |
+|---|---|---|
+| `entity-same-as-values` | warn | each `sameAs` address is a full http(s) address on a public host. No scheme (`facebook.com/acme`), `mailto:`/`javascript:` and a non-public host are problems; `http` instead of https, a duplicate, the page or entity itself, an address on the same site, and more than 15 are notes |
+| `entity-same-as-reachable` | warn | requests each `sameAs` address on another site (at most 8, status only, no redirect followed, public addresses only). A 404, a 410 or a host that does not exist is a defect; 401, 403, 429, 999 (LinkedIn), a 5xx, a redirect or a timeout is only a note |
+| `entity-identity-consistency` | warn | across the crawl, one `@id` (else one `url`) described with different names, logos, or two different profile addresses on the same network. A name that differs only by legal form, case or accents is the same; a page that lists fewer profiles than another is not a conflict. The audited page is judged, the others are listed |
+| `entity-disambiguation` | informational | per entity, which signals it carries: `@id`, `url`, `logo`, the number of `sameAs`, and identifiers |
+
+**Requests:** `entity-same-as-reachable` makes up to **8** requests per run to **other sites** (`LHCI_SEO_SAMEAS_MAX_CHECKS`, at most 20, `0` switches them off and that audit is then not applicable), 5 s each, with the same SSRF-protected helpers as the rest of the package (public addresses only for other sites). Checked live on 2026-10-06 on a purpose-built organization site (a missing scheme, a non-public address, a dead GitHub profile, a name and logo that differ between pages, a person page) and on real addresses: Wikipedia answered the probe with 403 and LinkedIn with 999, both correctly only notes.
+
 ### Soft-404 check (`soft-not-found`)
 
 - **`soft-not-found`** (Phase 5) — does the site answer a URL that does not exist with a normal page? A
@@ -867,6 +880,7 @@ Four **informational** audits (they never score or fail) about being found and q
 | `LHCI_SEO_DEVICE_PARITY` | on (`0` switches it off) | two requests to the audited page, with a mobile and a desktop user-agent (`device-content-parity`); `0` makes that audit not applicable |
 | `LHCI_SEO_CRUX_API_KEY` | unset (off) | a Google API key for the Chrome UX Report API; when set, `core-web-vitals-field` sends the page origin and path to Google once or twice per run (URL, then origin); unset, the audit is not applicable and nothing is sent |
 | `LHCI_SEO_HREFLANG_MAX_CHECKS` | 10 (0 to 25) | how many alternate versions named in the page's hreflang links are requested (`hreflang-return-links`, `-alternate-status`, `-canonical`); `0` switches the requests off and those audits are then not applicable |
+| `LHCI_SEO_SAMEAS_MAX_CHECKS` | 8 (0 to 20) | how many `sameAs` addresses on other sites `entity-same-as-reachable` requests; `0` switches them off and that audit is then not applicable |
 | `LHCI_SEO_AMP_CHECK` | on (`0` switches it off) | one request to the AMP version a page links to (`amp-check`); `0` makes that part of the report say it was not requested |
 | `LHCI_SEO_CRAWL_MAX_LINK_CHECKS` | 100 (0 to 200) | status-only checks of the audited page's own links the crawl did not read; `0` switches them off (the link-check audits then judge only links to pages the crawl read) |
 | `LHCI_SEO_CRAWL_TIME_BUDGET_SECONDS` | 120 (10 to 600) | total crawl time |
@@ -882,6 +896,7 @@ Four **informational** audits (they never score or fail) about being found and q
 | Per Lighthouse run, not cached | up to 100 internal link checks | `LHCI_SEO_CRAWL_MAX_LINK_CHECKS=0` |
 | Per run | up to 20 external link checks (2 per host, other sites) | the external-link setting above |
 | Per run | up to 10 hreflang alternates (at most 20 s; measured 7 to 9 s on ikea.com and stripe.com) | `LHCI_SEO_HREFLANG_MAX_CHECKS=0` |
+| Per run | up to 8 `sameAs` addresses and up to 5 video thumbnails, to **other sites** (status only, 5 s each; thumbnails on the audited site's own site go to it) | `LHCI_SEO_SAMEAS_MAX_CHECKS=0` (the thumbnail check has no switch: a page without video markup makes no request) |
 | Per run | 2 device-parity fetches, 1 AMP version, 3 URL-variant probes, 2 soft-404 probes | `LHCI_SEO_DEVICE_PARITY=0`, `LHCI_SEO_AMP_CHECK=0` |
 | Per run | up to 25 sitemap URLs, robots.txt, sitemaps, llms.txt, the favicon and og:image | |
 | Per run, only with a key | 1 or 2 calls to Google (CrUX) | `LHCI_SEO_CRUX_API_KEY` unset |
@@ -983,7 +998,7 @@ module.exports = {
 };
 ```
 
-This adds all 99 audits (listed with their phase, scoring and recommended assertion in the audit index below) on top of
+This adds all 125 audits (listed with their phase, scoring and recommended assertion in the audit index below) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
@@ -1025,11 +1040,11 @@ The LHCI server (`packages/server`) can run the audits for other repositories, s
 | `LHCI_SEO_SERVICE` | on | Set to `off` to turn the whole service off (no tables, no routes). |
 | `LHCI_SEO_PUBLIC_URL` | unset | The server's public address, for the "Full report" link in comments and alerts (`<this>/app/seo/<project>/runs/<run>`). No link when unset. |
 | `LHCI_SEO_SERVICE_CHROME_FLAGS` | unset | Extra Chrome flags for service runs, for example `--no-sandbox` inside a container. A flag that could undo the proxy (`--proxy-server`, `--proxy-bypass-list`, `--host-resolver-rules`) is dropped. |
-| `LHCI_SEO_CRAWL_*`, `LHCI_SEO_HREFLANG_MAX_CHECKS`, `LHCI_SEO_CRUX_API_KEY` | (service defaults: 30 pages, 60 s) | Passed to service runs like any run. `LHCI_SEO_ALLOW_PRIVATE_NETWORK` is **never** passed. |
+| `LHCI_SEO_CRAWL_*`, `LHCI_SEO_HREFLANG_MAX_CHECKS`, `LHCI_SEO_SAMEAS_MAX_CHECKS`, `LHCI_SEO_CRUX_API_KEY` | (service defaults: 30 pages, 60 s) | Passed to service runs like any run. `LHCI_SEO_ALLOW_PRIVATE_NETWORK` is **never** passed. |
 
 **Run it behind a reverse proxy** that rate-limits by address (the signature check is cheap but not free) and give the container limits on memory and CPU: a page can keep Chrome busy for the 10-minute run limit. The webhook routes are mounted before the server's basic-auth; the management routes are behind it and the project admin token. Webhook secrets, GitHub/GitLab tokens and Slack/Teams URLs are stored in the server's database in clear (like the project build token), so protect the database and its backups.
 
-### Audit index (all 99 audits)
+### Audit index (all 125 audits)
 
 Phase is the fork's own phase number. **Scoring** is what the audit reports; **Recommended assertion** is the severity `src/recommended-assertions.json` uses (`error` for objective defects, `warn` for the rest;
 informational audits are reports and cannot be asserted at all). 57 are scored (28 recommended at `error`, 29 at `warn`) and 42 are informational.
@@ -1138,6 +1153,10 @@ informational audits are reports and cannot be asserted at all). 57 are scored (
 | 18 | `content-security-policy-report` | informational | none (informational audits cannot be asserted) |
 | 18 | `referrer-policy` | pass, 0.5 warning | `warn` |
 | 18 | `x-content-type-options` | pass, 0.5 warning | `warn` |
+| 18 | `entity-disambiguation` | informational | none (informational audits cannot be asserted) |
+| 18 | `entity-identity-consistency` | pass, 0.5 warning | `warn` |
+| 18 | `entity-same-as-reachable` | pass, 0.5 warning | `warn` |
+| 18 | `entity-same-as-values` | pass, 0.5 warning | `warn` |
 | 18 | `video-discoverability` | pass, 0.5 warning | `warn` |
 | 18 | `video-sitemap-valid` | pass or fail | `error` |
 | 18 | `video-structured-data-values` | pass, 0.5 warning | `warn` |
@@ -1168,6 +1187,8 @@ Since the calibration of 2026-10-06 each audit belongs to one of three tiers (se
 | **Warn** | Best practice with real but moderate impact (a long redirect chain, a link to a 301, a missing `<h1>`, text or links only after JavaScript, generic anchor text) | **score 0.5**, weight 0.5 |
 | **Informational** | Advice, a heuristic or a report (thin content, click depth, link counts, anchor diversity, query parameters, duplicate descriptions, image file names and formats, `llms.txt`, HSTS strength, manifest icons, and others) | never scored; lhci cannot assert on it |
 
+As of Phase 18 there are **125 audits**: 79 scored (31 in the error tier, 48 in the warn tier) and 46 informational.
+
 `src/recommended-assertions.json` is a ready-made `assertions` object: the error tier at `error` (`minScore: 1`), the warn tier at `warn`, `ssl-certificate-expiry` at `error` with `minScore: 0.5` (0.5 means 15 days or fewer left), and no informational audit. A test keeps it in step with the audits (every scored audit is listed, no informational one is):
 
 ```js
@@ -1183,9 +1204,9 @@ Override single entries by spreading it: `assertions: {...require('...'), 'url-l
 
 ### Assertion severity
 
-None of the 99 audits are part of this fork's shared `all`/`recommended` presets
+None of the 125 audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all 99 here are opt-in via `configPath`, so they can't be part of that
+default, and all 125 here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js

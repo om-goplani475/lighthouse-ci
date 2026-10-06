@@ -10,7 +10,7 @@ done, decisions waiting, and deferred features. What was finished is in `docs/ph
 |------|-------|
 | Webhook platform | Phase 17 (`packages/server/src/seo/`, `packages/seo-audits/src/service/`, the dashboard): built and QA'd live; see the README and `docs/qa/webhook-platform.md`. |
 | Summary command | `packages/seo-audits/src/summary/cli.js` (Phase 16) scores, ranks and compares the reports; see the README. |
-| Audits | 99 in the `seo-extended` category: 57 scored (error tier at `error`, 7 warn-tier audits at score 0.5) and 42 informational. `packages/seo-audits/src/recommended-assertions.json` asserts the scored ones. |
+| Audits | 125 in the `seo-extended` category (Phase 18 on its branch, merge pending): 79 scored (31 error tier, 48 warn tier) and 46 informational. `packages/seo-audits/src/recommended-assertions.json` asserts the scored ones. |
 | `seo-audits` tests | 117 suites / 2,027 tests pass, on Node 24 and on Node 18.20.8 (what CI pins), checked 2026-10-06. Typecheck, lint and prettier clean. |
 | Security findings | **None open.** Findings 1-10 are fixed. One risk is *accepted*, not fixed: `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control (the README says so). |
 | Viewer | `@lhci/viewer` renders all 34 audits that had tables in five real reports (2026-10-06); the server and `seed-database` path was checked on 2026-10-05. |
@@ -49,6 +49,10 @@ A low-traffic site returns "no data", which is expected. Anything off is a `fix(
 ### H. Phase 17: verify the real destinations (needs you)
 
 The webhook service was built and run end to end with real Chrome and a real server, and its outbound requests are tested against fakes of the documented GitHub, GitLab, Slack and Teams APIs, but **no real pull request comment, alert or webhook delivery has been seen**. The steps are in `docs/qa/webhook-platform.md` ("Not verified"): a real GitHub or GitLab token commenting once and editing (not duplicating) on a second push; a real Slack and Teams alert for a new `noindex`; a real GitHub *Recent Deliveries* answer; a container run with `LHCI_SEO_SERVICE_CHROME_FLAGS=--no-sandbox`. **Pass when** each does what the document says. Anything off is a `fix(...)` commit with a test using the real response shape.
+
+### I. Phase 18: more real sites for the new audits
+
+The Phase 18 audits were checked live on real pages where they could be (IKEA and Allbirds product pages, the real New York Times news and video sitemaps, GitHub, web.dev, the Guardian) and on purpose-built sites with known defects for every positive path, which is how most of the defects in `docs/phases/phase-18-vertical-audits.md` were found. **Not covered live:** a real shop whose crawl is complete enough for `product-category-linking` and `product-pages-in-sitemap` to judge (Etsy refuses headless Chrome; IKEA's crawl and sitemap are too big); a real local-business site with several locations; a real video watch page. Run `lhci collect` on your own shop, local-business and publisher sites and read the six groups in `docs/qa/vertical-audits.md`. Anything that fires on a site you know to be correct is a `fix(seo-audits)` commit with a test.
 
 ### G. Real-site spot check (done twice; more sites always help)
 
