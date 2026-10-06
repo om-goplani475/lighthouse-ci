@@ -15,7 +15,14 @@
  * `news:publication_date`, `news:title`; at most 1,000 `news:news` per sitemap; only articles of the last two days.
  */
 
-import {clip, count, notApplicable, table, unreadSitemapsNote} from './vertical-common.js';
+import {
+  clip,
+  count,
+  notApplicable,
+  table,
+  unreadSitemapsNote,
+  parseIsoDate,
+} from './vertical-common.js';
 import {ARTICLE_TYPES} from './structured-facts.js';
 
 /** @typedef {import('./structured-facts.js').Entity} Entity */
@@ -29,39 +36,6 @@ const MAX_NEWS_ENTRIES = 1000;
 const STALE_SHARE = 0.1;
 const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
-const ISO_DATE =
-  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
-
-/**
- * @param {string} value
- * @return {{ok: boolean, ms: number, hasTime: boolean, hasZone: boolean}} Whether it is an ISO 8601 date or date-time (a real calendar date), and when.
- */
-function parseIsoDate(value) {
-  const m = ISO_DATE.exec(value.trim());
-  const bad = {ok: false, ms: NaN, hasTime: false, hasZone: false};
-  if (!m) return bad;
-  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  if (mo < 1 || mo > 12 || d < 1 || d > new Date(Date.UTC(y, mo, 0)).getUTCDate()) return bad;
-  const hasTime = m[4] !== undefined;
-  if (
-    hasTime &&
-    (Number(m[4]) > 23 || Number(m[5]) > 59 || (m[6] !== undefined && Number(m[6]) > 59))
-  ) {
-    return bad;
-  }
-  const zone = m[7];
-  const iso = `${m[1]}-${m[2]}-${m[3]}T${m[4] || '00'}:${m[5] || '00'}:${m[6] || '00'}${
-    zone
-      ? zone === 'Z'
-        ? 'Z'
-        : zone.length === 5
-        ? `${zone.slice(0, 3)}:${zone.slice(3)}`
-        : zone
-      : 'Z'
-  }`;
-  const ms = Date.parse(iso);
-  return Number.isNaN(ms) ? bad : {ok: true, ms, hasTime, hasZone: zone !== undefined};
-}
 
 /** @param {Entity} e @return {string} */
 function label(e) {
@@ -486,7 +460,6 @@ function newsSitemapReportProduct(sitemaps) {
 }
 
 export {
-  parseIsoDate,
   evaluateArticles,
   articleValuesProduct,
   evaluateNewsSitemap,

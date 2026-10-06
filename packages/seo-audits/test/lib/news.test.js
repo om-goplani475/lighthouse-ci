@@ -6,8 +6,8 @@
 
 /* eslint-env jest */
 
+const {parseIsoDate} = require('../../src/lib/vertical-common.js');
 const {
-  parseIsoDate,
   evaluateArticles,
   articleValuesProduct,
   evaluateNewsSitemap,

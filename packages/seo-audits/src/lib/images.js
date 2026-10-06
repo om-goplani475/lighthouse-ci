@@ -606,6 +606,7 @@ export {
   buildLegacyFormatProduct,
   buildFailedImagesProduct,
   baseName,
+  siteOf,
   MAX_ROWS,
   MAX_ALT_CHARS,
   LEGACY_MIN_BYTES,

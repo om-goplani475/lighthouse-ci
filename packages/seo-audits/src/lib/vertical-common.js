@@ -212,7 +212,43 @@ function unreadSitemapsNote(sitemaps) {
   return ` ${parts.join('; ')}, so one may exist that was not seen.`;
 }
 
+// ISO 8601 (W3C) date or date-time, as Google accepts in structured data and sitemaps.
+const ISO_DATE =
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+
+/**
+ * @param {string} value
+ * @return {{ok: boolean, ms: number, hasTime: boolean, hasZone: boolean}} Whether it is an ISO 8601 date or date-time (a real calendar date), and when.
+ */
+function parseIsoDate(value) {
+  const m = ISO_DATE.exec(value.trim());
+  const bad = {ok: false, ms: NaN, hasTime: false, hasZone: false};
+  if (!m) return bad;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (mo < 1 || mo > 12 || d < 1 || d > new Date(Date.UTC(y, mo, 0)).getUTCDate()) return bad;
+  const hasTime = m[4] !== undefined;
+  if (
+    hasTime &&
+    (Number(m[4]) > 23 || Number(m[5]) > 59 || (m[6] !== undefined && Number(m[6]) > 59))
+  ) {
+    return bad;
+  }
+  const zone = m[7];
+  const iso = `${m[1]}-${m[2]}-${m[3]}T${m[4] || '00'}:${m[5] || '00'}:${m[6] || '00'}${
+    zone
+      ? zone === 'Z'
+        ? 'Z'
+        : zone.length === 5
+        ? `${zone.slice(0, 3)}:${zone.slice(3)}`
+        : zone
+      : 'Z'
+  }`;
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? bad : {ok: true, ms, hasTime, hasZone: zone !== undefined};
+}
+
 export {
+  parseIsoDate,
   unreadSitemapsNote,
   MAX_ROWS,
   MAX_CELL_CHARS,
