@@ -220,8 +220,9 @@ function judgeConsistency(variant, audited, canonicalOrigin) {
         }
       : {verdict: 'note', text: `Returned HTTP ${last.status} without redirecting; not judged.`};
   }
-  if (last.status === 401 || last.status === 403 || last.status === 429 || last.status >= 500) {
-    // Bot protection, a rate limit or a server hiccup answers our probe; that says nothing about the redirect.
+  if (last.status !== 404 && last.status !== 410 && !(last.status >= 200 && last.status < 300)) {
+    // Only a page that is gone (404, 410) is a defect of the redirect. Bot protection (401, 403), a refused
+    // user-agent (406), a rate limit (429) or a server hiccup answers our probe and says nothing about it.
     return {
       verdict: 'note',
       text: `Redirects, but the chain ends in HTTP ${last.status} at ${last.url}, which is often bot protection or a temporary error; not judged.`,

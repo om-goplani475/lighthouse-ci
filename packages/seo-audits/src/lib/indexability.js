@@ -174,8 +174,13 @@ function analyze(input) {
           page.redirectLocation ? ` to ${clip(page.redirectLocation)}` : ''
         }), so it is not the final URL`
       );
-    } else if (page.status >= 400) {
+    } else if (page.status === 404 || page.status === 410) {
       problems.push(`the canonical target returns HTTP ${page.status}`);
+    } else if (page.status >= 400) {
+      // 401, 403, 406, 429 and 5xx: bot protection, a refused user-agent or a hiccup answered our request.
+      notes.push(
+        `the canonical target answered HTTP ${page.status} to our request, which is often bot protection; not judged`
+      );
     } else {
       const targetNoindex = noindexFor(CRAWLER_KEYS, {
         metas: page.metas,

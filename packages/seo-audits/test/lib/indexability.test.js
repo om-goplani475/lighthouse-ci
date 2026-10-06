@@ -197,6 +197,17 @@ describe('findConflicts: the four chosen contradictions', () => {
     expect(findConflicts(input({status: 404}))).toEqual([]);
   });
 
+  it('does not call a canonical target a conflict when it answered with bot protection or a refusal', () => {
+    for (const status of [401, 403, 406, 429, 503]) {
+      expect(findConflicts(input({canonicals: ['/shoes-main'], target: target({status})}))).toEqual(
+        []
+      );
+    }
+    expect(
+      conflictTexts(input({canonicals: ['/shoes-main'], target: target({status: 404})}))
+    ).toEqual([expect.stringMatching(/canonical target returns HTTP 404/)]);
+  });
+
   it('1. noindex that robots.txt hides, per crawler', () => {
     const both = conflictTexts(input({metas: noindexMeta, robotsTxt: BLOCK_ALL}));
     expect(both).toEqual(['noindex, but robots.txt blocks Googlebot and Bingbot']);
@@ -270,9 +281,10 @@ describe('findConflicts: the canonical target', () => {
     expect(texts[0]).toMatch(/redirects \(HTTP 301 to https:\/\/example.com\/new\)/);
   });
 
-  it('flags a target that errors', () => {
+  it('flags a target that is gone, but not one that answered 5xx (a hiccup at probe time)', () => {
     expect(conflictTexts(withTarget(target({status: 404})))[0]).toMatch(/returns HTTP 404/);
-    expect(conflictTexts(withTarget(target({status: 503})))[0]).toMatch(/returns HTTP 503/);
+    expect(conflictTexts(withTarget(target({status: 410})))[0]).toMatch(/returns HTTP 410/);
+    expect(conflictTexts(withTarget(target({status: 503})))).toEqual([]);
   });
 
   it('flags a noindex target, by header or meta', () => {

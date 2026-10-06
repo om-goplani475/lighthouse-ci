@@ -143,11 +143,20 @@ describe('judgeConsistency', () => {
   });
 
   it('does not judge a chain that ends in bot protection or a server error', () => {
-    for (const status of [401, 403, 429, 503]) {
+    for (const status of [401, 403, 406, 429, 503]) {
       const v = variant({
         hops: [hop('http://example.com/shoes?size=9', 301, AUDITED), hop(AUDITED, status)],
       });
       expect(judge(v).verdict).toBe('note');
+    }
+  });
+
+  it('fails only a chain that ends gone (404 or 410)', () => {
+    for (const status of [404, 410]) {
+      const v = variant({
+        hops: [hop('http://example.com/shoes?size=9', 301, AUDITED), hop(AUDITED, status)],
+      });
+      expect(judge(v).verdict).toBe('fail');
     }
   });
 
