@@ -9,10 +9,10 @@ done, decisions waiting, and deferred features. What was finished is in `docs/ph
 | Area | State |
 |------|-------|
 | Audits | 99 in the `seo-extended` category: 57 scored (error tier at `error`, 7 warn-tier audits at score 0.5) and 42 informational. `packages/seo-audits/src/recommended-assertions.json` asserts the scored ones. |
-| `seo-audits` tests | 112 suites / 1,989 tests pass, on Node 24 and on Node 18.20.8 (what CI pins), checked 2026-10-06. Typecheck, lint and prettier clean. |
+| `seo-audits` tests | 112 suites / 1,995 tests pass, on Node 24 and on Node 18.20.8 (what CI pins), checked 2026-10-06. Typecheck, lint and prettier clean. |
 | Security findings | **None open.** Findings 1-10 are fixed. One risk is *accepted*, not fixed: `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control (the README says so). |
 | Viewer | `@lhci/viewer` renders all 34 audits that had tables in five real reports (2026-10-06); the server and `seed-database` path was checked on 2026-10-05. |
-| Failing suites outside `seo-audits` | About 9-11 suites in `cli`, `server`, `viewer`, `utils` (see section 4). Not caused by this work. |
+| Failing suites outside `seo-audits` | 6 screenshot suites in `server` and `viewer` fail on this machine only (see section 4); the rest pass. Not caused by this work. |
 | Not verified at all | The real GitHub Actions run (A3) and the CrUX success path with a real key (E). |
 
 ## 2. Checks still to do
@@ -43,23 +43,19 @@ success path has never seen real data**. Create a Google Cloud API key, enable t
 **Pass when** it shows LCP, INP and CLS with a Google rating and a collection period, says whether the URL or the whole site answered, and the key does not appear in the report JSON.
 A low-traffic site returns "no data", which is expected. Anything off is a `fix(seo-audits)` commit with a test using the real response shape.
 
-### G. Real-site spot check: the types not yet covered
+### G. Real-site spot check (done twice; more sites always help)
 
-Done 2026-10-06 on MDN, BBC News, apple.com, ikea.com and Wikipedia (found and fixed six false positives). **Still to look at**, one real site each:
+Done 2026-10-06 on 15 real sites in two rounds. Round 1: MDN, BBC News, apple.com, ikea.com, Wikipedia (six false positives fixed). Round 2: spotify.com, lego.com, nike.com, rottentomatoes.com,
+theguardian.com, nextjs.org, react.dev, angular.dev, lipsum.com, paulgraham.com (no runtime error and no audit error row on any; four false positives fixed: a 406 or 403 on a probe read as a
+defect in `url-variant-consistency` and `indexability-conflicts`, a lazy image at the very bottom of the first screen, and Next.js app-router pages not recognised in `rendering-mode`).
+What fired afterwards looked genuine (missing og tags, no `<h1>`, a sitemap URL that 404s or redirects, SPAs answering 200 for any path, `sitemap.xml` serving HTML).
+**Known and accepted:** `placeholder-content` fails a page that is itself about lorem ipsum (lipsum.com), as its description says.
+**Not covered:** a site whose hreflang set includes an `x-default` language chooser that the crawler can read (spotify, lego and nike did not expose one), and one whose hreflang is only in the sitemap. Look for
+one when you meet it; the unit tests and the planted-site run cover that logic.
 
-- a **multilingual site with an `x-default` language chooser** (the hreflang audits and the `x-default` exemption), and one whose hreflang is **only in the sitemap**;
-- a **retail home page with a carousel** (`image-lazy-above-fold`, `hidden-text`);
-- a site with a JSON-LD **Article plus a Review** (`content-dates`);
-- a **Next.js / React / Angular site** (`rendering-mode`, `hydration-errors`, `js-*`), and a site that serves mobile differently (`device-content-parity`);
-- a **page about templates or lorem ipsum** (`placeholder-content`), and **real prose** for the readability numbers;
-- the Phase 15 AI reports (the question-heading heuristic on real content).
+### R13 (rest). Bytespider
 
-Look for audits that fire on healthy pages; a script-built site wrongly judged thin or duplicate should say "not applicable". Anything wrong is a `fix(seo-audits)` commit with a test.
-
-### R13 (rest). AI crawler names not yet checked against vendor pages
-
-OpenAI, Anthropic, Perplexity, Google-Extended and Applebot-Extended were confirmed on 2026-10-06. Not re-checked: `CCBot`, `Bytespider`, `Amazonbot`, `Meta-ExternalAgent`,
-`DuckAssistBot` (in `src/lib/ai-crawlers.js`). OpenAI also lists `OAI-AdsBot`, which is not in the list.
+`Bytespider` (ByteDance) is the one crawler name not confirmed: ByteDance publishes no reachable vendor page, so it is documented only by third parties. All 18 others in `src/lib/ai-crawlers.js` were checked against vendor pages on 2026-10-06.
 
 ## 3. Decisions and limits worth knowing
 
@@ -77,9 +73,14 @@ OpenAI, Anthropic, Perplexity, Google-Extended and Applebot-Extended were confir
 - **`docs/phases/phase-1-page-metadata.md` is stale.** Its "Not possible without new infrastructure" table still lists duplicate titles and duplicate meta descriptions as impossible; Phase 7
   built them. Move those rows to done. The same file calls roadmap Phase 16 "Site Intelligence & Multi-page Crawler", while `docs/master-roadmap.md` calls it "Site Intelligence / Product
   Layer": align the two.
-- **Failing suites outside `seo-audits`:** Storybook, Puppeteer and e2e suites in `server` and `viewer`, plus `cli/test/autorun-github.test.js`, `cli/test/upload.test.js`,
-  `cli/test/wizard.test.js` and `utils/test/build-context.test.js`. Run them once on a clean checkout of upstream `main` to confirm they fail there too; the causes were not investigated.
-  They only matter if you want a fully green local `npm run test`.
+- **Failing suites outside `seo-audits` (investigated 2026-10-06):** the fork's own commits touch only `packages/seo-audits`; everything else is upstream's history. Of the 8 suites that
+  failed on this Node 24 machine, 2 are fixed and 6 remain. Fixed: `utils/test/build-context.test.js` (the clone had no git tags, fixed by `git fetch upstream --tags`, plus 2 tests that assumed
+  `origin` is `GoogleChrome/lighthouse-ci`; they now compare with this clone's own `origin`) and `cli/test/wizard.test.js` (Node 24 prints a `url.parse()` deprecation from sqlite3's
+  `@mapbox/node-pre-gyp` into stderr; the wizard test now runs with `--no-deprecation`; it passed on Node 18 already). **Remaining, all pixel comparisons against screenshots made on
+  upstream's machine:** `viewer/test/e2e/simple-comparison`, `viewer/test/e2e/different-category-comparison`, `server/test/e2e/project-dashboard`, `project-dashboard-empty`,
+  `project-dashboard-mixed-v5-v6` and `server/test/ui/storybook` (0.4% to 2.5% of pixels, text edges and 1px offsets; the layout is identical). They are rendering differences from this
+  machine's fonts and Chrome, not defects. Judge them in CI (the runner that made the goldens), or regenerate the goldens there; regenerating them here would only move the problem. The storybook run
+  also writes two new untracked snapshots for the Lighthouse 12.6.1 stories (`version-1261`) that upstream does not have; delete them, do not commit them.
 
 ## 5. Deferred features (choices, not bugs)
 
