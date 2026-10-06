@@ -13,13 +13,13 @@ import {analyzeLlmsTxt} from '../lib/llms-txt.js';
 const MAX_PROBLEM_ROWS = 30;
 
 const UIStrings = {
-  title: 'llms.txt follows the llms.txt format',
+  title: 'llms.txt structure',
   failureTitle: 'llms.txt does not follow the llms.txt format',
   description:
-    'Checks `/llms.txt`, if the site has one, against the format at llmstxt.org: an H1 title (the ' +
+    'Informational: never fails a build. Checks `/llms.txt`, if the site has one, against the format at llmstxt.org: an H1 title (the ' +
     'only required part), and any list items under H2 sections written as `[name](url)` links. A ' +
     'file that is really an HTML page (a single-page app answering every path with its index ' +
-    'page) also fails. **llms.txt is a community proposal, not a ratified standard, and this audit ' +
+    'page) is reported as a problem. **llms.txt is a community proposal, not a ratified standard, and this audit ' +
     'does not claim any search engine or AI system uses it**: it only checks that a file you chose ' +
     'to publish is well-formed. A missing file is not a failure (the audit is not-applicable), ' +
     'because nothing requires one. Only `/llms.txt` at the site root is checked, and its links are ' +
@@ -38,6 +38,7 @@ class LlmsTxtStructure extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       // @ts-expect-error - see the class-level @ts-expect-error above.
       requiredArtifacts: ['LlmsTxt'],
     };
@@ -83,6 +84,7 @@ class LlmsTxtStructure extends Audit {
     }
     return {
       score: 0,
+      displayValue: `${analysis.problems.length} problem(s)`,
       explanation: `${analysis.problems.length} problem(s) found in llms.txt.`,
       details,
     };
