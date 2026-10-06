@@ -36,7 +36,7 @@ Read from the main document's response headers Lighthouse already has.
 | `product-variants` | warn | a page with several `Product` offers/variants should use `ProductGroup` with `productGroupID`, `variesBy` and `hasVariant`; each variant needs a unique `sku` or `gtin` | Google product variants |
 | `faceted-navigation-explosion` | warn (crawl) | one path linked with many distinct query-parameter combinations (a crawl trap); reports the path and parameter names | judgement; reads the crawl links |
 | `product-pages-in-sitemap` | warn (crawl) | crawled `Product` pages that no sitemap lists | judgement |
-| `product-category-linking` | warn (crawl, complete crawls only) | a `Product` page that no listing page links to (a listing page is a crawled page linking to at least 5 product pages) | judgement; as `orphan-pages`, not judged on an incomplete crawl |
+| `product-category-linking` | warn (crawl, complete crawls only) | a `Product` page that no listing page links to (a listing page is a crawled page linking to at least 3 product pages) | judgement; as `orphan-pages`, not judged on an incomplete crawl |
 
 ### C. Local (5)
 
@@ -78,4 +78,5 @@ Read from the main document's response headers Lighthouse already has.
 ## Status
 
 - **A. Security headers: built** (3 audits, 16 unit tests, checked live on github.com, web.dev and example.com). A missing `Referrer-Policy` is not faulted (browsers already default to `strict-origin-when-cross-origin`); only `unsafe-url` is. The config test no longer lists every audit id by hand: it derives the list from `summary/categories.js`, the single source of truth.
-- B to F: not built yet. Each vertical is built, QA'd against a real site, documented here, and committed after one approval.
+- **B. E-commerce: built** (6 audits, 42 + 9 + 9 unit tests, shared infrastructure). Built with it: `lib/structured-facts.js`, JSON-LD capture in the crawler, snapshot version 3, and the crawler's body cap raised from 512 KiB to 2 MiB. Live checks found and fixed three real problems: the crawler missed JSON-LD past byte 512 KiB (Allbirds: byte 824,767), variants written as bare pointers were wrongly flagged, and the crawl audits said "no product pages" when the crawler had simply been refused (403) on the audited page. A purpose-built shop with known defects proved every audit's positive path. The category threshold is 3 product links (not 5): a real "Boots" category with 2 products was wrongly seen as unlinked at 5.
+- C to F: not built yet. Each vertical is built, QA'd against a real site, documented here, and committed after one approval.

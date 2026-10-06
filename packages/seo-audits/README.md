@@ -503,6 +503,25 @@ Read the response headers of the main document that Lighthouse already collected
 
 Checked live on 2026-10-06: github.com (all present), web.dev (`nosniff`, no Referrer-Policy: a note), example.com (no `nosniff`: 0.5).
 
+### E-commerce audits (Phase 18)
+
+Six audits for shops. Three judge the audited page's own `Product` markup (JSON-LD), three read the site crawl and the sitemap. A page with no product markup is **not applicable**, never a failure. Sources: Google's merchant listing and product variants documentation, read 2026-10-06; where a rule is only our judgement the audit says so.
+
+| Audit | Level | What it checks |
+|---|---|---|
+| `product-identifiers` | warn | each product has a `gtin`, `mpn` or `sku` and a `brand`; any GTIN is numeric, has a valid length (8, 12, 13 or 14) and a valid check digit; the `sku` has no whitespace |
+| `product-offer-values` | **error** | values Google calls invalid: a price with a currency symbol, text, a thousands separator or a decimal comma (digits and a point only), or negative; a `priceCurrency` that is not an ISO 4217 code; an `availability` or `itemCondition` that is not a documented value, or more than one of either. `https://schema.org/InStock`, `schema:InStock` and a bare `InStock` are all accepted. A price of 0 and a lower-case currency are notes |
+| `product-variants` | warn | a `ProductGroup` needs `productGroupID` and `variesBy`; inline variants need a unique `sku` or `gtin`; products with the same name and different identifiers that are not grouped look like ungrouped variants. A variant that is only a pointer (`{"@type": "Product", "url": ...}`), as many shops write it because each variant has its own page, is not judged here |
+| `faceted-navigation-explosion` | warn | one path linked with 20 or more different combinations of 2 or more query parameters (tracking, session and pagination parameters ignored): a crawl trap. A site-level check from the crawl's links; our threshold, not Google's |
+| `product-pages-in-sitemap` | warn | crawled product pages (status 200, not noindex, with product markup) that no sitemap lists. Judged only when the sitemap was read in full |
+| `product-category-linking` | warn | the audited product is linked from no category page (a page that links to 3 or more product pages). Judged only when the crawl saw the whole site, as `orphan-pages` |
+
+As the other cross-page audits, `product-pages-in-sitemap` and `product-category-linking` judge the audited page and list the other offending pages without failing on them. When the crawler could not read the audited page (a shop that answers a crawler with a 403, or a page larger than the size cap) they say so instead of claiming "no product pages".
+
+**Known limits.** Product markup is read from JSON-LD only (not Microdata or RDFa). On a shop with faceted navigation the crawler skips the query-string variants as unread, which makes the crawl incomplete, so `product-category-linking` often declines there; `faceted-navigation-explosion` is the audit that reports that trap. Checked live on 2026-10-06: IKEA's product page (all pass; the crawl audits decline honestly on a partial crawl and a sitemap too large to read in full), Allbirds (its pointer variants were first wrongly flagged: fixed), and a purpose-built shop with known defects (an invalid `$1,299.00` price, a bad GTIN check digit, 24 facet combinations, an unlisted and an unlinked product), where every audit gave the expected result.
+
+**The crawl snapshot now records structured data.** Each crawled page carries its `entities` (a bounded projection of its JSON-LD: identity, address, phone, hours, geo, `sameAs`, product identifiers, offers and variants; `lib/structured-facts.js`), so cross-page audits can compare pages. The snapshot version is now 3 (an old cache is simply not used) and the crawler's per-page body cap rose from 512 KiB to 2 MiB, because structured data often sits at the end of a heavy page (one real product page had its JSON-LD at byte 824,767 of 841,717).
+
 ### Soft-404 check (`soft-not-found`)
 
 - **`soft-not-found`** (Phase 5) — does the site answer a URL that does not exist with a normal page? A
@@ -612,7 +631,7 @@ Lighthouse run** as the `SiteCrawl` gatherer; `lhci autorun` needs no extra step
   link or a redirect to another host, port or scheme is recorded and **never requested** (external links are stored, not
   requested). URLs that are plainly files (`.png`, `.pdf`, `.js`, ...) are not requested, and at most **5 query-string
   variants of one path** are (a crawl-trap guard); both are listed as skipped. HTML only, server HTML (no JavaScript is
-  run), up to 512 KiB per page.
+  run), up to 2 MiB per page (512 KiB before Phase 18; structured data is often at the end of a heavy page).
 - **What it keeps** per page: final URL and redirect chain, status, content type, `<title>`, meta description,
   canonicals, robots meta and `X-Robots-Tag`, the first five `<h1>` texts, a **hash** of the visible text with its
   length and word count, **how deep the crawl found it**, its internal links **with their anchor text** (image alt text when
@@ -1079,6 +1098,12 @@ informational audits are reports and cannot be asserted at all). 57 are scored (
 | 18 | `content-security-policy-report` | informational | none (informational audits cannot be asserted) |
 | 18 | `referrer-policy` | pass, 0.5 warning | `warn` |
 | 18 | `x-content-type-options` | pass, 0.5 warning | `warn` |
+| 18 | `faceted-navigation-explosion` | pass, 0.5 warning | `warn` |
+| 18 | `product-category-linking` | pass, 0.5 warning | `warn` |
+| 18 | `product-identifiers` | pass, 0.5 warning | `warn` |
+| 18 | `product-offer-values` | pass or fail | `error` |
+| 18 | `product-pages-in-sitemap` | pass, 0.5 warning | `warn` |
+| 18 | `product-variants` | pass, 0.5 warning | `warn` |
 
 ### Three tiers and the recommended assertions
 

@@ -56,7 +56,7 @@ artifact.
      failure is recorded as `unavailable` and **no page other than the audited one is requested** (a crawler must not guess
      when it could not read the rules). The audited page is always requested once so every page is extracted the same way.
   4. **Fetch** through `checkUrls` (Phase 4's bounded worker pool: 5 at a time, 5 s each, one retry for a network error only,
-     total budget) with `safeFetchPrefix` at a **512 KiB** body cap and `Accept-Encoding: identity`. Same-origin only: a seed on
+     total budget) with `safeFetchPrefix` at a **2 MiB** body cap (512 KiB until Phase 18, raised because JSON-LD often sits at the end of a heavy page; the extractor is linear so only download time grows) and `Accept-Encoding: identity`. Same-origin only: a seed on
      another origin is recorded as skipped and never requested.
   5. **Redirects**: a 3xx whose `Location` is on the same origin is requested once more, for at most 3 rounds, each hop
      recorded; a redirect to another origin is recorded and never requested. Hops count against a request cap of 3 x pages.
