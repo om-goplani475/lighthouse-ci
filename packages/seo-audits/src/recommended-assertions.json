@@ -352,5 +352,41 @@
     {
       "minScore": 1
     }
+  ],
+  "product-identifiers": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "product-offer-values": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "product-variants": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "faceted-navigation-explosion": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "product-pages-in-sitemap": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "product-category-linking": [
+    "warn",
+    {
+      "minScore": 1
+    }
   ]
 }

@@ -172,6 +172,17 @@ const CATEGORIES = [
     name: 'Security headers',
     audits: ['x-content-type-options', 'referrer-policy', 'content-security-policy-report'],
   },
+  {
+    name: 'E-commerce',
+    audits: [
+      'product-identifiers',
+      'product-offer-values',
+      'product-variants',
+      'faceted-navigation-explosion',
+      'product-pages-in-sitemap',
+      'product-category-linking',
+    ],
+  },
 ];
 
 /**

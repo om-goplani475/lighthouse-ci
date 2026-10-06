@@ -25,8 +25,9 @@ const PRESETS = {
     promote: CATEGORIES.map(c => c.name),
   },
   ecommerce: {
-    description: 'Recommended, with structured data, images and duplicate content as errors.',
-    promote: ['Structured data', 'Images', 'Duplicates and coverage'],
+    description:
+      'Recommended, with structured data, images, duplicate content and the e-commerce checks as errors.',
+    promote: ['Structured data', 'Images', 'Duplicates and coverage', 'E-commerce'],
   },
   blog: {
     description: 'Recommended, with international and content checks as errors.',
