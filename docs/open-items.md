@@ -19,20 +19,26 @@ done, decisions waiting, and deferred features. What was finished is in `docs/ph
 
 ### A3. A real GitHub Actions run with the fork config (the real run is yours)
 
-Simulated locally on 2026-10-05 (not a GitHub runner): `yarn install --frozen-lockfile` left `yarn.lock` unchanged, the global `@lhci/cli@0.15.1` (with its own
-`lighthouse` 12.6.1) ran the fork config and found every fork audit, the env vars reached the child processes, each crawled page was requested once across URLs, the cache
-directory is mode 700, and Node 18.20.8 worked. Note: `lhci autorun` with no `assert` block falls back to `lighthouse:recommended` and fails on its performance assertions, so a real
-workflow needs its own `assert` section (use `recommended-assertions.json`).
+**Ready to run:** `.github/workflows/seo-audit.yml` (a manual workflow, "SEO audit (A3 check)") with `.github/seo-audit/lighthouserc.js` and `summarize.mjs`. It runs two jobs on `ubuntu-latest` with Node 18: the fork's own
+`lhci` after `yarn install --frozen-lockfile` (it fails if `yarn.lock` changes, prints `yarn why lighthouse`, shows the crawl cache directory's mode), and a **global `@lhci/cli@0.15.x`** with the fork config (it prints both
+Lighthouse copies). Each job writes a summary: whether the "Extended SEO (fork)" category is present, how many of the 57 scored audits ran, what failed or warned, the crawl coverage line, the time each
+request-sending gatherer took and the total time, and uploads the reports. It uses `recommended-assertions.json`, so a failing audit fails the job (the summary is still written).
 
-**Still needs a real run:** the runner's egress and DNS, a shared runner's temp directory, your actual `.github/workflows`, and the cost and time of a cold crawl on a real site.
-Point `collect.settings.configPath` at `require.resolve('@lhci/seo-audits/src/lighthouse-config.js')`, run `lhci autorun`, and check:
+**To run it:**
+1. The workflow file must be on the repository's default branch for the "Run workflow" button to appear: push `main` (or push this branch and run it with `gh workflow run seo-audit.yml --ref <branch> -f url=<page>`).
+2. GitHub, Actions, "SEO audit (A3 check)", Run workflow: give a **public** page (the default is `https://web.dev/`) and leave runs at 1 for the first time. Crawl limits start at 30 pages / 60 s.
+3. Open each job's summary and check the list below. Then try your own site, and `runs: 3` to see the per-run requests repeat.
 
-- **Two Lighthouse copies:** `npm ls lighthouse`. **Pass when** the "Extended SEO (fork)" category exists with no "audit not found".
-- **Time and requests:** how long the first run takes with the crawl on (up to about 150 requests, up to 120 s) and whether the page cap or the time budget ended it (the `crawl-coverage`
-  notes say which). Also what the per-run requests add (up to 100 internal link checks, 20 external checks, 10 hreflang alternates; the README has the full table) and whether the audited
-  site's logs tolerate them. If not: lower `LHCI_SEO_CRAWL_MAX_PAGES`, `LHCI_SEO_CRAWL_MAX_LINK_CHECKS`, `LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS`, `LHCI_SEO_HREFLANG_MAX_CHECKS`, or switch things off.
-- **External links:** a runner with no outbound access must degrade to "unreliable", never to false "broken" links; a site with a known dead external link must fail
-  `broken-external-links`, and `LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS=0` must make it not applicable. Not verified against many real third-party sites (rate limiters, tarpits).
+**Pass when:** both jobs show the category present with no runtime error and no "audit not found"; `yarn.lock` is unchanged; the global job shows a second Lighthouse copy and the audits still ran; the crawl coverage line says the page cap or time budget
+ended the crawl; the total time is acceptable; and the cache directory is mode 700. Anything else is a `fix(seo-audits)` or `ci(...)` commit.
+
+**Already checked locally** (not a GitHub runner): the same config and summary script on web.dev gave 57 of 57 scored audits present, no runtime error, a crawl of 14 of 15 pages in about 39 s and a total of about 95 s (sitemap 21 s, hreflang 12 s), cache directory mode 700. It also found three genuine hreflang
+defects on web.dev (`pt-BR-cn`, an `x-default` pointing at two URLs, two noindex alternates). Earlier simulation (2026-10-05): `yarn install --frozen-lockfile` left `yarn.lock` unchanged, the global `@lhci/cli@0.15.1` found every fork audit with its own `lighthouse` 12.6.1, and each crawled page was requested once across URLs.
+
+**Still needs the real runner:** its egress and DNS, a shared runner's temp directory, your own workflows, and the cost of a cold crawl on a real site. If the audited site's WAF blocks the runner, lower `LHCI_SEO_CRAWL_MAX_PAGES`,
+`LHCI_SEO_CRAWL_MAX_LINK_CHECKS`, `LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS` and `LHCI_SEO_HREFLANG_MAX_CHECKS` (the README's request-budget table lists them all).
+
+- **External links:** a runner with no outbound access must degrade to "unreliable", never to false "broken" links; a site with a known dead external link must fail `broken-external-links`, and `LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS=0` must make it not applicable.
 - **Shared runner:** if the run warns that the cache is unusable, the crawl still works but each run crawls again.
 
 ### E. Phase 13: verify `core-web-vitals-field` with a real key (needs you)

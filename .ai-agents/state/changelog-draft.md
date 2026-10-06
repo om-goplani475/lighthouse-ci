@@ -651,3 +651,7 @@ Found by running the audits on five real sites (MDN, BBC News, apple.com, ikea.c
 ## 2026-10-06 — Bytespider removed
 
 `ai-crawler-summary` no longer lists `Bytespider` (ByteDance publishes no documentation to check it against); it now lists 18 crawlers, all confirmed against vendor pages. No migration.
+
+## 2026-10-06 — A3 workflow
+
+A manual workflow, `.github/workflows/seo-audit.yml`, runs the fork's audits on a GitHub runner in two ways (the fork's own `lhci` and a global `@lhci/cli@0.15.x`) and writes a summary; see `docs/open-items.md`, A3. No change to the audits.
