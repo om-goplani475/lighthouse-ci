@@ -493,6 +493,16 @@ URL is not `https:`.
     are ignored. In practice this audit is the **early warning** before that happens.
   - Not applicable when the browser reported no certificate dates (for example a reused connection).
 
+### Security-header audits (`x-content-type-options`, `referrer-policy`, `content-security-policy-report`, Phase 18)
+
+Read the response headers of the main document that Lighthouse already collected: no request and no new gatherer. They are hygiene signals, **not Google ranking requirements**, so they give advice (a partial score, the `warn` tier) or a report, and never block a build on their own.
+
+- **`x-content-type-options`** warns when the header is missing or its first value is not `nosniff` (browsers read only the first value of a list).
+- **`referrer-policy`** warns only for `unsafe-url`, which sends the full address (path and query) to every other site. A missing header is not faulted: every current browser defaults to `strict-origin-when-cross-origin`. A list of fallbacks is judged by its last recognised value, as browsers do; the old default `no-referrer-when-downgrade` and unrecognised values are notes.
+- **`content-security-policy-report`** (informational) says whether a policy, or only a report-only policy, is sent, whether scripts are restricted, whether `'unsafe-inline'` or `'unsafe-eval'` is allowed, and whether `frame-ancestors` is set. Lighthouse core's own `csp-xss` audit stays in the report; this one is shorter and does not judge.
+
+Checked live on 2026-10-06: github.com (all present), web.dev (`nosniff`, no Referrer-Policy: a note), example.com (no `nosniff`: 0.5).
+
 ### Soft-404 check (`soft-not-found`)
 
 - **`soft-not-found`** (Phase 5) — does the site answer a URL that does not exist with a normal page? A
@@ -1066,6 +1076,9 @@ informational audits are reports and cannot be asserted at all). 57 are scored (
 | 15 | `amp-check` | informational | none (informational audits cannot be asserted) |
 | 15 | `answer-structure` | informational | none (informational audits cannot be asserted) |
 | 15 | `author-entity-signals` | informational | none (informational audits cannot be asserted) |
+| 18 | `content-security-policy-report` | informational | none (informational audits cannot be asserted) |
+| 18 | `referrer-policy` | pass, 0.5 warning | `warn` |
+| 18 | `x-content-type-options` | pass, 0.5 warning | `warn` |
 
 ### Three tiers and the recommended assertions
 
