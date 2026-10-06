@@ -56,6 +56,8 @@ jobs:
         with:
           name: fork-checkout-reports
           path: .lighthouseci
+          # .lighthouseci is a hidden folder, which upload-artifact skips unless told otherwise
+          include-hidden-files: true
       - name: Fail the job if the audit step failed
         if: steps.audit.outcome == 'failure'
         run: echo "lhci autorun reported failed assertions or a collect error; see the summary" && exit 1
@@ -93,6 +95,8 @@ jobs:
         with:
           name: global-cli-reports
           path: .lighthouseci
+          # .lighthouseci is a hidden folder, which upload-artifact skips unless told otherwise
+          include-hidden-files: true
       - name: Fail the job if the audit step failed
         if: steps.audit.outcome == 'failure'
         run: echo "lhci autorun reported failed assertions or a collect error; see the summary" && exit 1
