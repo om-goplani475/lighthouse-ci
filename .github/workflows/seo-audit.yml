@@ -1,0 +1,98 @@
+name: SEO audit (A3 check)
+
+# A manual run of the fork's SEO audits on a GitHub runner. It answers the open points of docs/open-items.md A3:
+# the two Lighthouse copies, yarn.lock, environment variables, crawl cost and time, the cache directory, Node 18.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'The public page to audit'
+        required: true
+        default: 'https://web.dev/'
+      runs:
+        description: 'Lighthouse runs per URL (the per-run requests repeat for each)'
+        required: true
+        default: '1'
+
+env:
+  SEO_AUDIT_URL: ${{ github.event.inputs.url }}
+  SEO_AUDIT_RUNS: ${{ github.event.inputs.runs }}
+  # Keep the first run small; raise these once you know the cost.
+  LHCI_SEO_CRAWL_MAX_PAGES: '30'
+  LHCI_SEO_CRAWL_TIME_BUDGET_SECONDS: '60'
+
+jobs:
+  fork-checkout:
+    name: Fork checkout (yarn install, the fork's own lhci)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - name: yarn.lock must be unchanged
+        run: git diff --exit-code yarn.lock
+      - name: Which Lighthouse copies are installed
+        run: yarn why lighthouse | head -40
+      - name: Collect and assert
+        id: audit
+        continue-on-error: true
+        run: |
+          start=$(date +%s)
+          node packages/cli/src/cli.js autorun --config=.github/seo-audit/lighthouserc.js
+          echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
+      - name: Cache directory mode and request cost
+        if: always()
+        run: |
+          ls -ld /tmp/lhci-seo-crawl-* || echo "no crawl cache directory"
+          echo "collect+assert took ${{ steps.audit.outputs.seconds }} s"
+      - name: Summary
+        if: always()
+        run: node .github/seo-audit/summarize.mjs .lighthouseci >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fork-checkout-reports
+          path: .lighthouseci
+      - name: Fail the job if the audit step failed
+        if: steps.audit.outcome == 'failure'
+        run: echo "lhci autorun reported failed assertions or a collect error; see the summary" && exit 1
+
+  global-cli:
+    name: Global @lhci/cli 0.15 with the fork config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: yarn
+      # The fork's audits import `lighthouse` from the repo's node_modules, so the repo is installed too.
+      - run: yarn install --frozen-lockfile
+      - run: npm install -g @lhci/cli@0.15.x
+      - name: Two Lighthouse copies (global CLI and the repo)
+        run: |
+          echo "--- global"; npm ls -g lighthouse || true
+          echo "--- repo"; yarn why lighthouse | head -20
+      - name: Collect and assert
+        id: audit
+        continue-on-error: true
+        run: |
+          start=$(date +%s)
+          lhci autorun --config=.github/seo-audit/lighthouserc.js
+          echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
+      - name: Summary
+        if: always()
+        run: |
+          echo "collect+assert took ${{ steps.audit.outputs.seconds }} s" >> "$GITHUB_STEP_SUMMARY"
+          node .github/seo-audit/summarize.mjs .lighthouseci >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: global-cli-reports
+          path: .lighthouseci
+      - name: Fail the job if the audit step failed
+        if: steps.audit.outcome == 'failure'
+        run: echo "lhci autorun reported failed assertions or a collect error; see the summary" && exit 1
