@@ -280,6 +280,12 @@ describe('build-context.js', () => {
 
   describe('#getGitHubRepoSlug', () => {
     const DEFAULT_API_HOST = 'https://api.github.com';
+    // The slug of this clone's own `origin` (GoogleChrome/lighthouse-ci upstream; a fork's own slug in a fork).
+    const originSlug = require('child_process')
+      .spawnSync('git', ['remote', 'get-url', 'origin'], {encoding: 'utf8'})
+      .stdout.trim()
+      .replace(/^.*github\.com[:/]/, '')
+      .replace(/\.git$/, '');
 
     it('should return undefined when there is no valid slug on github', () => {
       process.env.LHCI_BUILD_CONTEXT__GIT_REMOTE = `${DEFAULT_API_HOST}/broken/url/repo`;
@@ -322,9 +328,7 @@ describe('build-context.js', () => {
     });
 
     it('should work when default API host is provided', () => {
-      expect(buildContext.getGitHubRepoSlug(DEFAULT_API_HOST)).toEqual(
-        'GoogleChrome/lighthouse-ci'
-      );
+      expect(buildContext.getGitHubRepoSlug(DEFAULT_API_HOST)).toEqual(originSlug);
     });
 
     it('should work when git remote does not end in .git', () => {
@@ -338,7 +342,7 @@ describe('build-context.js', () => {
     });
 
     it('should fallback to getGitRemote result', () => {
-      expect(buildContext.getGitHubRepoSlug()).toEqual('GoogleChrome/lighthouse-ci');
+      expect(buildContext.getGitHubRepoSlug()).toEqual(originSlug);
     });
   });
 });
