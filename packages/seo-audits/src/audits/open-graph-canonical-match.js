@@ -16,21 +16,24 @@ const UIStrings = {
   title: '`og:url` matches the canonical URL',
   failureTitle: '`og:url` does not match the canonical URL',
   description:
-    'The Open Graph protocol defines `og:url` as the canonical URL of the page. When it ' +
+    'The Open Graph protocol defines `og:url` as the canonical URL of the page. When its host or path ' +
     'disagrees with the page\'s own `<link rel="canonical">`, search and social crawlers are ' +
-    'told two different "real" URLs for the same content.',
+    'told two different "real" URLs for the same content. A difference in the trailing slash or the query ' +
+    'string only (often a tracking parameter) is a note, not a failure.',
 };
 
 /**
  * @param {string} href
- * @return {string | null} normalized (protocol/host/path, trailing slash stripped, no hash) or
- *   null if unparseable
+ * @return {{page: string, query: string} | null} the page (protocol, host and path with the trailing slash
+ *   stripped) and the query string, or null if unparseable
  */
 function normalize(href) {
   try {
     const url = new URL(href);
-    const path = url.pathname.replace(/\/$/, '') || '/';
-    return `${url.protocol}//${url.host}${path}${url.search}`;
+    // A loop, not /\/+$/: that pattern is quadratic on a long run of slashes.
+    let end = url.pathname.length;
+    while (end > 1 && url.pathname.charCodeAt(end - 1) === 47) end--;
+    return {page: `${url.protocol}//${url.host}${url.pathname.slice(0, end)}`, query: url.search};
   } catch {
     return null;
   }
@@ -79,8 +82,11 @@ class OpenGraphCanonicalMatch extends Audit {
       return {score: 1, notApplicable: true};
     }
 
-    if (normalizedOgUrl === normalizedCanonical) {
-      return {score: 1};
+    if (normalizedOgUrl.page === normalizedCanonical.page) {
+      // Only the query string differs (often a tracking parameter): a note, not a mismatch.
+      return normalizedOgUrl.query === normalizedCanonical.query
+        ? {score: 1}
+        : {score: 1, displayValue: 'Differs only by the query string (a note)'};
     }
 
     return {

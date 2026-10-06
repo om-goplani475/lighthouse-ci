@@ -43,13 +43,22 @@ describe('open-graph-completeness audit', () => {
     ]);
   });
 
-  it('reports every missing required tag on a page with none of the four', () => {
+  it('fails on a missing og:title and og:image, and only recommends og:type and og:url', () => {
     const result = runAudit([]);
     expect(result.score).toBe(0);
     const errorProperties = result.details.items
       .filter(item => item.severity === 'error')
       .map(item => item.property);
-    expect(errorProperties.sort()).toEqual(['og:image', 'og:title', 'og:type', 'og:url']);
+    expect(errorProperties.sort()).toEqual(['og:image', 'og:title']);
+    const recommended = result.details.items
+      .filter(item => item.severity === 'info')
+      .map(item => item.property);
+    expect(recommended).toEqual(expect.arrayContaining(['og:type', 'og:url']));
+  });
+
+  it('passes a page with og:title and og:image but no og:type or og:url', () => {
+    const tags = FULL_TAGS.filter(tag => tag.property !== 'og:type' && tag.property !== 'og:url');
+    expect(runAudit(tags).score).toBe(1);
   });
 
   it('does not fail the audit when only a recommended tag is missing', () => {

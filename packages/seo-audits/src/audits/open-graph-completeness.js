@@ -19,18 +19,20 @@
 import {Audit} from 'lighthouse/core/audits/audit.js';
 
 const UIStrings = {
-  title: 'Open Graph metadata is complete',
-  failureTitle: 'Open Graph metadata is missing required properties',
+  title: 'Open Graph metadata has a title and an image',
+  failureTitle: 'Open Graph metadata is missing a title or an image',
   description:
     'Open Graph tags control how a page appears when shared on social platforms and in chat/' +
-    'messaging link previews. Per the Open Graph protocol (ogp.me), `og:title`, `og:type`, ' +
-    '`og:image`, and `og:url` are required; `og:description`, `og:site_name`, and `og:image:alt` ' +
-    '(when an image is present) are recommended and reported informationally, never failing the ' +
-    'audit on their own.',
+    'messaging link previews. Fails only when `og:title` or `og:image` is missing, the two a good ' +
+    'preview needs. `og:type` and `og:url` (the protocol lists them as required, but platforms default ' +
+    'og:type to website and fall back to the page URL), `og:description`, `og:site_name` and ' +
+    '`og:image:alt` (when an image is present) are reported as recommendations and never fail the audit.',
 };
 
-const REQUIRED_PROPERTIES = ['og:title', 'og:type', 'og:image', 'og:url'];
-const RECOMMENDED_PROPERTIES = ['og:description', 'og:site_name'];
+// Only what a link preview needs. Platforms default og:type to "website" and fall back to the page URL when
+// og:url is absent, so those two are recommended, not required.
+const REQUIRED_PROPERTIES = ['og:title', 'og:image'];
+const RECOMMENDED_PROPERTIES = ['og:type', 'og:url', 'og:description', 'og:site_name'];
 
 /**
  * @param {Array<{name?: string, content?: string, property?: string}>} metaElements

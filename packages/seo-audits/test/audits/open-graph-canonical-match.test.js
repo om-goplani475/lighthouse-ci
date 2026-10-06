@@ -32,6 +32,12 @@ describe('open-graph-canonical-match audit', () => {
     expect(result.score).toBe(1);
   });
 
+  it('notes, and does not fail, a difference in the query string only', () => {
+    const result = runAudit('https://example.com/page?utm_source=x', 'https://example.com/page');
+    expect(result.score).toBe(1);
+    expect(result.displayValue).toContain('query string');
+  });
+
   it('fails when og:url points at a different path than the canonical', () => {
     const result = runAudit('https://example.com/other-page', 'https://example.com/page');
     expect(result.score).toBe(0);

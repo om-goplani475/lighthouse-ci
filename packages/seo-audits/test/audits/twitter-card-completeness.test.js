@@ -32,11 +32,11 @@ describe('twitter-card-completeness audit', () => {
     expect(result.details).toBeUndefined();
   });
 
-  it('fails outright with no details table when twitter:card itself is missing', () => {
+  it('only notes a missing twitter:card, because X falls back to the og: tags', () => {
     const tags = FULL_TWITTER_TAGS.filter(tag => tag.name !== 'twitter:card');
     const result = runAudit(tags);
-    expect(result.score).toBe(0);
-    expect(result.explanation).toContain('twitter:card');
+    expect(result.score).toBe(1);
+    expect(result.displayValue).toContain('No twitter:card');
   });
 
   it('falls back to og:title/og:description/og:image when the twitter: equivalents are absent', () => {

@@ -25,7 +25,7 @@ const UIStrings = {
   title: 'Twitter/X Card metadata is complete',
   failureTitle: 'Twitter/X Card metadata is missing required properties',
   description:
-    '`twitter:card` is required. `twitter:title`/`twitter:description`/`twitter:image` fall ' +
+    'A missing `twitter:card` is only a note (X falls back to a summary card from the Open Graph tags). When it is present, `twitter:title`/`twitter:description`/`twitter:image` fall ' +
     'back to their Open Graph equivalents when absent, so they only fail here if neither the ' +
     '`twitter:`-specific tag nor its `og:*` fallback is present. `twitter:site`/`twitter:creator` ' +
     'and `twitter:image:alt` (when an image is present) are recommended and reported ' +
@@ -55,14 +55,11 @@ class TwitterCardCompleteness extends Audit {
     const cardType = twitterContent(MetaElements, 'twitter:card');
 
     if (!cardType) {
-      // Nothing else is meaningful to check without a card type — a page with zero twitter:*
-      // tags and zero intent to declare a card isn't a partial-completeness case, it's simply
-      // not using Twitter Cards at all. Still scored (not not-applicable): declaring intent via
-      // og:title/og:image but skipping the one Twitter-specific tag needed to render a card is a
-      // real, fixable gap, not a legitimate opt-out this audit should stay silent about.
+      // X falls back to a summary card built from the og: tags when twitter:card is absent, so a missing
+      // twitter:card is a note, not a broken preview. Nothing else is meaningful to check without a type.
       return {
-        score: 0,
-        explanation: 'Missing required "twitter:card" meta tag.',
+        score: 1,
+        displayValue: 'No twitter:card (a note: X falls back to a summary card from og: tags)',
       };
     }
 
