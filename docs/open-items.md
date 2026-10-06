@@ -8,7 +8,7 @@ Written 2026-10-02 at `main` = `28939f1` (Phases 1-7 merged, 46 audits in `seo-e
 
 | Area | State |
 |------|-------|
-| Security findings (`.ai-agents/state/security-findings.md`) | **One open, low, accepted: Finding 10** (Phase 8: a hostile site with very long link URLs can make the crawl snapshot exceed the 16 MiB cache cap; see B1). Findings 1-9 are all fixed (8 on 2026-10-01, 9 on 2026-10-02). One risk is *accepted*, not fixed: `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control (the README says so). |
+| Security findings (`.ai-agents/state/security-findings.md`) | **None open (Finding 10 fixed 2026-10-06)**; was: Finding 10 (Phase 8: a hostile site with very long link URLs can make the crawl snapshot exceed the 16 MiB cache cap; see B1). Findings 1-9 are all fixed (8 on 2026-10-01, 9 on 2026-10-02). One risk is *accepted*, not fixed: `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control (the README says so). |
 | `seo-audits` tests | 82 suites / 1,670 tests pass on the dev machine (Node 24), typecheck and lint clean (Phase 8 complete). Also run on Node 18.20.8 (what CI pins) on 2026-10-05: all 82 suites / 1,670 tests pass (A5 done). |
 | Failing suites outside `seo-audits` | 9 suites / 84 tests fail in `cli`, `server`, `viewer`, `utils` (11 / 92 after Phase 7: a few fail only intermittently under load). Same families failed before Phase 4. Not caused by this work (see C). |
 | Not verified at all | Only the real-runner part of A3 (A1, A2, A4 and A5 passed on 2026-10-05; A3 was simulated locally). |
@@ -108,7 +108,7 @@ or a site that serves bots a different page. Anything wrong is a `fix(seo-audits
 
 ### B. Opened by Phase 8 (updated as the phase proceeds)
 
-**B1. Close Finding 10 (low, open, accepted): the crawl snapshot can exceed the cache cap on a hostile site.**
+**B1. Finding 10 (low): the crawl snapshot can exceed the cache cap on a hostile site. DONE 2026-10-06:** the extractor now stops storing a page's links once their URLs total 40,000 characters (at most 8 MB of URLs at 200 pages, under the 16 MiB cap; a normal page is unaffected). Covered by a unit test; not re-run against a full hostile site. Original description:
 Item 0 stores each page's links with their URLs (up to 2,000 characters each) and anchor text. At the default 50 pages the worst case is a 20 MiB snapshot
 (about 360 MB resident, 1.5 s); at 200 pages, 81 MiB (about 750 MB). The cache refuses a file over 16 MiB, so each Lighthouse run then crawls again.
 1. Decide whether it matters for your sites: it needs a site whose pages carry hundreds of near-2,000-character link URLs. Real sites do not.

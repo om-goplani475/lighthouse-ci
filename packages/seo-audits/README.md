@@ -431,7 +431,7 @@ audits use it. **How it works:**
   - Not-applicable when no sitemap URL list or robots.txt could be read; a missing robots.txt
     (404) means nothing is disallowed, so it passes.
 
-- **`llms-txt-structure`** (Phase 4 item 10) — scored on structure **only when the file exists**.
+- **`llms-txt-structure`** (Phase 4 item 10) — **informational** (since 2026-10-06: llms.txt is an unratified proposal, so it never fails a build) and only applies **when the file exists**.
   Fetches `/llms.txt` at the audited page's origin (through the SSRF-protected fetch: one request,
   1 MiB cap, 5 s, no redirects followed) and checks it against the format at llmstxt.org.
   **`llms.txt` is a community proposal (Jeremy Howard, September 2024), not a ratified standard, and
@@ -764,7 +764,7 @@ Seven audits on a page's `hreflang` links (the head's `<link rel="alternate" hre
 - **`hreflang-canonical`** (scored) fails when the page's canonical points at another language version of itself, or an alternate's canonical is not the URL hreflang names.
 - **`hreflang-x-default`**, **`hreflang-sitemap-consistency`** and **`hreflang-locale-meta`** (informational) report whether an x-default exists (optional for Google), how the page's hreflang differs from the `xhtml:link` alternates the sitemap lists for the same URL, and whether `<html lang>`, `content-language` and `og:locale` match the language the page declares for itself.
 
-**Requests:** the first four read the alternates, so the page makes up to **10** requests (`LHCI_SEO_HREFLANG_MAX_CHECKS`, at most 25, `0` switches them off and those audits become not applicable): the first 128 KiB of each, hosts in parallel but one request at a time per host, 5 s each and 20 s in all, the crawler's user-agent, no redirect followed. An alternate on the page's own origin uses the normal safe fetch; an alternate on **another host** (the usual ccTLD setup) uses the strict public-only fetch, so a private address is never requested whatever `LHCI_SEO_ALLOW_PRIVATE_NETWORK` says. HTTP `Link` headers are not read for the alternates.
+**Requests:** the first four read the alternates, so the page makes up to **10** requests (at most **20 s** added to a run in the worst case: the total time budget) (`LHCI_SEO_HREFLANG_MAX_CHECKS`, at most 25, `0` switches them off and those audits become not applicable): the first 128 KiB of each, hosts in parallel but one request at a time per host, 5 s each and 20 s in all, the crawler's user-agent, no redirect followed. An alternate on the page's own origin uses the normal safe fetch; an alternate on **another host** (the usual ccTLD setup) uses the strict public-only fetch, so a private address is never requested whatever `LHCI_SEO_ALLOW_PRIVATE_NETWORK` says. HTTP `Link` headers are not read for the alternates.
 
 #### Content quality audits
 
@@ -979,8 +979,6 @@ module.exports = {
         'sitemap-indexability': ['warn', {minScore: 1}],
         // Listing a URL the same site disallows is a definite contradiction, not a judgment call.
         'sitemap-robots-crossref': ['error', {minScore: 1}],
-        // llms.txt is an unratified proposal and optional, so 'warn' unless you want to gate on it.
-        'llms-txt-structure': ['warn', {minScore: 1}],
         // Fails only on blocked or active content, which Chrome itself reports and which breaks the
         // page: low false-positive risk.
         'mixed-content': ['error', {minScore: 1}],
