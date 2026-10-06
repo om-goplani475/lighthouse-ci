@@ -13,7 +13,7 @@
 import {Audit} from 'lighthouse/core/audits/audit.js';
 import {videoThumbnailProduct, THUMBNAIL_TIMEOUT_MS} from '../lib/video.js';
 import {entitiesFromArtifact} from '../lib/structured-facts.js';
-import {safeFetchStatus, statusWithLookup, publicOnlyLookup} from '../lib/safe-fetch.js';
+import {safeFetchStatus, safeFetchPublicStatus} from '../lib/safe-fetch.js';
 import {siteOf} from '../lib/images.js';
 
 const UIStrings = {
@@ -58,7 +58,7 @@ class VideoThumbnailReachable extends Audit {
       (url, firstParty) =>
         firstParty
           ? safeFetchStatus(url, {timeoutMs: THUMBNAIL_TIMEOUT_MS})
-          : statusWithLookup(url, publicOnlyLookup, {timeoutMs: THUMBNAIL_TIMEOUT_MS}),
+          : safeFetchPublicStatus(url, {timeoutMs: THUMBNAIL_TIMEOUT_MS}),
       siteOf
     );
   }

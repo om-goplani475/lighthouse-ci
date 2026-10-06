@@ -12,6 +12,7 @@ const {
   safeLookup,
   publicOnlyLookup,
   safeFetchPublicPrefix,
+  safeFetchPublicStatus,
   safeFetchJson,
   safeFetchStatus,
   safeFetchBytes,
@@ -1200,6 +1201,40 @@ describe('safeFetchPublicPrefix and publicOnlyLookup: other people’s sites nev
       expect(requests).toEqual([]);
     }
   );
+
+  it.each([
+    ['loopback', '127.0.0.1'],
+    ['a private 10.x address', '10.0.0.5'],
+    ['the cloud metadata address', '169.254.169.254'],
+    ['IPv6 loopback', '[::1]'],
+    ['an IPv4-mapped loopback', '[::ffff:127.0.0.1]'],
+    ['an IPv6 unique-local address', '[fd00::1]'],
+    ['the decimal spelling of 127.0.0.1', '2130706433'],
+    ['the hex spelling of 127.0.0.1', '0x7f000001'],
+    ['the octal spelling of 127.0.0.1', '0177.0.0.1'],
+    ['0.0.0.0', '0.0.0.0'],
+  ])(
+    'safeFetchPublicStatus refuses %s even with the opt-in on, without connecting (a probe of a page-controlled address)',
+    async (_name, host) => {
+      await expect(safeFetchPublicStatus(`http://${host}:${port}/x`)).rejects.toThrow(
+        /private\/reserved/
+      );
+      expect(requests).toEqual([]);
+    }
+  );
+
+  it('safeFetchPublicStatus refuses a host name that resolves to a private address, and a bad URL', async () => {
+    await expect(safeFetchPublicStatus(`http://localhost:${port}/x`)).rejects.toThrow(
+      /private\/reserved/
+    );
+    await expect(safeFetchPublicStatus('not a url')).rejects.toThrow(/not a valid URL/);
+    expect(requests).toEqual([]);
+  });
+
+  it('safeFetchStatus (the audited site) still allows the loopback with the opt-in: the two differ on purpose', async () => {
+    const {safeFetchStatus} = require('../../src/lib/safe-fetch.js');
+    expect((await safeFetchStatus(`http://127.0.0.1:${port}/ok`)).status).toBe(200);
+  });
 
   it('does not suggest the opt-in in its refusal', async () => {
     await expect(safeFetchPublicPrefix(`http://127.0.0.1:${port}/`)).rejects.not.toThrow(

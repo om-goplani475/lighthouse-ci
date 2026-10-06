@@ -911,6 +911,32 @@ function safeFetchPrefix(urlString, options) {
 }
 
 /**
+ * `safeFetchStatus` for a URL on someone else's site (a thumbnail on a CDN, a `sameAs` profile address): a status request with the same
+ * protections, but a private or reserved address is refused **whatever the environment says**, and a literal IP is refused *before*
+ * any connection (Node skips the `lookup` option for an IP literal, so the lookup alone cannot catch `http://127.0.0.1/`,
+ * `http://[::ffff:127.0.0.1]/` or the decimal and hex spellings, which `new URL` normalises to an IP literal). Calling
+ * `statusWithLookup` directly with `publicOnlyLookup` does NOT have this check: use this function.
+ * @param {string} urlString
+ * @param {{timeoutMs?: number}} [options]
+ * @return {Promise<{status: number, redirectLocation?: string}>}
+ */
+function safeFetchPublicStatus(urlString, options) {
+  let url;
+  try {
+    url = new URL(urlString);
+  } catch {
+    return Promise.reject(new Error(`"${urlString}" is not a valid URL`));
+  }
+  const literalIp = literalIpOf(url);
+  if (literalIp && isPrivateOrReservedIp(literalIp)) {
+    return Promise.reject(
+      new Error(`refusing to fetch "${urlString}": a private/reserved IP address (${literalIp}).`)
+    );
+  }
+  return statusWithLookup(urlString, publicOnlyLookup, options);
+}
+
+/**
  * `safeFetchPrefix` for a URL on someone else's site (a link from the audited page): the same protections (scheme
  * allowlist, no redirects followed, a total deadline, a byte cap, a validated user-agent), but a private or
  * reserved address is refused **whatever the environment says**: the private-network opt-in is for auditing your
@@ -942,6 +968,7 @@ export {
   safeFetchBytes,
   safeFetchPrefix,
   safeFetchPublicPrefix,
+  safeFetchPublicStatus,
   safeFetchJson,
   safeFetchStatus,
   isPrivateOrReservedIp,
