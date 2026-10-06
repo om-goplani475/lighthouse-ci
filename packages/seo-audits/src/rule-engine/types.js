@@ -38,12 +38,14 @@
  * @typedef {{
  *   type: string,
  *   required: string[],
+ *   recommended?: string[],
  *   datatypes?: Record<string, GoogleRuleSetDatatype>,
  * }} GoogleRuleSetNestedRule
  */
 /**
  * @typedef {{
  *   required: string[],
+ *   recommended?: string[],
  *   nested: Record<string, GoogleRuleSetNestedRule>,
  *   conditional: Array<{if: object, then: object}>,
  *   datatypes?: Record<string, GoogleRuleSetDatatype>,

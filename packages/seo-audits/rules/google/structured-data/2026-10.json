@@ -2,18 +2,21 @@
   "version": "2026-10",
   "types": {
     "Product": {
-      "required": ["name", "image", "offers"],
+      "required": ["name", "offers|review|aggregateRating"],
+      "recommended": ["image"],
       "nested": {
         "offers": {
           "type": "Offer",
-          "required": ["price", "priceCurrency", "availability"],
+          "required": ["price|priceSpecification|lowPrice"],
+          "recommended": ["priceCurrency", "availability"],
           "datatypes": {"price": "number", "priceCurrency": "currency"}
         }
       },
       "conditional": []
     },
     "Article": {
-      "required": ["headline", "image", "datePublished"],
+      "required": [],
+      "recommended": ["headline", "image", "datePublished", "dateModified", "author"],
       "nested": {},
       "datatypes": {"datePublished": "date"},
       "conditional": []
@@ -44,7 +47,8 @@
       "conditional": []
     },
     "Recipe": {
-      "required": ["name", "image", "author", "recipeIngredient", "recipeInstructions"],
+      "required": ["name", "image"],
+      "recommended": ["author", "recipeIngredient", "recipeInstructions"],
       "nested": {},
       "conditional": []
     },

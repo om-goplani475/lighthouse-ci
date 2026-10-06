@@ -81,11 +81,18 @@ describe('rule registry — real production rulesets', () => {
       'Review',
       'VideoObject',
     ]);
+    // Verified against Google's documentation on 2026-10-06: a product snippet needs a name plus one of
+    // offers, review or aggregateRating, and an offer needs a price; currency and availability are recommended.
+    expect(google.types.Product.required).toEqual(['name', 'offers|review|aggregateRating']);
     expect(google.types.Product.nested.offers.required).toEqual([
-      'price',
+      'price|priceSpecification|lowPrice',
+    ]);
+    expect(google.types.Product.nested.offers.recommended).toEqual([
       'priceCurrency',
       'availability',
     ]);
+    expect(google.types.Article.required).toEqual([]);
+    expect(google.types.Recipe.required).toEqual(['name', 'image']);
     // Array-nested property (structured-data-remaining-types) — BreadcrumbList.itemListElement
     // is a list of ListItem, not a single object; confirms the engine's one-level nesting check
     // applies per-instance, same as a single nested object.

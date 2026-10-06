@@ -14,6 +14,7 @@
         "required": ["required", "nested", "conditional"],
         "properties": {
           "required": {"type": "array", "items": {"type": "string"}},
+          "recommended": {"type": "array", "items": {"type": "string"}},
           "datatypes": {"$ref": "#/definitions/datatypes"},
           "nested": {
             "type": "object",
@@ -24,6 +25,7 @@
               "properties": {
                 "type": {"type": "string"},
                 "required": {"type": "array", "items": {"type": "string"}},
+                "recommended": {"type": "array", "items": {"type": "string"}},
                 "datatypes": {"$ref": "#/definitions/datatypes"}
               }
             }

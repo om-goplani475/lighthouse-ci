@@ -159,13 +159,35 @@ describe('structured-data-schema-properties audit', () => {
     expect(result.score).toBe(1);
   }, 30000);
 
-  it('fails a Product missing a nested required property (offers.availability)', async () => {
+  it('only recommends offers.availability and priceCurrency, which Google does not require', async () => {
     const result = await runAudit([{content: PRODUCT_MISSING_AVAILABILITY}]);
-    expect(result.score).toBe(0);
-    const failure = result.details.items.find(
+    expect(result.score).toBe(1);
+    const note = result.details.items.find(
       /** @param {any} item */ item => item.namespace === 'google-requirements'
     );
-    expect(failure.property).toBe('offers.availability');
+    expect(note.property).toBe('offers.availability');
+    expect(note.message).toMatch(/^Recommended/);
+  }, 30000);
+
+  it('passes a review-only product snippet, and fails a product with no offers, review or rating', async () => {
+    const base = {'@context': 'https://schema.org', '@type': 'Product', name: 'Widget'};
+    const reviewOnly = await runAudit([
+      {content: JSON.stringify({...base, review: {'@type': 'Review'}})},
+    ]);
+    expect(reviewOnly.score).toBe(1);
+    const bare = await runAudit([{content: JSON.stringify(base)}]);
+    expect(bare.score).toBe(0);
+    expect(bare.details.items[0].property).toBe('offers or review or aggregateRating');
+  }, 30000);
+
+  it('fails an offer with no price at all, and accepts priceSpecification or lowPrice', async () => {
+    const product = (/** @type {any} */ offers) =>
+      JSON.stringify({'@context': 'https://schema.org', '@type': 'Product', name: 'W', offers});
+    expect((await runAudit([{content: product({priceCurrency: 'USD'})}])).score).toBe(0);
+    expect((await runAudit([{content: product({priceSpecification: {price: 5}})}])).score).toBe(1);
+    expect((await runAudit([{content: product({lowPrice: 5, priceCurrency: 'USD'})}])).score).toBe(
+      1
+    );
   }, 30000);
 
   it('passes an Article with all required flat properties', async () => {
@@ -173,13 +195,14 @@ describe('structured-data-schema-properties audit', () => {
     expect(result.score).toBe(1);
   }, 30000);
 
-  it('fails an Article missing a required flat property (datePublished)', async () => {
+  it('passes an Article missing datePublished: Google lists no required Article properties', async () => {
     const result = await runAudit([{content: ARTICLE_MISSING_DATE}]);
-    expect(result.score).toBe(0);
-    const failure = result.details.items.find(
+    expect(result.score).toBe(1);
+    const note = result.details.items.find(
       /** @param {any} item */ item => item.namespace === 'google-requirements'
     );
-    expect(failure.property).toBe('datePublished');
+    expect(note.property).toBe('datePublished');
+    expect(note.message).toMatch(/^Recommended/);
   }, 30000);
 
   it('is not applicable when no block has a tracked type', async () => {
@@ -227,13 +250,15 @@ describe('structured-data-schema-properties audit', () => {
     expect(result.score).toBe(1);
   }, 30000);
 
-  it('fails a Recipe missing a required flat property (recipeIngredient)', async () => {
-    const result = await runAudit([{content: RECIPE_MISSING_INGREDIENT}]);
-    expect(result.score).toBe(0);
-    const failure = result.details.items.find(
-      /** @param {any} item */ item => item.namespace === 'google-requirements'
-    );
-    expect(failure.property).toBe('recipeIngredient');
+  it('only recommends recipeIngredient, and fails a Recipe with no image', async () => {
+    const note = await runAudit([{content: RECIPE_MISSING_INGREDIENT}]);
+    expect(note.score).toBe(1);
+    expect(note.details.items[0].property).toBe('recipeIngredient');
+    const noImage = JSON.parse(VALID_RECIPE);
+    delete noImage.image;
+    const failed = await runAudit([{content: JSON.stringify(noImage)}]);
+    expect(failed.score).toBe(0);
+    expect(failed.details.items[0].property).toBe('image');
   }, 30000);
 
   it('passes an Event with a complete nested location', async () => {
@@ -288,14 +313,19 @@ describe('structured-data-schema-properties audit', () => {
   it('unwraps @graph and checks each entity independently (Phase 2 item 5)', async () => {
     const graphBlock = JSON.stringify({
       '@context': 'https://schema.org',
-      '@graph': [JSON.parse(VALID_PRODUCT), JSON.parse(ARTICLE_MISSING_DATE)],
+      '@graph': [
+        JSON.parse(VALID_PRODUCT),
+        JSON.parse(ARTICLE_MISSING_DATE),
+        {'@type': 'Recipe', name: 'Soup'},
+      ],
     });
     const result = await runAudit([{content: graphBlock}]);
-    expect(result.score).toBe(0); // The Article inside the graph is missing datePublished.
+    expect(result.score).toBe(0); // The Recipe inside the graph has no image.
     const failure = result.details.items.find(
-      /** @param {any} item */ item => item.namespace === 'google-requirements'
+      /** @param {any} item */ item =>
+        item.namespace === 'google-requirements' && item.type === 'Recipe'
     );
-    expect(failure).toEqual(expect.objectContaining({type: 'Article', property: 'datePublished'}));
+    expect(failure).toEqual(expect.objectContaining({type: 'Recipe', property: 'image'}));
   }, 30000);
 
   it('resolves an @id reference to a sibling @graph entity before checking nested properties', async () => {

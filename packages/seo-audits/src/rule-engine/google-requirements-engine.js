@@ -8,7 +8,9 @@
  * structured-data-schema-properties feature's intake decision), one level of nested
  * required sub-objects (e.g. Product.offers), and (added for Phase 2 item 4) datatype checks
  * for a present property's *value*, not just its presence — e.g. Product.offers.price being a
- * non-numeric string. `conditional` rules are parsed by the registry but not evaluated here in
+ * non-numeric string. A `required` entry written `a|b` means "at least one of a or b" (Google's Product snippet
+ * needs `offers`, `review` or `aggregateRating`). `recommended` properties produce an `info` finding, never an
+ * `error`. `conditional` rules are parsed by the registry but not evaluated here in
  * v1 — reserved for a later feature.
  */
 
@@ -85,6 +87,42 @@ function checkDatatypes(schemaType, object, datatypes, labelPrefix) {
 
 /**
  * @param {string} schemaType
+ * @param {Record<string, unknown>} object
+ * @param {string[] | undefined} required Property names; `a|b` accepts either.
+ * @param {string[] | undefined} recommended
+ * @param {string} labelPrefix
+ * @return {import('./types.js').Finding[]}
+ */
+function checkPresence(schemaType, object, required, recommended, labelPrefix) {
+  /** @type {import('./types.js').Finding[]} */
+  const findings = [];
+  for (const entry of required || []) {
+    const options = entry.split('|');
+    if (options.some(option => option in object)) continue;
+    const label = options.map(option => `${labelPrefix}${option}`).join(' or ');
+    findings.push({
+      namespace: 'google-requirements',
+      type: schemaType,
+      property: label,
+      severity: 'error',
+      message: `Missing ${label}`,
+    });
+  }
+  for (const property of recommended || []) {
+    if (property in object) continue;
+    findings.push({
+      namespace: 'google-requirements',
+      type: schemaType,
+      property: `${labelPrefix}${property}`,
+      severity: 'info',
+      message: `Recommended: add ${labelPrefix}${property}`,
+    });
+  }
+  return findings;
+}
+
+/**
+ * @param {string} schemaType
  * @param {Record<string, unknown>} parsedBlock
  * @param {import('./types.js').GoogleRequirementsRuleSet} ruleset
  * @return {import('./types.js').Finding[]}
@@ -96,17 +134,9 @@ export function validate(schemaType, parsedBlock, ruleset) {
   /** @type {import('./types.js').Finding[]} */
   const findings = [];
 
-  for (const property of typeRule.required) {
-    if (!(property in parsedBlock)) {
-      findings.push({
-        namespace: 'google-requirements',
-        type: schemaType,
-        property,
-        severity: 'error',
-        message: `Missing ${property}`,
-      });
-    }
-  }
+  findings.push(
+    ...checkPresence(schemaType, parsedBlock, typeRule.required, typeRule.recommended, '')
+  );
 
   findings.push(...checkDatatypes(schemaType, parsedBlock, typeRule.datatypes, ''));
 
@@ -116,17 +146,15 @@ export function validate(schemaType, parsedBlock, ruleset) {
     const instances = asObjectArray(parsedBlock[property]);
     instances.forEach((instance, index) => {
       const label = instances.length > 1 ? `${property}[${index}]` : property;
-      for (const nestedProperty of nestedRule.required) {
-        if (!(nestedProperty in instance)) {
-          findings.push({
-            namespace: 'google-requirements',
-            type: schemaType,
-            property: `${label}.${nestedProperty}`,
-            severity: 'error',
-            message: `Missing ${label}.${nestedProperty}`,
-          });
-        }
-      }
+      findings.push(
+        ...checkPresence(
+          schemaType,
+          instance,
+          nestedRule.required,
+          nestedRule.recommended,
+          `${label}.`
+        )
+      );
       findings.push(...checkDatatypes(schemaType, instance, nestedRule.datatypes, `${label}.`));
     });
   }
