@@ -8,10 +8,10 @@ import {Audit} from 'lighthouse/core/audits/audit.js';
 import {buildHeadSignalsProduct} from '../lib/rendering.js';
 
 const UIStrings = {
-  title: 'Title, description, canonical and robots are the same without JavaScript',
-  failureTitle: 'JavaScript creates or changes the title, description, canonical or robots',
+  title: 'Canonical and robots are the same without JavaScript',
+  failureTitle: 'JavaScript changes the canonical or robots',
   description:
-    'Fails when the page title, meta description, canonical URL or noindex in the raw HTML (what Chrome received) is missing or different from the one the page has after JavaScript runs. A crawler may index either version, and Google may not apply a noindex or canonical that JavaScript changes.',
+    'Fails when the noindex in the raw HTML (what Chrome received) differs from the one the page has after JavaScript runs, or when the raw and rendered pages name two different canonical URLs. A title or meta description that JavaScript sets or changes is shown as a note only, because Google renders JavaScript and indexes the rendered title (a counter or a greeting differs by design). Google may not apply a noindex or canonical that JavaScript changes.',
 };
 
 class JsHeadSignals extends Audit {

@@ -9,8 +9,8 @@
  * (`crawl-extract.js`), so a difference is a difference in the HTML, not in how it was parsed. No I/O,
  * never throws.
  *
- * Rules, chosen with the developer: a title, meta description, canonical or noindex that exists only
- * after JavaScript (or changes) fails; links and visible text that exist only after JavaScript fail past a
+ * Rules, chosen with the developer and refined after review: a noindex that changes, or two different canonicals,
+ * fails; a title or description that exists only after JavaScript (or changes) is a note, because Google renders JavaScript; links and visible text that exist only after JavaScript fail past a
  * share (more than 20% of the internal links, more than half the words) and are otherwise a note.
  */
 
@@ -209,25 +209,46 @@ function labelled(first, second, rows) {
 function buildHeadSignalsProduct(html, rendered, url) {
   const pair = pairOf(html, rendered, url);
   if (!pair) return notApplicable(NOT_COLLECTED);
-  const rows = labelled(
-    'in the raw HTML',
-    'after JavaScript',
-    headDifferences(pair.raw, pair.rendered)
+  const differences = headDifferences(pair.raw, pair.rendered);
+  // Google renders JavaScript, so a title or description set (or changed) by script is indexed as rendered: a note.
+  // What is unreliable is a noindex that changes, or two different canonicals.
+  const failing = differences.filter(
+    d => d.field.startsWith('Robots') || (d.field === 'Canonical' && d.problem === 'differs')
   );
+  const notes = differences.filter(d => !failing.includes(d));
+  const headings = /** @type {Array<[string, string]>} */ ([
+    ['field', 'Signal'],
+    ['first', 'Raw HTML'],
+    ['second', 'After JavaScript'],
+    ['problem', 'Problem'],
+  ]);
+  const rows = [
+    ...labelled('in the raw HTML', 'after JavaScript', failing),
+    ...labelled('in the raw HTML', 'after JavaScript', notes).map(r => ({
+      ...r,
+      problem: `note: ${r.problem}; Google renders JavaScript, so this is normally indexed as rendered`,
+    })),
+  ];
   if (rows.length === 0) {
     return {score: 1, displayValue: 'Title, description, canonical and robots are the same'};
   }
+  if (failing.length === 0) {
+    return {
+      score: 1,
+      displayValue: `${notes.length} head ${
+        notes.length === 1 ? 'signal is' : 'signals are'
+      } set or changed by JavaScript (a note)`,
+      details: table(rows, headings),
+    };
+  }
   return {
     score: 0,
-    displayValue: `${rows.length} head ${rows.length === 1 ? 'signal differs' : 'signals differ'}`,
+    displayValue: `${failing.length} head ${
+      failing.length === 1 ? 'signal differs' : 'signals differ'
+    }`,
     explanation:
-      'The title, meta description, canonical or noindex in the raw HTML is not the one the page has after JavaScript runs. A crawler may index either; a noindex or canonical that JavaScript changes is not reliable. Put these in the server HTML.',
-    details: table(rows, [
-      ['field', 'Signal'],
-      ['first', 'Raw HTML'],
-      ['second', 'After JavaScript'],
-      ['problem', 'Problem'],
-    ]),
+      'The canonical or noindex in the raw HTML is not the one the page has after JavaScript runs. Google may not apply a noindex or canonical that JavaScript changes, and a crawler that does not run JavaScript sees only the raw one. Put these in the server HTML.',
+    details: table(rows, headings),
   };
 }
 

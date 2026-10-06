@@ -35,21 +35,32 @@ describe('buildHeadSignalsProduct', () => {
   it('passes when the head is identical', () => {
     expect(run(html(), html()).score).toBe(1);
   });
-  it('fails a title, description and canonical that exist only after JavaScript', () => {
+  it('only notes a title, description and canonical that exist only after JavaScript', () => {
     const p = run(html({title: null, desc: null, canonical: null}), html());
-    expect(p.score).toBe(0);
-    expect(p.details.items.map((/** @type {any} */ i) => [i.field, i.problem])).toEqual([
-      ['Title', 'only after JavaScript'],
-      ['Meta description', 'only after JavaScript'],
-      ['Canonical', 'only after JavaScript'],
+    expect(p.score).toBe(1);
+    expect(p.displayValue).toBe('3 head signals are set or changed by JavaScript (a note)');
+    expect(p.details.items.map((/** @type {any} */ i) => i.field)).toEqual([
+      'Title',
+      'Meta description',
+      'Canonical',
     ]);
+    expect(p.details.items[0].problem).toMatch(/^note: only after JavaScript/);
   });
-  it('fails a changed title and a changed canonical', () => {
+  it('notes a changed title, as for a counter or a greeting', () => {
+    const p = run(html({title: 'Inbox'}), html({title: '(3) Inbox'}));
+    expect(p.score).toBe(1);
+    expect(p.details.items[0].problem).toMatch(/Google renders JavaScript/);
+  });
+  it('fails two different canonicals, and lists a changed title as a note beside it', () => {
     const p = run(html(), html({title: 'Other', canonical: 'https://example.com/other'}));
-    expect(p.details.items.map((/** @type {any} */ i) => i.problem)).toEqual([
-      'differs',
-      'differs',
-    ]);
+    expect(p.score).toBe(0);
+    expect(p.displayValue).toBe('1 head signal differs');
+    expect(p.details.items.map((/** @type {any} */ i) => [i.field, i.problem.slice(0, 7)])).toEqual(
+      [
+        ['Canonical', 'differs'],
+        ['Title', 'note: d'],
+      ]
+    );
   });
   it('fails noindex added or removed by JavaScript', () => {
     expect(run(html(), html({robots: 'noindex'})).details.items[0].field).toBe('Robots (noindex)');
