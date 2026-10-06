@@ -12,7 +12,7 @@ const UIStrings = {
   title: 'Image formats',
   failureTitle: 'Some large images use JPEG, PNG or GIF',
   description:
-    'Informational (never fails a build): flags when a loaded image is a JPEG, PNG or GIF over 10 KiB. WebP, AVIF and SVG pass. Read from the page-load network log, no extra request; stricter than core modern-image-formats, which only estimates savings.',
+    'Informational (never fails a build): flags when a loaded image is a JPEG, PNG or GIF over 10 KiB. WebP, AVIF and SVG pass. Read from the page-load network log, no extra request; stricter than core modern-image-formats, which only estimates savings. An image served by another site (an ad, a widget) is only a note.',
 };
 
 class ImageLegacyFormats extends Audit {
@@ -27,7 +27,7 @@ class ImageLegacyFormats extends Audit {
       description: UIStrings.description,
       supportedModes: ['navigation'],
       scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
-      requiredArtifacts: ['DevtoolsLog'],
+      requiredArtifacts: ['DevtoolsLog', 'URL'],
     };
   }
 
@@ -39,7 +39,10 @@ class ImageLegacyFormats extends Audit {
    */
   static async audit(artifacts, context) {
     const records = await NetworkRecords.request(artifacts.DevtoolsLog, context);
-    return buildLegacyFormatProduct(records);
+    return buildLegacyFormatProduct(
+      records,
+      artifacts.URL && (artifacts.URL.finalDisplayedUrl || artifacts.URL.requestedUrl)
+    );
   }
 }
 

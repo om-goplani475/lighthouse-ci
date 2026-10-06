@@ -198,6 +198,36 @@ describe('buildDimensionsProduct', () => {
   });
 });
 
+describe('first-party filtering of the informational image audits', () => {
+  const page = 'https://www.example.com/';
+
+  it('filename quality: an image from another site is only a note', () => {
+    const own = el({src: 'https://cdn.example.com/IMG_1234.jpg'});
+    const other = el({src: 'https://ads.tracker.net/IMG_5678.jpg'});
+    const p = lib.buildFilenameProduct([own, other], page);
+    expect(p.numericValue).toBe(1);
+    expect(p.details.items.map((/** @type {any} */ i) => i.problem)).toEqual([
+      expect.stringMatching(/^file name "IMG_1234" is a camera/),
+      expect.stringMatching(/^note: .*another site/),
+    ]);
+    expect(lib.buildFilenameProduct([other], page).score).toBe(1);
+  });
+
+  it('legacy formats: a big JPEG from another site is only a note', () => {
+    const p = lib.buildLegacyFormatProduct(
+      [rec({url: 'https://ads.tracker.net/b.jpg', mimeType: 'image/jpeg', resourceSize: 90000})],
+      page
+    );
+    expect(p.score).toBe(1);
+    expect(p.details.items[0].problem).toMatch(/^note: .*another site/);
+    const own = lib.buildLegacyFormatProduct(
+      [rec({url: 'https://cdn.example.com/b.jpg', mimeType: 'image/jpeg', resourceSize: 90000})],
+      page
+    );
+    expect(own.numericValue).toBe(1);
+  });
+});
+
 describe('buildOversizedProduct', () => {
   const run = (/** @type {any[]} */ els, /** @type {string} */ page) =>
     lib.buildOversizedProduct(els, page);

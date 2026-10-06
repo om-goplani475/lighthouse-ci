@@ -11,7 +11,7 @@ const UIStrings = {
   title: 'Image file names',
   failureTitle: 'Some images have non-descriptive file names',
   description:
-    'Informational (never fails a build): flags when a content image (at least 50 x 50 px, including CSS background images) has a file name that is a camera or tool default (IMG_1234, DSC0001, Screenshot 12), a number only, a hash or ID, or a generic word such as image or banner.',
+    'Informational (never fails a build): flags when a content image (at least 50 x 50 px, including CSS background images) has a file name that is a camera or tool default (IMG_1234, DSC0001, Screenshot 12), a number only, a hash or ID, or a generic word such as image or banner. An image served by another site (an ad, a widget) is only a note.',
 };
 
 class ImageFilenameQuality extends Audit {
@@ -25,7 +25,7 @@ class ImageFilenameQuality extends Audit {
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
       scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
-      requiredArtifacts: ['ImageElements'],
+      requiredArtifacts: ['ImageElements', 'URL'],
     };
   }
 
@@ -35,7 +35,10 @@ class ImageFilenameQuality extends Audit {
    * @return {import('lighthouse/types/audit.js').default.Product}
    */
   static audit(artifacts) {
-    return buildFilenameProduct(artifacts.ImageElements);
+    return buildFilenameProduct(
+      artifacts.ImageElements,
+      artifacts.URL && (artifacts.URL.finalDisplayedUrl || artifacts.URL.requestedUrl)
+    );
   }
 }
 

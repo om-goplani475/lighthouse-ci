@@ -11,7 +11,7 @@ const UIStrings = {
   title: 'Content images reserve their space',
   failureTitle: 'Some images do not reserve their space',
   description:
-    'Fails when a content img (at least 50 x 50 px) does not reserve its space (width and height, or one of them plus an aspect-ratio, by attribute or by CSS), which makes the layout shift while it loads. Uses the same rule as core unsized-images, so the two now agree.',
+    'Fails when a content img (at least 50 x 50 px) does not reserve its space (width and height, or one of them plus an aspect-ratio, by attribute or by CSS), which makes the layout shift while it loads. Uses the same rule as core unsized-images, so the two agree; what it adds is a verdict limited to content images (not icons) inside the Extended SEO category.',
 };
 
 class ImageDimensionsAttributes extends Audit {

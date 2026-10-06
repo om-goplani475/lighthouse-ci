@@ -117,7 +117,9 @@ function baseName(src) {
  * @return {Product}
  */
 function offenderProduct(offenders, text, urlLabel = 'Image') {
-  if (offenders.length === 0) return {score: 1, displayValue: text.pass};
+  if (offenders.length === 0) {
+    return {score: 1, numericValue: 0, numericUnit: 'unitless', displayValue: text.pass};
+  }
   const failing = offenders.filter(o => !o.note);
   const notes = offenders.length - failing.length;
   /** @type {import('lighthouse/types/audit.js').default.Details.Table['headings']} */
@@ -137,12 +139,16 @@ function offenderProduct(offenders, text, urlLabel = 'Image') {
   if (failing.length === 0) {
     return {
       score: 1,
+      numericValue: 0,
+      numericUnit: 'unitless',
       displayValue: `${text.pass}; ${notes} ${notes === 1 ? 'note' : 'notes'}`,
       details,
     };
   }
   return {
     score: 0,
+    numericValue: failing.length,
+    numericUnit: 'unitless',
     displayValue: `${failing.length} ${text.fail}`,
     explanation: text.explain(failing.length),
     details,
@@ -290,9 +296,10 @@ function buildAltQualityProduct(artifact) {
 
 /**
  * @param {any[] | null | undefined} elements ImageElements
+ * @param {string} [pageUrl] The audited page; an image from another site is only a note.
  * @return {Product}
  */
-function buildFilenameProduct(elements) {
+function buildFilenameProduct(elements, pageUrl) {
   if (!Array.isArray(elements)) return notApplicable('The page images were not collected.');
   const seen = new Set();
   /** @type {Offender[]} */
@@ -316,7 +323,12 @@ function buildFilenameProduct(elements) {
       problem = 'a hash or ID, not words';
     } else if (GENERIC_NAMES.has(lowered)) problem = 'a generic word';
     if (problem) {
-      offenders.push({url: el.src, problem: `file name "${clip(name, 60)}" is ${problem}`});
+      const own = isFirstParty(el.src, pageUrl);
+      offenders.push({
+        url: el.src,
+        problem: `file name "${clip(name, 60)}" is ${problem}${own ? '' : ' (another site)'}`,
+        note: !own,
+      });
     }
   }
   if (judged === 0) return notApplicable('The page has no content images to judge.');
@@ -501,9 +513,10 @@ function imageRecords(records) {
 
 /**
  * @param {any[] | null | undefined} records
+ * @param {string} [pageUrl] The audited page; an image from another site (an ad, a widget) is only a note.
  * @return {Product}
  */
-function buildLegacyFormatProduct(records) {
+function buildLegacyFormatProduct(records, pageUrl) {
   const images = imageRecords(records);
   if (!images) return notApplicable('The network log was not collected.');
   const seen = new Set();
@@ -521,7 +534,8 @@ function buildLegacyFormatProduct(records) {
         url: r.url,
         problem: `${type.replace('image/', '').toUpperCase()} of ${Math.round(
           bytes / 1024
-        )} KiB; WebP or AVIF is smaller`,
+        )} KiB; WebP or AVIF is smaller${isFirstParty(r.url, pageUrl) ? '' : ' (another site)'}`,
+        note: !isFirstParty(r.url, pageUrl),
       });
     }
   }
