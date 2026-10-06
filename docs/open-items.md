@@ -50,8 +50,8 @@ theguardian.com, nextjs.org, react.dev, angular.dev, lipsum.com, paulgraham.com 
 defect in `url-variant-consistency` and `indexability-conflicts`, a lazy image at the very bottom of the first screen, and Next.js app-router pages not recognised in `rendering-mode`).
 What fired afterwards looked genuine (missing og tags, no `<h1>`, a sitemap URL that 404s or redirects, SPAs answering 200 for any path, `sitemap.xml` serving HTML).
 **Known and accepted:** `placeholder-content` fails a page that is itself about lorem ipsum (lipsum.com), as its description says.
-**Not covered:** a site whose hreflang set includes an `x-default` language chooser that the crawler can read (spotify, lego and nike did not expose one), and one whose hreflang is only in the sitemap. Look for
-one when you meet it; the unit tests and the planted-site run cover that logic.
+**Round 3 (hreflang chooser):** ikea.com's root (a real country chooser with `x-default`) and stripe.com (89 alternates) were run: the `x-default` exemption works, the audits stay quiet on a healthy set, and the real error IKEA ships (`es-CE`, not a region code) is reported. The hreflang requests added 7 to 9 s per run, inside the 20 s budget.
+**Not covered:** a site whose hreflang is only in the sitemap.
 
 ### R13 (rest). Bytespider
 
@@ -64,15 +64,11 @@ one when you meet it; the unit tests and the planted-site run cover that logic.
   it cannot be judged with this crawler (a new decision: a dedicated crawl command, or sitemap-only orphan detection).
 - **`pagination-trap` (now informational) needs a deeper crawl for a next-only endless chain.** At depth 3 such a chain reads "too few to call it a trap"; at `LHCI_SEO_CRAWL_MAX_DEPTH=5` it
   is flagged. A `rel=next` loop longer than 50 pages is not detected.
-- **Optional, not done:** fold the three URL-variant audits into one (instead `url-normalization` became informational); expose `numericValue` from the audits that do not yet (17 do);
-  cache the per-run link checks by audited URL (decided against: it would hide a link that broke between runs).
+- **Decided against, with reasons (2026-10-06):** (1) a shared input guard that turns a wrong-shaped core artifact into "not applicable": no real run produces such shapes (Lighthouse's own gatherers do not), Lighthouse already turns a thrown audit into one error row, and a guard would hide a genuine bug as a quiet N/A; (2) folding the three URL-variant audits into one: with `url-normalization` informational nothing is counted twice, and removing audit ids would break users' assertions; (3) a per-host cap on hreflang requests: measured at 7 to 9 s per run, and a cap would halve coverage for the usual single-domain site; (4) caching the per-run link checks: it would hide a link that broke between runs.
 - **`sitemap-url-status` scores 1 when its time budget runs out** before the sample finishes (a pinned behaviour).
 
 ## 4. Housekeeping
 
-- **`docs/phases/phase-1-page-metadata.md` is stale.** Its "Not possible without new infrastructure" table still lists duplicate titles and duplicate meta descriptions as impossible; Phase 7
-  built them. Move those rows to done. The same file calls roadmap Phase 16 "Site Intelligence & Multi-page Crawler", while `docs/master-roadmap.md` calls it "Site Intelligence / Product
-  Layer": align the two.
 - **Failing suites outside `seo-audits` (investigated 2026-10-06):** the fork's own commits touch only `packages/seo-audits`; everything else is upstream's history. Of the 8 suites that
   failed on this Node 24 machine, 2 are fixed and 6 remain. Fixed: `utils/test/build-context.test.js` (the clone had no git tags, fixed by `git fetch upstream --tags`, plus 2 tests that assumed
   `origin` is `GoogleChrome/lighthouse-ci`; they now compare with this clone's own `origin`) and `cli/test/wizard.test.js` (Node 24 prints a `url.parse()` deprecation from sqlite3's

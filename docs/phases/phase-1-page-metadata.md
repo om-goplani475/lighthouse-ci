@@ -15,13 +15,15 @@ Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 ## A structural note before any feature starts here
 
 Several items in this phase's original wishlist are **site-wide** (duplicate titles/descriptions
-*across* pages, template-suffix pattern detection). A Lighthouse audit — the mechanism every
-feature in this package has used so far — evaluates **one page at a time**; it has no way to
-compare page A's title against page B's, because it never sees page B. Cross-page duplicate
-detection needs a crawler/orchestration layer that doesn't exist anywhere in this repo yet (see
-`docs/master-roadmap.md`'s Phase 16 (Site Intelligence & Multi-page Crawler), explicitly not started). Those items are filed under "Not possible without
-new infrastructure" below, not folded into the single-page features — this is a real, structural
-limitation of the audit model itself, not a scoping choice that could go either way.
+*across* pages, template-suffix pattern detection). A Lighthouse audit evaluates **one page at a time**;
+it cannot compare page A's title against page B's, because it never sees page B. Cross-page duplicate
+detection needs a crawler layer, which did not exist when this phase was written, so those items were
+filed under "Not possible without new infrastructure" below instead of being folded into the
+single-page features.
+
+**Update 2026-10-06:** the crawler now exists (a `SiteCrawl` gatherer built in Phase 7, extended in
+Phase 8) and the exact-match duplicates were built on it; see the table below. The roadmap's later
+"Phase 16" is a different thing (the summary and product layer, not the crawler).
 
 ## Features
 
@@ -36,16 +38,16 @@ limitation of the audit model itself, not a scoping choice that could go either 
 | 5 | Canonical quality: exists/absolute/HTTPS/points to 200 (not redirected/404/blocked); canonical conflicts (multiple canonicals, A→B→A chains) | **done** (basic scope) | `canonical-https` — merged `d0ce06c` directly to this branch, QA'd live see `docs/qa/robots-and-canonical.md`. Core's own `canonical` audit already covers presence, validity, absoluteness, multiple-conflicting-canonicals, hreflang mismatches, and the "points to domain root" mistake (confirmed by reading its full source) — this audit adds only the HTTPS check. The "points to 200"/A→B→A-chain checks need a new outbound-fetch capability with SSRF-prevention obligations; confirmed with the developer via a blocking question to build the basic (no-fetch) version now and record the advanced version below rather than build it in this pass. |
 | 6 | Favicon presence + multi-size/manifest icon check | **done** | `favicon-presence` (scored) + `favicon-quality` (informational) + `manifest-icons` (scored, fetch-based) — merged `91dc05a` directly to this branch, QA'd live see `docs/qa/favicon-and-manifest.md`, security-reviewed see `.ai-agents/state/security-findings.md` (the first outbound-fetch capability this package has ever had — reviewed with real care, not lightweight-mode speed). Core has zero favicon/manifest coverage at all (confirmed — this Lighthouse version doesn't even have a `WebAppManifest` gatherer). Unlike item 5, the developer chose the **advanced** option here via blocking question: build the SSRF-protected manifest fetch now (`src/lib/safe-fetch.js`) rather than defer it — caught and fixed a real bypass (Node's http client skipping the custom DNS `lookup` for literal-IP URLs) before it ever shipped. New `FaviconLinks` gatherer. |
 
-## Not possible without new infrastructure
+## Was "not possible without new infrastructure", now built or still deferred
 
-Not a prioritization choice — these need a crawler/multi-page orchestration layer this repo has
-never built, tracked separately (Phase 16 (Site Intelligence & Multi-page Crawler) in `docs/master-roadmap.md`), before they're even
-buildable as a concept, regardless of how much time is spent on them.
+These needed a crawler. Phase 7 built it (`docs/phases/phase-7-duplicates.md`), and the exact-match
+versions exist:
 
-| Item | Why | Reference |
+| Item | State | Reference |
 |---|---|---|
-| Duplicate/near-duplicate meta descriptions across site | Requires comparing values across multiple pages — a single-page Lighthouse audit structurally cannot see another page's content | `docs/master-roadmap.md` Phase 16/31 |
-| Duplicate titles across site (incl. template-suffix pattern detection, e.g. "Home \| MyCompany") | Same structural limitation — needs a crawl step that aggregates titles across URLs before any comparison logic can run | `docs/master-roadmap.md` Phase 16/31 |
+| Duplicate meta descriptions across site | **built** (exact match only, after trimming and case-folding) as `duplicate-descriptions`, informational since the 2026-10-06 calibration | Phase 7 |
+| Duplicate titles across site | **built** (exact match) as `duplicate-titles`, scored; pages that are canonicalised elsewhere or in one `rel=next` series are skipped | Phase 7 |
+| Near-duplicate (fuzzy) descriptions or titles, template-suffix pattern detection (e.g. "Home \| MyCompany") | **still deferred**: similarity matching is its own false-positive decision | `docs/open-items.md`, section 5 |
 
 ## Deferred
 

@@ -643,3 +643,7 @@ Found by running the audits on five real sites (MDN, BBC News, apple.com, ikea.c
 ## 2026-10-06 — calibration, round 5 (ten more real sites)
 
 `url-variant-consistency` fails only a redirect chain that ends gone (404 or 410); a 401, 403, 406, 429 or 5xx at the end is a note (the Guardian answered the probe with 406). `indexability-conflicts` no longer reports a canonical target that answered 401, 403, 406, 429 or 5xx (LEGO answered 403 to the probe); 404 and 410 still count. `image-lazy-above-fold` ignores a lazy image that starts below 75% of the first screen. `rendering-mode` recognises Next.js app-router pages (`/_next/static/`, `__next_f`). `ai-crawler-summary` lists 19 crawlers (adds `OAI-AdsBot`, `Amzn-SearchBot`, `Amzn-User`, `Meta-ExternalFetcher`) with vendor-confirmed purposes; the user-initiated fetchers may ignore robots.txt. No migration.
+
+## 2026-10-06 — docs only
+
+`docs/phases/phase-1-page-metadata.md` now says the crawler exists and the exact-match duplicate audits were built (Phase 7); the roadmap's Phase 16 is the summary layer, not the crawler. No code change.
