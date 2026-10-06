@@ -9,8 +9,12 @@
  *
  * Rules, chosen with the developer: values match when equal after trimming and case-folding (nothing
  * fuzzier); an empty value never counts (that is the core `document-title` / `meta-description` audits'
- * job); the audit fails when at least one other crawled page shares the audited page's value.
+ * job); the audit fails when at least one other crawled page shares the audited page's value. Pairs that share a
+ * value on purpose are skipped (and counted): a page whose canonical names another URL (a duplicate that is not
+ * indexed in its own right), and two pages that are members of a rel=next / rel=prev series ("Blog - Page 2").
  */
+
+import {normalizeUrl} from './crawl-snapshot.js';
 
 import {Audit} from 'lighthouse/core/audits/audit.js';
 
@@ -38,6 +42,39 @@ function clip(text, max = MAX_CELL_CHARS) {
  */
 function keyOf(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+/**
+ * @param {CrawlPage} page
+ * @return {boolean} Whether the page names another URL as its canonical.
+ */
+function canonicalisedElsewhere(page) {
+  if (!Array.isArray(page.canonicals) || page.canonicals.length !== 1) return false;
+  const own = normalizeUrl(page.finalUrl || page.url);
+  const named = normalizeUrl(page.canonicals[0], page.finalUrl || page.url);
+  return !!own && !!named && own !== named;
+}
+
+/**
+ * @param {CrawlPage} page
+ * @return {boolean}
+ */
+function inSeries(page) {
+  const p = page.pagination;
+  return !!p && ((p.next && p.next.length > 0) || (p.prev && p.prev.length > 0));
+}
+
+/**
+ * @param {CrawlPage} audited
+ * @param {CrawlPage} other
+ * @return {boolean} Whether the two pages share a value on purpose.
+ */
+function sharesOnPurpose(audited, other) {
+  return (
+    canonicalisedElsewhere(audited) ||
+    canonicalisedElsewhere(other) ||
+    (inSeries(audited) && inSeries(other))
+  );
 }
 
 /**
@@ -83,10 +120,13 @@ function buildDuplicateProduct(artifact, field) {
   const seen = new Set([audited.finalUrl]);
   /** @type {CrawlPage[]} */
   const others = [];
+  let skippedOnPurpose = 0;
   for (const page of snapshot.pages) {
     if (page === audited || page.extraction !== 'ok' || seen.has(page.finalUrl)) continue;
     seen.add(page.finalUrl);
-    if (keyOf(page[field]) === key) others.push(page);
+    if (keyOf(page[field]) !== key) continue;
+    if (sharesOnPurpose(audited, page)) skippedOnPurpose++;
+    else others.push(page);
   }
   const compared = seen.size;
   if (compared < 2) {
@@ -99,7 +139,11 @@ function buildDuplicateProduct(artifact, field) {
   if (others.length === 0) {
     return {
       score: 1,
-      displayValue: `Unique among ${compared} crawled pages`,
+      displayValue: `Unique among ${compared} crawled pages${
+        skippedOnPurpose
+          ? ` (${skippedOnPurpose} sharing it on purpose: canonicalised or paginated)`
+          : ''
+      }`,
     };
   }
 

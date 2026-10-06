@@ -170,3 +170,44 @@ describe('buildDuplicateProduct', () => {
     expect(product.details.items[0].value.length).toBeLessThan(110);
   });
 });
+
+describe('pages that share a value on purpose', () => {
+  const run = (/** @type {any[]} */ pages) =>
+    // @ts-expect-error - partial test artifact
+    buildDuplicateProduct(artifact(pages), 'title');
+
+  it('skips a page whose canonical names another URL, and says so', () => {
+    const p = run([
+      audited(),
+      page({url: 'https://example.com/a?ref=x', canonicals: ['https://example.com/a']}),
+    ]);
+    expect(p.score).toBe(1);
+    expect(p.displayValue).toMatch(/1 sharing it on purpose: canonicalised or paginated/);
+    // the audited page itself canonicalised elsewhere is not compared either
+    const q = run([
+      audited({canonicals: ['https://example.com/main']}),
+      page({url: 'https://example.com/a'}),
+    ]);
+    expect(q.score).toBe(1);
+  });
+
+  it('skips two members of a rel=next series ("Blog - Page 2")', () => {
+    const series = {pagination: {next: ['https://example.com/page/3'], prev: []}};
+    const p = run([
+      audited({title: 'Blog', ...series}),
+      page({url: 'https://example.com/page/2', title: 'Blog', ...series}),
+    ]);
+    expect(p.score).toBe(1);
+  });
+
+  it('still fails a plain duplicate, and a page that canonicalises to itself', () => {
+    const own = {canonicals: ['https://example.com/a']};
+    const p = run([audited(), page({url: 'https://example.com/a', ...own})]);
+    expect(p.score).toBe(0);
+    const single = run([
+      audited({pagination: {next: ['/x'], prev: []}}),
+      page({url: 'https://example.com/b'}),
+    ]);
+    expect(single.score).toBe(0);
+  });
+});

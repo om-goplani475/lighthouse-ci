@@ -12,7 +12,8 @@ const UIStrings = {
   failureTitle: 'Another crawled page has the same title',
   description:
     'Fails when another crawled page has the same <title> as the audited page. Compared with the other pages the site crawl reached (the audited page, the homepage, the sitemap URLs and the pages ' +
-    'they link to, up to 3 hops, same origin, from server HTML), equal after trimming and ignoring case. A missing ' +
+    'they link to, up to 3 hops, same origin, from server HTML), equal after trimming and ignoring case. Pages that share a title on purpose are skipped: a page whose canonical names ' +
+    'another URL, and two members of a rel=next/prev series ("Blog - Page 2"). A missing ' +
     'value is not counted here. See crawl-coverage for how much of the site was seen.',
 };
 
