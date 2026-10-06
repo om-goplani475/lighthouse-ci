@@ -166,6 +166,10 @@ const config = {
     './audits/local-name-consistency.js',
     './audits/local-pages-report.js',
     './audits/local-pages-in-sitemap.js',
+    './audits/article-values.js',
+    './audits/news-sitemap-valid.js',
+    './audits/news-sitemap-freshness.js',
+    './audits/news-sitemap-report.js',
   ],
   categories: {
     'seo-extended': {
@@ -284,6 +288,10 @@ const config = {
         {id: 'local-name-consistency', weight: 0.5},
         {id: 'local-pages-report', weight: 1},
         {id: 'local-pages-in-sitemap', weight: 0.5},
+        {id: 'article-values', weight: 0.5},
+        {id: 'news-sitemap-valid', weight: 1},
+        {id: 'news-sitemap-freshness', weight: 0.5},
+        {id: 'news-sitemap-report', weight: 1},
       ],
     },
   },

@@ -193,6 +193,15 @@ const CATEGORIES = [
       'local-pages-in-sitemap',
     ],
   },
+  {
+    name: 'News',
+    audits: [
+      'article-values',
+      'news-sitemap-valid',
+      'news-sitemap-freshness',
+      'news-sitemap-report',
+    ],
+  },
 ];
 
 /**

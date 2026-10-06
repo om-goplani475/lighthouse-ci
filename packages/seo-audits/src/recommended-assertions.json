@@ -412,5 +412,23 @@
     {
       "minScore": 1
     }
+  ],
+  "article-values": [
+    "warn",
+    {
+      "minScore": 1
+    }
+  ],
+  "news-sitemap-valid": [
+    "error",
+    {
+      "minScore": 1
+    }
+  ],
+  "news-sitemap-freshness": [
+    "warn",
+    {
+      "minScore": 1
+    }
   ]
 }

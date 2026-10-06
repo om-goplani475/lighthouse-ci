@@ -33,6 +33,10 @@ const PRESETS = {
     description: 'Recommended, with structured data and the local business checks as errors.',
     promote: ['Structured data', 'Local business'],
   },
+  news: {
+    description: 'Recommended, with structured data and the news checks as errors.',
+    promote: ['Structured data', 'News'],
+  },
   blog: {
     description: 'Recommended, with international and content checks as errors.',
     promote: ['International (hreflang)', 'Content and AI search', 'Social sharing'],
