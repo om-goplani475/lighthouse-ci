@@ -935,3 +935,29 @@ No new request, gatherer, dependency or environment variable: the command only r
 
 No `critical`, `high`, `medium` or `low` finding.
 
+## 2026-10-06 — webhook-platform (Phase 17, full pass over slices 1 to 6)
+
+The biggest new surface in the fork: unauthenticated inbound webhooks, a server-side Chrome that loads attacker-influenced URLs, outbound requests to configured destinations, secrets at rest, and a dashboard. Reviewed against `.ai-agents/prompts/security-checklist.md` by reading each path and by tests and live runs, not by template.
+
+**One finding, fixed in this phase (low):** every failed signature wrote a log row, and the project id is in the webhook URL, so anyone who knew it could fill the log table without authenticating. Failed-signature logging is now capped at 20 per project per minute (the request is still refused with 401); a test sends 40 bad signatures, checks 20 rows, and checks a genuine delivery is still accepted.
+
+**Reviewed and found sound (each with a test):**
+- **Inbound authentication.** HMAC-SHA256 over the raw bytes, constant-time compare (both sides hashed first, so length does not leak), the same generic 401 whatever failed (the reason is only in the owner's log). The `lhci` form binds a timestamp into the signature and checks it only after the signature (no staleness oracle). GitHub and `lhci` replays are refused (a bounded memory). GitLab sends only a token, so it cannot be replay-protected: documented. Body capped at 1 MB before parsing; wrong content types get 415.
+- **Input to storage.** Repository, sha, branch, PR number and URL are validated and bounded before they reach a row, a log, a comment or a URL (`../x` was caught as a repository name by a test). All queries are parameterised; list limits are coerced to integers and capped.
+- **SSRF through the audited URL.** Mandatory per-project host allow-list (no IP entries, no TLD-wide wildcards; look-alike hosts and credentials refused); the host must also resolve to public addresses; **Chrome is forced through a local guard proxy** that resolves every name itself, refuses private, loopback and link-local addresses for the page, its redirects and all subresources, connects to the address it checked (no rebinding window), and never honours the private-network opt-in. Verified live: a loopback page was refused and its server saw 0 requests.
+- **Blast radius of the audit child.** It is built from an allow-list of environment variables (no database or cloud credentials; `LHCI_SEO_ALLOW_PRIVATE_NETWORK` never passed), runs in its own temp folder with its own crawl cache (a later push never sees an earlier push's pages), and is killed with its process group on timeout. Operator Chrome flags that could undo the proxy are dropped and the guard flags come last.
+- **Outbound requests.** https only, public addresses only, no redirects followed (so a token cannot be sent on to another host), 10 s timeout, 1 MB cap. Each destination kind can only name its own hosts (Slack, Teams, GitHub/GitLab API base). Tokens must be printable ASCII (no header injection). Tokens and URLs are redacted from every error and never returned by the API.
+- **Hostile text.** Page-controlled text in comments and alerts is escaped; `@` is broken so a page cannot make a comment notify anyone; Slack control sequences are escaped; a report link is percent-encoded including parentheses (a test caught `encodeURIComponent` leaving `)`). The dashboard renders everything through Preact; page URLs become links only if http(s).
+- **Resource limits.** Queue 20 waiting, 1 worker; 10 deliveries per project per 10 minutes; 10-minute run limit; 60 s for all sending; bounded replay and rate-limit memory; the proxy caps connections, ports and idle time.
+- **Hostile management input.** Odd project ids and malformed bodies get a client error, never a 500 (a test sends them).
+
+**Accepted, not fixed (documented in the README and `docs/qa/webhook-platform.md`):**
+- **Secrets in clear in the database** (webhook secret, GitHub/GitLab tokens, Slack/Teams URLs): a verifier needs the webhook secret itself, and the fork has no key store. Same exposure as the upstream project build token. Protect the database and backups.
+- **Admin token in the browser's `localStorage`**, as the upstream project settings page already does; the SEO screens render only escaped text.
+- **No per-address rate limit on the webhook route** (the signature check is cheap, and a failed one writes at most 20 log rows a minute per project): put a reverse proxy in front.
+- **A page can keep Chrome busy for the 10-minute limit**; the queue and rate limits bound how often. Run in a container with CPU and memory limits.
+- **The webhook routes sit before the server's basic-auth** (they authenticate by signature); the management routes are behind it and the admin token.
+- **In-memory replay memory:** a restart forgets it (the `lhci` form's timestamp window still applies).
+
+No `critical`, `high` or `medium` finding open. Findings 1 to 10 of earlier phases remain fixed.
+

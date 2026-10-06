@@ -1,7 +1,7 @@
 # Current feature
 
-- slug: summary-command
-- stage: implemented in lightweight mode and QA'd live (design conversation, then code); commits pending approval
-- spec: none (lightweight; decisions are in docs/phases/phase-16-site-intelligence.md)
+- slug: webhook-platform
+- stage: built in slices 1 to 6 (full pipeline, with a design conversation per decision), slice 7 (docs, QA, security review) done; merge into main pending approval
+- spec: docs/phases/phase-17-webhook-platform.md
 - base_branch: main
-- phase: 16 (site intelligence, the summary layer), branch phase-16-site-intelligence: built, merge into main pending approval
+- phase: 17 (CI/DevOps and webhook platform), branch phase-17-ci-devops: 14 commits, merge into main pending approval

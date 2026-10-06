@@ -938,6 +938,27 @@ It reads the `lhr-*.json` files (the latest run of each page), sends nothing any
 
 It always exits 0 when it can read the reports (it reports; `lhci assert` gates) and 2 on a usage error. The A3 workflow (`.github/workflows/seo-audit.yml`) appends its output to the job summary.
 
+### The webhook service (Phase 17)
+
+The LHCI server (`packages/server`) can run the audits for other repositories, so they do not each install `@lhci/cli` and run Chrome. A repository sends a signed webhook with a preview URL; the server audits it with the project's own rules, comments on the pull request, and can alert Slack or Teams. Design and decisions: `docs/phases/phase-17-webhook-platform.md`; checks: `docs/qa/webhook-platform.md`.
+
+**Set up (per LHCI project):** open `/app/projects/<slug>/seo` (or call the API with the project's admin token), choose where webhooks come from (GitHub, GitLab, or a CI job), list the hosts that may be audited (`preview.example.com`, `*.stage.example.org`; at least one is required) and save. The webhook address and secret are shown **once**. Then add the webhook in the repository: GitHub (content type `application/json`, that secret, events *Pull requests* and optionally *Deployment statuses*), GitLab (that secret as the token; *Merge request* and *Deployment* events), or, from a CI job, a JSON body `{"repo": "owner/name", "sha": "...", "url": "https://...", "prNumber": 12, "branch": "...", "baseBranch": "main"}` signed with `X-Lhci-Timestamp` and `X-Lhci-Signature: sha256=HMAC_SHA256(secret, "<timestamp>.<body>")`.
+
+- **Rules per project:** a preset (`seo:recommended`, `seo:strict`, `ecommerce`, `blog`, `internal-portal`, `minimal`) plus a severity (`error`, `warn`, `off`) per category or per audit. Informational audits cannot be switched (they are never asserted).
+- **Pull request comment:** one comment per pull request, found by a hidden marker and edited in place on every push: score and grade, change since the baseline (the latest finished run of the same path on the base branch, so the base branch must also send events), per-category movement, and new, fixed and remaining issues. Needs a GitHub or GitLab token with permission to comment (a personal access token or a GitHub App installation token), stored in the project's destinations.
+- **Alerts** (Slack incoming webhook, Teams webhook): sent when a run that is not a pull request introduces a new critical problem: an error-tier audit among `robots-directives-conflict`, `indexability-conflicts`, `robots-txt-crawler-access`, `canonical-conflicts`, `canonical-https`, `redirect-loop`, `sitemap-valid`, `mixed-content`, `ssl-certificate-expiry`, or a page whose Lighthouse `is-crawlable` score fell from 1 to 0 (an accidental `noindex`). Nothing is "new" without a baseline, so a first audit never alerts.
+- **Dashboard:** run an audit by hand, runs and scores, the webhook log, and the rules and destinations.
+- **What protects the server:** deliveries are accepted only with a valid signature (HMAC over the raw body; GitHub and `lhci` replays are refused); only hosts on the project's allow-list are audited; Chrome is forced through a local proxy that refuses private, loopback and link-local addresses for the page, its redirects and every subresource; the audit runs in a child process that does not see the server's environment; at most 20 runs wait in the queue, 10 deliveries per project per 10 minutes are accepted, each run is stopped after 10 minutes; outbound messages go only to Slack, Teams, GitHub and GitLab hosts over https with no redirects.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `LHCI_SEO_SERVICE` | on | Set to `off` to turn the whole service off (no tables, no routes). |
+| `LHCI_SEO_PUBLIC_URL` | unset | The server's public address, for the "Full report" link in comments and alerts (`<this>/app/seo/<project>/runs/<run>`). No link when unset. |
+| `LHCI_SEO_SERVICE_CHROME_FLAGS` | unset | Extra Chrome flags for service runs, for example `--no-sandbox` inside a container. A flag that could undo the proxy (`--proxy-server`, `--proxy-bypass-list`, `--host-resolver-rules`) is dropped. |
+| `LHCI_SEO_CRAWL_*`, `LHCI_SEO_HREFLANG_MAX_CHECKS`, `LHCI_SEO_CRUX_API_KEY` | (service defaults: 30 pages, 60 s) | Passed to service runs like any run. `LHCI_SEO_ALLOW_PRIVATE_NETWORK` is **never** passed. |
+
+**Run it behind a reverse proxy** that rate-limits by address (the signature check is cheap but not free) and give the container limits on memory and CPU: a page can keep Chrome busy for the 10-minute run limit. The webhook routes are mounted before the server's basic-auth; the management routes are behind it and the project admin token. Webhook secrets, GitHub/GitLab tokens and Slack/Teams URLs are stored in the server's database in clear (like the project build token), so protect the database and its backups.
+
 ### Audit index (all 99 audits)
 
 Phase is the fork's own phase number. **Scoring** is what the audit reports; **Recommended assertion** is the severity `src/recommended-assertions.json` uses (`error` for objective defects, `warn` for the rest;

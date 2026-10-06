@@ -663,3 +663,10 @@ New command `node packages/seo-audits/src/summary/cli.js <folder>`: reads the `l
 ## 2026-10-06 — A3 result
 
 The A3 workflow ran on a GitHub runner (web.dev, Node 18): both install paths (the fork's own `lhci` and a global `@lhci/cli` 0.15) ran all 57 scored audits with identical results; a 71 s run. The workflow now records its elapsed time even when assertions fail. No change to the audits.
+
+## 2026-10-06 — webhook-platform (Phase 17)
+
+The LHCI server can now audit URLs for other repositories. A repository sends a signed webhook (GitHub, GitLab, or a generic signed JSON form) with a preview URL; the server checks the signature and the project's host allow-list, queues the audit, runs it in Chrome behind a guard proxy that refuses private addresses, scores it with the project's own rules (a preset plus a severity of `error`, `warn` or `off` per category or audit), compares it with the latest run of the same page on the base branch, comments on the pull request (one comment, updated in place) and alerts Slack or Teams when a deployment introduces a new critical problem such as a page that can no longer be indexed. A dashboard (`/app/projects/<slug>/seo`) runs audits by hand and manages rules, hosts, tokens and the webhook log.
+
+New: `packages/seo-audits/src/service/` (project config, webhook signature, payload, host allow-list, guard proxy, runner, outbound sender, comment and alert text, notifier), `packages/server/src/seo/` (tables `seo_projects`, `seo_notifications`, `seo_runs`, `seo_webhook_logs`; queue; routes under `/api/v1/webhooks` and `/api/v1/seo`), and the dashboard screens in `packages/server/src/ui/routes/seo/`. Upstream files changed: `server.js` (mount, 8 lines), `package.json` (two workspace dependencies), `app.jsx` (two routes), `page-sidebar.jsx` (one icon). New variables: `LHCI_SEO_SERVICE`, `LHCI_SEO_PUBLIC_URL`, `LHCI_SEO_SERVICE_CHROME_FLAGS`. See `docs/phases/phase-17-webhook-platform.md`, `docs/qa/webhook-platform.md` and the README.
+

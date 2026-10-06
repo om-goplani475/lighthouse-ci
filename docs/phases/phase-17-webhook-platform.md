@@ -1,6 +1,6 @@
 # Phase 17: CI/DevOps and webhook platform
 
-Status: **slices 1-6 built** on branch `phase-17-ci-devops`. Build mode: full pipeline, in slices; each slice is tested, then committed on approval.
+Status: **complete (slices 1-7); merge into main pending approval** on branch `phase-17-ci-devops`. Build mode: full pipeline, in slices; each slice is tested, then committed on approval.
 
 ## Goal
 
@@ -27,7 +27,7 @@ Other repositories do not install `@lhci/cli` or run Chrome. They send a webhook
 4. **Runner** *(done)*: executes `collect` for the URL with the resolved config, runs Phase 16 summary and compare against the baseline.
 5. **Dispatcher** *(done)*: PR comment (GitHub first, GitLab second), Slack/Teams alerts.
 6. **Dashboard** *(done)* (server UI, new route directory): on-demand run, rules editor, webhook log, run history.
-7. **Docs, QA against a real run, security review.**
+7. **Docs, QA against a real run, security review** *(done)*.
 
 ## Security notes (carried into each slice)
 
@@ -80,3 +80,9 @@ New screens in `packages/server/src/ui/` (new files plus two small edits: two ro
 - **Safety:** all text, including anything that came from the audited page, is rendered by Preact (escaped); no `dangerouslySetInnerHTML`. A page URL becomes a link only when it is http(s). Requests never throw: a missing or refused token, a validation problem (every problem listed), a busy server and a network failure are each shown as what they are.
 - **Checked in real Chrome against the real server** (puppeteer, a fresh database): no token asks for the token; an off-list URL is refused with the server's message; **a run started from the page audited `web.dev` in 1m48s and showed 91.4 (A)**; the run page, webhook log (the rejected delivery) and settings rendered; saving a preset through the page changed it on the server; a stored Slack URL was accepted and its secret part is not on the page; no console or page errors.
 - **Not done / known:** the run list reads each finished run's stored report to get its score, which is fine at 25 rows but would want a stored score column if the list grows; the UI has no automated screenshot test (the existing screenshot suites fail on this machine for font reasons), so the screens were checked by hand in Chrome and the logic behind them is unit tested.
+
+## Slice 7: docs, QA and the security review
+
+- The README has a "webhook service" section and the new variables; `docs/qa/webhook-platform.md` lists what was checked and the five things that need real destinations; `docs/open-items.md` has item H for them.
+- **Security pass over the whole phase** (`.ai-agents/state/security-findings.md`): one low finding, fixed: failed signatures wrote an unbounded number of log rows to anyone who knew the project's webhook URL; failed-signature logging is now capped at 20 per project per minute, with a test. Odd project ids and hostile bodies were probed (a test): client errors only, no 500. Accepted and documented: secrets in clear in the database, the admin token in `localStorage` (as upstream does), no per-address rate limit (use a reverse proxy), a page can keep Chrome busy for the 10-minute limit, in-memory replay memory.
+- **Not built, deliberately:** per-template grouping of pages, scheduled crawl diffs with alerting, SARIF output (it needs code scanning and file locations the audits do not have), GitHub App registration, a stored score column for the run list, secrets encrypted at rest.

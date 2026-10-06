@@ -8,13 +8,15 @@ done, decisions waiting, and deferred features. What was finished is in `docs/ph
 
 | Area | State |
 |------|-------|
+| Webhook platform | Phase 17 (`packages/server/src/seo/`, `packages/seo-audits/src/service/`, the dashboard): built and QA'd live; see the README and `docs/qa/webhook-platform.md`. |
 | Summary command | `packages/seo-audits/src/summary/cli.js` (Phase 16) scores, ranks and compares the reports; see the README. |
 | Audits | 99 in the `seo-extended` category: 57 scored (error tier at `error`, 7 warn-tier audits at score 0.5) and 42 informational. `packages/seo-audits/src/recommended-assertions.json` asserts the scored ones. |
 | `seo-audits` tests | 117 suites / 2,027 tests pass, on Node 24 and on Node 18.20.8 (what CI pins), checked 2026-10-06. Typecheck, lint and prettier clean. |
 | Security findings | **None open.** Findings 1-10 are fixed. One risk is *accepted*, not fixed: `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control (the README says so). |
 | Viewer | `@lhci/viewer` renders all 34 audits that had tables in five real reports (2026-10-06); the server and `seed-database` path was checked on 2026-10-05. |
+| Phase 17 not built | Per-template grouping of pages, scheduled crawl diffs with alerting, SARIF output, GitHub App registration, a stored score column for the run list, secrets encrypted at rest. See `docs/phases/phase-17-webhook-platform.md`. |
 | Failing suites outside `seo-audits` | 6 screenshot suites in `server` and `viewer` fail on this machine only (see section 4); the rest pass. Not caused by this work. |
-| Not verified at all | The CrUX success path with a real key (E). The real GitHub Actions run (A3) passed on 2026-10-06. |
+| Not verified at all | The CrUX success path with a real key (E). A real pull request comment, Slack and Teams alert and GitHub/GitLab webhook delivery (H). The real GitHub Actions run (A3) passed on 2026-10-06. |
 
 ## 2. Checks still to do
 
@@ -43,6 +45,10 @@ success path has never seen real data**. Create a Google Cloud API key, enable t
 `LHCI_SEO_CRUX_API_KEY=<key> npx lhci collect --url=<a busy public site, for example https://web.dev/> --settings.configPath=packages/seo-audits/src/lighthouse-config.js` and read the table.
 **Pass when** it shows LCP, INP and CLS with a Google rating and a collection period, says whether the URL or the whole site answered, and the key does not appear in the report JSON.
 A low-traffic site returns "no data", which is expected. Anything off is a `fix(seo-audits)` commit with a test using the real response shape.
+
+### H. Phase 17: verify the real destinations (needs you)
+
+The webhook service was built and run end to end with real Chrome and a real server, and its outbound requests are tested against fakes of the documented GitHub, GitLab, Slack and Teams APIs, but **no real pull request comment, alert or webhook delivery has been seen**. The steps are in `docs/qa/webhook-platform.md` ("Not verified"): a real GitHub or GitLab token commenting once and editing (not duplicating) on a second push; a real Slack and Teams alert for a new `noindex`; a real GitHub *Recent Deliveries* answer; a container run with `LHCI_SEO_SERVICE_CHROME_FLAGS=--no-sandbox`. **Pass when** each does what the document says. Anything off is a `fix(...)` commit with a test using the real response shape.
 
 ### G. Real-site spot check (done twice; more sites always help)
 

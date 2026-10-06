@@ -1,9 +1,11 @@
 # Current phase
 
-- phase: 16 (site intelligence, the summary layer): built and QA'd live, waiting for the merge into main; see docs/phases/phase-16-site-intelligence.md
-- branch: phase-16-site-intelligence
-- roadmap: docs/master-roadmap.md (Phase 17 CI/DevOps is next) and docs/open-items.md
+- phase: 17 (CI/DevOps and webhook platform): built (slices 1 to 7), waiting for the merge into main; see docs/phases/phase-17-webhook-platform.md
+- branch: phase-17-ci-devops
+- roadmap: docs/master-roadmap.md and docs/open-items.md
 - status: complete, merge pending approval
+
+<!-- Phase 16 (site intelligence, the summary command) closed 2026-10-06, ff-merged into main. See docs/phases/phase-16-site-intelligence.md. -->
 
 <!-- Phase 15 (AI search reports) closed 2026-10-05: four informational audits and two gatherers, ff-merged into main. See docs/phases/phase-15-ai-search.md. -->
 
