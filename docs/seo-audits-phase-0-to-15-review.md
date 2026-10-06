@@ -120,7 +120,7 @@ audit deliberately sits beside a core one it is meant to say what it adds.
 - **Informational:** `readability-score` (English only), `hidden-text` (carousel slides clipped by their container are not counted), `keyword-alignment`.
 
 ### Phase 15: AI search (4 audits, all informational)
-- `ai-crawler-summary` (15 crawlers and tokens; the user-initiated fetchers `ChatGPT-User` and `Perplexity-User` may ignore robots.txt, and the table says so), `answer-structure`, `author-entity-signals`, `amp-check`.
+- `ai-crawler-summary` (18 crawlers and tokens, each checked against its vendor's own page; the user-initiated fetchers `ChatGPT-User` and `Perplexity-User` may ignore robots.txt, and the table says so), `answer-structure`, `author-entity-signals`, `amp-check`.
 - Informational because there is no official rule for this area and blocking an AI crawler is a legitimate choice.
 
 ---
@@ -151,7 +151,6 @@ session IDs in URLs, case and trailing-slash twins, hydration errors.
 - **A3:** a real GitHub Actions run with the fork config (yours); it settles the runner's egress, the cost of a cold crawl and the per-run request budget.
 - **E:** `core-web-vitals-field` has never seen real CrUX data (needs a Google API key).
 - **Real-site checks:** a multilingual site with an `x-default` chooser, a retail carousel, an Article plus Review, a Next/React/Angular site, template and real-prose pages.
-- **AI crawler names** not yet checked against vendor pages: `CCBot`, `Bytespider`, `Amazonbot`, `Meta-ExternalAgent`, `DuckAssistBot`.
 - Housekeeping: the stale `docs/phases/phase-1-page-metadata.md`, and the failing suites in packages other than `seo-audits`.
 
 ---

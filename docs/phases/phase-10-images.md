@@ -2,7 +2,7 @@
 
 Live tracker for this phase's work in `packages/seo-audits`. Branch: `phase-10-images` (off `main`), the ninth phase to use the phase-branch workflow. Merges into `main` once built, QA'd and approved.
 
-**Status: built and QA'd live (2026-10-05); awaiting the merge into `main`.**
+**Status: done (2026-10-05): built, QA'd live and merged into `main`; recalibrated on 2026-10-06 (horizontal viewport test, CSS sizes accepted, 3.5x oversize, other-site images are notes, `image-filename-quality` and `image-legacy-formats` informational).**
 
 ## Planning decisions (2026-10-05, lightweight with a short design conversation)
 

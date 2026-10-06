@@ -175,7 +175,7 @@
 
 - item: follow-up from the security review (Finding 10, low): give the snapshot a byte budget for stored links, or a lower URL length for them, so a hostile
   site cannot make it exceed the 16 MiB cache cap.
-- status: open
+- status: done (2026-10-06: the extractor stores at most 40,000 characters of link URLs per page)
 
 ## 2026-10-05 — link-graph-audits
 
@@ -223,3 +223,14 @@
 - item: {description of the gap or improvement}
 - status: open | done
 -->
+
+## 2026-10-06 — state sync after the calibration
+
+- item: the Node 18.20.8 re-runs listed as "still to do" in the Phase 8 entries above were done: `jest packages/seo-audits` under Node 18.20.8 passed (82 suites on 2026-10-05; 112 suites / 1,995 tests on 2026-10-06). The open
+  point that remains for CI is the real GitHub Actions run (`docs/open-items.md`, A3).
+- status: done
+
+- item: for any CI job: use `packages/seo-audits/src/recommended-assertions.json` as the `assert.assertions` object (error tier at `error`, warn tier at `warn`; informational audits cannot be asserted). Per Lighthouse run the audits
+  send up to about 150 crawl requests once per collect plus the per-run requests in the README's request-budget table. The CLI test suites outside `seo-audits` that still fail on a developer machine are screenshot
+  comparisons (`docs/open-items.md`, section 4).
+- status: done (documented in the README)

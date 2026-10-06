@@ -2,7 +2,7 @@
 
 Live tracker for this phase's work in `packages/seo-audits`. Branch: `phase-12-js-rendering` (off `main`), the tenth phase to use the phase-branch workflow. Phase 11 (hreflang) was skipped for now at the developer's request. Merges into `main` once built, QA'd and approved.
 
-**Status: built and QA'd live (2026-10-05); awaiting the merge into `main`.**
+**Status: done (2026-10-05): built, QA'd live and merged into `main`; recalibrated on 2026-10-06 (`js-head-signals` fails only on a changed noindex or conflicting canonicals; `js-internal-links` and `js-visible-content` are warnings).**
 
 ## Planning decisions (2026-10-05, lightweight with a design conversation)
 

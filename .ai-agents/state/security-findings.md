@@ -919,3 +919,9 @@ Two new gatherers and four informational audits. One new request: **`amp-check` 
 
 No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 remains open and accepted.
 
+## 2026-10-06 — status sync after the calibration
+
+**No `critical`, `high`, `medium` or `low` finding is open.** Finding 10 (a hostile site with very long link URLs exceeding the snapshot cache cap) was fixed on 2026-10-06 by a per-page budget of 40,000 characters of stored link URLs
+in `crawl-extract.js`, with a unit test; it was not re-run against a full hostile site. Findings 1 to 9 were fixed earlier. The calibration (2026-10-06) changed what the audits score and added no new request surface, apart from reading
+Open Graph tags written with `name=` and listing four more AI crawler names (data only). **One risk is accepted, not fixed:** `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control.
+

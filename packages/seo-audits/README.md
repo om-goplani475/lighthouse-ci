@@ -780,7 +780,7 @@ Five audits on the page's own text, read in the browser (the visible text of the
 
 Four **informational** audits (they never score or fail) about being found and quoted by AI answer engines. There is no official rule for this area (Google says its AI features use the normal search signals), so they describe what is there and make no claim about what an engine will do. The `llms.txt` file is checked by `llms-txt-structure`; AI-crawler access is also shown inside `robots-txt-crawler-access` for four crawlers.
 
-- **`ai-crawler-summary`** lists 19 AI crawlers and AI-related robots.txt tokens (GPTBot, OAI-SearchBot, OAI-AdsBot, ChatGPT-User, ClaudeBot, Claude-SearchBot, Claude-User, PerplexityBot, Perplexity-User, Google-Extended, Applebot-Extended, CCBot, Bytespider, Amazonbot, Amzn-SearchBot, Amzn-User, Meta-ExternalAgent, Meta-ExternalFetcher, DuckAssistBot) checked against the vendors' pages on 2026-10-06 (Bytespider has no reachable vendor page); user-initiated fetchers such as ChatGPT-User and Amzn-User may ignore robots.txt; and whether robots.txt allows each on this page, and whether its own rule or the `*` rule decided it. Blocking an AI crawler is a legitimate choice. Vendors rename crawlers; the list is data to keep current.
+- **`ai-crawler-summary`** lists 18 AI crawlers and AI-related robots.txt tokens (GPTBot, OAI-SearchBot, OAI-AdsBot, ChatGPT-User, ClaudeBot, Claude-SearchBot, Claude-User, PerplexityBot, Perplexity-User, Google-Extended, Applebot-Extended, CCBot, Amazonbot, Amzn-SearchBot, Amzn-User, Meta-ExternalAgent, Meta-ExternalFetcher, DuckAssistBot) checked against the vendors' pages on 2026-10-06; user-initiated fetchers such as ChatGPT-User and Amzn-User may ignore robots.txt; and whether robots.txt allows each on this page, and whether its own rule or the `*` rule decided it. Blocking an AI crawler is a legitimate choice. Vendors rename crawlers; the list is data to keep current.
 - **`answer-structure`** describes how easy the page is to quote: whether its text is in the HTML without JavaScript (share of words), which landmarks it uses, its heading outline (skipped levels), how many question-style headings have a short answer (up to 60 words) right after them, how many lists and tables, whether FAQPage/QAPage/HowTo markup and an `llms.txt` exist.
 - **`author-entity-signals`** shows the author and publisher the page declares (JSON-LD, `<meta name="author">`, `rel=author`), its `sameAs` links (and which are not absolute http(s) URLs), whether an Organization logo is declared, and whether the site name is the same in JSON-LD and `og:site_name`.
 - **`amp-check`** detects an AMP page or a `rel=amphtml` link and, for a linked version, requests it **once** (same safe fetch as the hreflang requests; `LHCI_SEO_AMP_CHECK=0` switches it off) to see whether it loads and names this page as its canonical. AMP is no longer required for Google Top Stories and is declining. Not applicable without AMP.
@@ -789,6 +789,8 @@ Four **informational** audits (they never score or fail) about being found and q
 
 | Variable | Default | Effect |
 |---|---|---|
+| `LHCI_SEO_ALLOW_PRIVATE_NETWORK` | off (`1` or `true` turns it on) | lets the audits request the audited host when it is a private or loopback address (localhost, RFC 1918, IPv6 unique-local); needed for a staging or local site, never needed for a public one. Link-local and cloud-metadata addresses stay blocked, and requests to other people's sites ignore it. Set it only on jobs that audit hosts you control |
+| `LHCI_SEO_SITEMAP_SAMPLE_SIZE` | 10 (1 to 25) | how many sitemap URLs `sitemap-url-status` and `sitemap-indexability` request (an evenly spread, deterministic sample) |
 | `LHCI_SEO_CRAWL` | on | `0` or `false` switches the crawl off entirely (no requests; the audits that read it are not applicable) |
 | `LHCI_SEO_CRAWL_MAX_PAGES` | 50 (1 to 200) | page cap, the audited page included |
 | `LHCI_SEO_CRAWL_MAX_DEPTH` | 3 (1 to 5) | how many hops of links to follow from the starting pages |
@@ -912,21 +914,117 @@ module.exports = {
 };
 ```
 
-This adds all fifty-nine audits (`structured-data-json-ld`, `structured-data-schema-properties`,
-`structured-data-rich-result-eligibility`, `structured-data-type-conflicts`,
-`structured-data-deprecated-properties`, `pixel-width-truncation`,
-`meta-description-identical-to-title`, `document-title-quality`, `document-h1-count`,
-`h1-title-relevance`, `robots-directives-report`, `robots-directives-conflict`, `canonical-https`,
-`favicon-presence`, `favicon-quality`, `manifest-icons`, `open-graph-completeness`,
-`open-graph-canonical-match`, `open-graph-image-reachable`, `twitter-card-completeness`,
-`social-preview-content`, `robots-txt-sitemap-declared`, `robots-txt-crawler-access`,
-`robots-txt-rule-conflicts`, `sitemap-valid`, `sitemap-duplicate-urls`, `sitemap-limits`,
-`sitemap-url-status`, `sitemap-robots-crossref`, `sitemap-indexability`, `llms-txt-structure`, `mixed-content`, `hsts-quality`,
-`ssl-certificate-expiry`, `soft-not-found`, `url-variant-consistency`, `redirect-chain-length`,
-`redirect-loop`, `indexability-verdict`, `indexability-conflicts`, `crawl-coverage`, `duplicate-titles`, `duplicate-descriptions`, `thin-content`, `canonical-conflicts`, `duplicate-content`, `dead-end-pages`, `internal-link-counts`, `orphan-pages`, `crawl-depth`, `broken-internal-links`, `redirecting-internal-links`, `internal-redirect-chains`, `anchor-text-diversity`, `descriptive-anchor-text`, `pagination-links`, `paginated-canonical`, `pagination-trap`, `broken-external-links`, `url-length`, `url-query-parameters`, `url-session-tracking`, `url-encoding`, `url-case-variants`, `url-trailing-slash-variants`, `url-normalization`, `image-alt-quality`, `image-filename-quality`, `image-lazy-above-fold`, `image-dimensions-attributes`, `image-oversized`, `image-legacy-formats`, `broken-images`, `js-head-signals`, `js-internal-links`, `js-visible-content`, `raw-rendered-diff`, `rendering-mode`, `hydration-errors`, `device-content-parity`, `core-web-vitals-field`, `render-blocking-report`, `request-weight-report`, `hreflang-codes`, `hreflang-return-links`, `hreflang-alternate-status`, `hreflang-canonical`, `hreflang-x-default`, `hreflang-sitemap-consistency`, `hreflang-locale-meta`, `placeholder-content`, `content-dates`, `readability-score`, `hidden-text`, `keyword-alignment`, `ai-crawler-summary`, `answer-structure`, `author-entity-signals`, `amp-check`) on top of
+This adds all 99 audits (listed with their phase, scoring and recommended assertion in the audit index below) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
+
+### Audit index (all 99 audits)
+
+Phase is the fork's own phase number. **Scoring** is what the audit reports; **Recommended assertion** is the severity `src/recommended-assertions.json` uses (`error` for objective defects, `warn` for the rest;
+informational audits are reports and cannot be asserted at all). 57 are scored (28 recommended at `error`, 29 at `warn`) and 42 are informational.
+
+| Phase | Audit | Scoring | Recommended assertion |
+|---|---|---|---|
+| 1 | `canonical-https` | pass or fail | `error` |
+| 1 | `document-h1-count` | pass, 0.5 warning | `warn` |
+| 1 | `document-title-quality` | pass or fail | `warn` |
+| 1 | `favicon-presence` | informational | none (informational audits cannot be asserted) |
+| 1 | `favicon-quality` | informational | none (informational audits cannot be asserted) |
+| 1 | `h1-title-relevance` | informational | none (informational audits cannot be asserted) |
+| 1 | `manifest-icons` | informational | none (informational audits cannot be asserted) |
+| 1 | `meta-description-identical-to-title` | informational | none (informational audits cannot be asserted) |
+| 1 | `pixel-width-truncation` | informational | none (informational audits cannot be asserted) |
+| 1 | `robots-directives-conflict` | pass or fail | `error` |
+| 1 | `robots-directives-report` | informational | none (informational audits cannot be asserted) |
+| 2 | `structured-data-deprecated-properties` | informational | none (informational audits cannot be asserted) |
+| 2 | `structured-data-json-ld` | pass or fail | `error` |
+| 2 | `structured-data-rich-result-eligibility` | informational | none (informational audits cannot be asserted) |
+| 2 | `structured-data-schema-properties` | pass or fail | `warn` |
+| 2 | `structured-data-type-conflicts` | pass or fail | `warn` |
+| 3 | `open-graph-canonical-match` | pass or fail | `warn` |
+| 3 | `open-graph-completeness` | pass or fail | `warn` |
+| 3 | `open-graph-image-reachable` | pass or fail | `error` |
+| 3 | `social-preview-content` | informational | none (informational audits cannot be asserted) |
+| 3 | `twitter-card-completeness` | pass or fail | `warn` |
+| 4 | `llms-txt-structure` | informational | none (informational audits cannot be asserted) |
+| 4 | `robots-txt-crawler-access` | pass or fail | `error` |
+| 4 | `robots-txt-rule-conflicts` | informational | none (informational audits cannot be asserted) |
+| 4 | `robots-txt-sitemap-declared` | informational | none (informational audits cannot be asserted) |
+| 4 | `sitemap-duplicate-urls` | informational | none (informational audits cannot be asserted) |
+| 4 | `sitemap-indexability` | pass or fail | `warn` |
+| 4 | `sitemap-limits` | pass or fail | `error` |
+| 4 | `sitemap-robots-crossref` | pass or fail | `error` |
+| 4 | `sitemap-url-status` | pass or fail | `warn` |
+| 4 | `sitemap-valid` | pass or fail | `error` |
+| 5 | `hsts-quality` | informational | none (informational audits cannot be asserted) |
+| 5 | `mixed-content` | pass or fail | `error` |
+| 5 | `redirect-chain-length` | pass, 0.5 warning | `warn` |
+| 5 | `redirect-loop` | pass or fail | `error` |
+| 5 | `soft-not-found` | pass or fail | `warn` |
+| 5 | `ssl-certificate-expiry` | pass, 0.5 (15 days or fewer), fail | `error` with `minScore: 0.5` |
+| 5 | `url-variant-consistency` | pass or fail | `warn` |
+| 6 | `indexability-conflicts` | pass or fail | `error` |
+| 6 | `indexability-verdict` | informational | none (informational audits cannot be asserted) |
+| 7 | `canonical-conflicts` | pass or fail | `error` |
+| 7 | `crawl-coverage` | informational | none (informational audits cannot be asserted) |
+| 7 | `duplicate-content` | pass or fail | `error` |
+| 7 | `duplicate-descriptions` | informational | none (informational audits cannot be asserted) |
+| 7 | `duplicate-titles` | pass or fail | `warn` |
+| 7 | `thin-content` | informational | none (informational audits cannot be asserted) |
+| 8 | `anchor-text-diversity` | informational | none (informational audits cannot be asserted) |
+| 8 | `broken-external-links` | pass or fail | `error` |
+| 8 | `broken-internal-links` | pass or fail | `error` |
+| 8 | `crawl-depth` | informational | none (informational audits cannot be asserted) |
+| 8 | `dead-end-pages` | pass or fail | `error` |
+| 8 | `descriptive-anchor-text` | pass, 0.5 warning | `warn` |
+| 8 | `internal-link-counts` | informational | none (informational audits cannot be asserted) |
+| 8 | `internal-redirect-chains` | pass, 0.5 warning | `warn` |
+| 8 | `orphan-pages` | pass or fail | `warn` |
+| 8 | `paginated-canonical` | pass or fail | `error` |
+| 8 | `pagination-links` | informational | none (informational audits cannot be asserted) |
+| 8 | `pagination-trap` | informational | none (informational audits cannot be asserted) |
+| 8 | `redirecting-internal-links` | pass, 0.5 warning | `warn` |
+| 9 | `url-case-variants` | pass or fail | `error` |
+| 9 | `url-encoding` | pass or fail | `error` |
+| 9 | `url-length` | pass or fail | `error` |
+| 9 | `url-normalization` | informational | none (informational audits cannot be asserted) |
+| 9 | `url-query-parameters` | informational | none (informational audits cannot be asserted) |
+| 9 | `url-session-tracking` | pass or fail | `error` |
+| 9 | `url-trailing-slash-variants` | pass or fail | `error` |
+| 10 | `broken-images` | pass or fail | `warn` |
+| 10 | `image-alt-quality` | pass or fail | `warn` |
+| 10 | `image-dimensions-attributes` | pass or fail | `warn` |
+| 10 | `image-filename-quality` | informational | none (informational audits cannot be asserted) |
+| 10 | `image-lazy-above-fold` | pass or fail | `warn` |
+| 10 | `image-legacy-formats` | informational | none (informational audits cannot be asserted) |
+| 10 | `image-oversized` | pass or fail | `warn` |
+| 11 | `hreflang-alternate-status` | pass or fail | `warn` |
+| 11 | `hreflang-canonical` | pass or fail | `error` |
+| 11 | `hreflang-codes` | pass or fail | `error` |
+| 11 | `hreflang-locale-meta` | informational | none (informational audits cannot be asserted) |
+| 11 | `hreflang-return-links` | pass or fail | `warn` |
+| 11 | `hreflang-sitemap-consistency` | informational | none (informational audits cannot be asserted) |
+| 11 | `hreflang-x-default` | informational | none (informational audits cannot be asserted) |
+| 12 | `device-content-parity` | pass or fail | `warn` |
+| 12 | `hydration-errors` | pass or fail | `error` |
+| 12 | `js-head-signals` | pass or fail | `error` |
+| 12 | `js-internal-links` | pass, 0.5 warning | `warn` |
+| 12 | `js-visible-content` | pass, 0.5 warning | `warn` |
+| 12 | `raw-rendered-diff` | informational | none (informational audits cannot be asserted) |
+| 12 | `rendering-mode` | informational | none (informational audits cannot be asserted) |
+| 13 | `core-web-vitals-field` | pass or fail | `warn` |
+| 13 | `render-blocking-report` | informational | none (informational audits cannot be asserted) |
+| 13 | `request-weight-report` | informational | none (informational audits cannot be asserted) |
+| 14 | `content-dates` | pass or fail | `warn` |
+| 14 | `hidden-text` | informational | none (informational audits cannot be asserted) |
+| 14 | `keyword-alignment` | informational | none (informational audits cannot be asserted) |
+| 14 | `placeholder-content` | pass or fail | `error` |
+| 14 | `readability-score` | informational | none (informational audits cannot be asserted) |
+| 15 | `ai-crawler-summary` | informational | none (informational audits cannot be asserted) |
+| 15 | `amp-check` | informational | none (informational audits cannot be asserted) |
+| 15 | `answer-structure` | informational | none (informational audits cannot be asserted) |
+| 15 | `author-entity-signals` | informational | none (informational audits cannot be asserted) |
 
 ### Three tiers and the recommended assertions
 
@@ -953,9 +1051,9 @@ Override single entries by spreading it: `assertions: {...require('...'), 'url-l
 
 ### Assertion severity
 
-None of the fifty-nine audits are part of this fork's shared `all`/`recommended` presets
+None of the 99 audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all fifty-nine here are opt-in via `configPath`, so they can't be part of that
+default, and all 99 here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js

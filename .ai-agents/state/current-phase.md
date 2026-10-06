@@ -1,9 +1,9 @@
 # Current phase
 
-- phase: none in progress
+- phase: none in progress; Phases 1 to 15 are closed. Next: Phase 16 (`docs/phases/phase-16-site-intelligence.md` when opened)
 - branch: main
-- roadmap: docs/master-roadmap.md (no next phase fixed: see its "What is genuinely remaining") and docs/open-items.md (the verification checks still to do)
-- status: idle
+- roadmap: docs/master-roadmap.md (Phase 16 site intelligence, then Phase 17 CI/DevOps) and docs/open-items.md (the checks still to do)
+- status: idle, ready for Phase 16
 
 <!-- Phase 15 (AI search reports) closed 2026-10-05: four informational audits and two gatherers, ff-merged into main. See docs/phases/phase-15-ai-search.md. -->
 

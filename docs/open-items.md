@@ -53,10 +53,6 @@ What fired afterwards looked genuine (missing og tags, no `<h1>`, a sitemap URL 
 **Round 3 (hreflang chooser):** ikea.com's root (a real country chooser with `x-default`) and stripe.com (89 alternates) were run: the `x-default` exemption works, the audits stay quiet on a healthy set, and the real error IKEA ships (`es-CE`, not a region code) is reported. The hreflang requests added 7 to 9 s per run, inside the 20 s budget.
 **Not covered:** a site whose hreflang is only in the sitemap.
 
-### R13 (rest). Bytespider
-
-`Bytespider` (ByteDance) is the one crawler name not confirmed: ByteDance publishes no reachable vendor page, so it is documented only by third parties. All 18 others in `src/lib/ai-crawlers.js` were checked against vendor pages on 2026-10-06.
-
 ## 3. Decisions and limits worth knowing
 
 - **`orphan-pages` is usually not applicable with the default crawl limits.** It is only judged when the crawl saw the whole site, so on a site of more than about 50 pages it says "not

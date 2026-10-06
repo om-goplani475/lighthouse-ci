@@ -647,3 +647,7 @@ Found by running the audits on five real sites (MDN, BBC News, apple.com, ikea.c
 ## 2026-10-06 — docs only
 
 `docs/phases/phase-1-page-metadata.md` now says the crawler exists and the exact-match duplicate audits were built (Phase 7); the roadmap's Phase 16 is the summary layer, not the crawler. No code change.
+
+## 2026-10-06 — Bytespider removed
+
+`ai-crawler-summary` no longer lists `Bytespider` (ByteDance publishes no documentation to check it against); it now lists 18 crawlers, all confirmed against vendor pages. No migration.
