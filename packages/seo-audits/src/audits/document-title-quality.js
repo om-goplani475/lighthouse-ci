@@ -37,12 +37,10 @@ const GENERIC_TITLES = new Set([
   'page 1',
 ]);
 
-// Below this length (after trimming), a title is unlikely to meaningfully describe a page.
-// Arbitrary but conservative — deliberately short enough that this rarely fires on a real,
-// intentional short title (e.g. a brand name alone), only on near-empty ones a template or CMS
-// left behind ("Home", "New", "..."). Chosen independently of GENERIC_TITLES so a short title
-// not on that list (e.g. "Blog") still gets flagged once, not zero times.
-const MIN_MEANINGFUL_LENGTH = 10;
+// Below this length (after trimming), a title cannot describe a page. Deliberately tiny (it was 10, which
+// failed real titles such as "Pricing", "About us" and "Blog"): only an empty-looking leftover ("A", "..")
+// is flagged here; well-known placeholders such as "Home" or "Untitled" are caught by GENERIC_TITLES.
+const MIN_MEANINGFUL_LENGTH = 3;
 
 /**
  * @param {string} text

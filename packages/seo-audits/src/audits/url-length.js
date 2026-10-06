@@ -11,7 +11,7 @@ const UIStrings = {
   title: 'The URL is not too long',
   failureTitle: 'The URL is too long',
   description:
-    'Fails when the audited page URL is longer than 115 characters of path and query, which is hard to read, share and often truncated in results. Other crawled URLs are listed, not judged.',
+    'Notes a URL longer than 115 characters of path and query (hard to read and share; not a Google limit) and fails only above 2,000 characters, where browsers and servers start refusing it. Other crawled URLs are listed, not judged.',
 };
 
 // @ts-expect-error - SiteCrawl isn't part of Lighthouse's own closed Artifacts type from an

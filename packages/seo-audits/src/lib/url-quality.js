@@ -8,7 +8,8 @@
  * is judged; the other URLs the site crawl reached are listed, never failed. These audits work even when
  * the crawl is switched off, because the audited URL is always known. No I/O, never throws.
  *
- * Rules, chosen with the developer: more than 115 characters of path plus query, or more than 3 query
+ * Rules, chosen with the developer and relaxed after review: more than 115 characters of path plus query is a note
+ * (it fails only above 2,000), or more than 3 query
  * parameters, fails; a session ID in the URL fails; a tracking parameter is a note only; repeated slashes,
  * broken percent-encoding and double encoding fail.
  */
@@ -21,6 +22,9 @@ import {Audit} from 'lighthouse/core/audits/audit.js';
 /** @typedef {{id: string, subject: string, check: (url: URL) => UrlFinding[], passText: string, failText: string}} UrlRule */
 
 const MAX_URL_LENGTH = 115;
+// 115 is a readability convention, not a Google limit, so it is a note. Only an extreme length (browsers and
+// servers start refusing URLs around here) fails.
+const EXTREME_URL_LENGTH = 2000;
 const MAX_PARAMS = 3;
 const MAX_ROWS = 50;
 const MAX_CELL_CHARS = 200;
@@ -98,11 +102,19 @@ const RULES = {
     failText: 'is too long',
     check(url) {
       const length = url.pathname.length + url.search.length;
+      if (length > EXTREME_URL_LENGTH) {
+        return [
+          {
+            severity: 'fail',
+            detail: `${length} characters of path and query (extreme: over ${EXTREME_URL_LENGTH})`,
+          },
+        ];
+      }
       return length > MAX_URL_LENGTH
         ? [
             {
-              severity: 'fail',
-              detail: `${length} characters of path and query (limit ${MAX_URL_LENGTH})`,
+              severity: 'note',
+              detail: `${length} characters of path and query (a note above ${MAX_URL_LENGTH})`,
             },
           ]
         : [];
@@ -267,6 +279,7 @@ export {
   buildUrlRuleProduct,
   RULES,
   MAX_URL_LENGTH,
+  EXTREME_URL_LENGTH,
   MAX_PARAMS,
   MAX_ROWS,
   isTrackingParam,

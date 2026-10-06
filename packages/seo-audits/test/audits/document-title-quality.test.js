@@ -44,9 +44,15 @@ describe('document-title-quality audit', () => {
   });
 
   it('flags a title under the minimum meaningful length', () => {
-    const result = runAudit({text: 'Shoes', widthPx: 50}, 1);
+    const result = runAudit({text: 'Ab', widthPx: 20}, 1);
     expect(result.score).toBe(0);
     expect(result.details.items).toEqual([expect.objectContaining({issue: 'Title too short'})]);
+  });
+
+  it('accepts short but real titles such as Pricing, About us and Blog', () => {
+    for (const text of ['Pricing', 'About us', 'Blog']) {
+      expect(runAudit({text, widthPx: 60}, 1).score).toBe(1);
+    }
   });
 
   it('flags multiple <title> elements regardless of what the (first) title text says', () => {

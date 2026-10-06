@@ -10,6 +10,7 @@ const {
   buildUrlRuleProduct,
   RULES,
   MAX_URL_LENGTH,
+  EXTREME_URL_LENGTH,
   MAX_PARAMS,
   MAX_ROWS,
   isTrackingParam,
@@ -39,21 +40,28 @@ describe('url-length', () => {
     expect(p.displayValue).toMatch(/No problem found/);
   });
 
-  it('fails past the limit and measures path plus query, not the host', () => {
+  it('notes a URL past 115 characters (path plus query, not the host) and fails only an extreme one', () => {
     const long = `https://example.com/${'a'.repeat(MAX_URL_LENGTH)}`;
     const p = run(artifact(long), 'length');
-    expect(p.score).toBe(0);
-    expect(p.details.items[0].problem).toMatch(/116 characters/);
+    expect(p.score).toBe(1);
+    expect(p.details.items[0].problem).toMatch(/116 characters .*a note above 115/);
+    expect(p.details.items[0].page).toBe('audited page (note)');
     expect(
-      run(artifact(`https://example.com/${'a'.repeat(MAX_URL_LENGTH - 1)}`), 'length').score
-    ).toBe(1);
+      run(artifact(`https://example.com/${'a'.repeat(MAX_URL_LENGTH - 1)}`), 'length').displayValue
+    ).toMatch(/No problem found/);
+    const extreme = run(
+      artifact(`https://example.com/${'a'.repeat(EXTREME_URL_LENGTH)}`),
+      'length'
+    );
+    expect(extreme.score).toBe(0);
+    expect(extreme.details.items[0].problem).toMatch(/extreme/);
   });
 
   it('lists other long crawled URLs without failing', () => {
     const long = `https://example.com/${'a'.repeat(200)}`;
     const p = run(artifact('https://example.com/', [page(long)]), 'length');
     expect(p.score).toBe(1);
-    expect(p.details.items[0]).toMatchObject({page: 'other crawled page'});
+    expect(p.details.items[0]).toMatchObject({page: 'other crawled page (note)'});
     expect(p.displayValue).toMatch(/1 on other crawled URLs/);
   });
 });
