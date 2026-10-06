@@ -21,6 +21,8 @@ const StorageMethod = require('./api/storage/storage-method.js');
 const {errorMiddleware, createBasicAuthMiddleware} = require('./api/express-utils.js');
 const {startPsiCollectCron} = require('./cron/psi-collect.js');
 const {startDeleteOldBuildsCron} = require('./cron/delete-old-builds');
+const {createSeoService} = require('./seo/seo-routes.js');
+const {loadSeoDeps} = require('./seo/load-deps.js');
 const version = require('../package.json').version;
 
 const DIST_FOLDER = path.join(__dirname, '../dist');
@@ -44,6 +46,13 @@ async function createApp(options) {
   // While LHCI should be served behind nginx/apache that handles compression, it won't always be.
   app.use(compression());
 
+  // SEO webhook service (Phase 17). Webhooks are signed, so they sit before auth and the body parser (they keep the raw body).
+  const seoService =
+    process.env.LHCI_SEO_SERVICE === 'off'
+      ? undefined
+      : await createSeoService(context, await loadSeoDeps());
+  if (seoService) app.use('/api/v1/webhooks', seoService.webhooks);
+
   if (typeof useBodyParser === 'undefined' || useBodyParser) {
     // 1. Optional if you want to overwrite by other middleware like koa or fastify
     // 2. Support large payloads because LHRs are big.
@@ -58,6 +67,7 @@ async function createApp(options) {
   const authMiddleware = createBasicAuthMiddleware(context);
   if (authMiddleware) app.use(authMiddleware);
 
+  if (seoService) app.use('/api/v1/seo', seoService.management);
   app.get('/', (_, res) => res.redirect('/app'));
   app.use('/version', (_, res) => res.send(version));
   app.use('/v1/projects', createProjectsRouter(context));
