@@ -8,10 +8,10 @@ import {Audit} from 'lighthouse/core/audits/audit.js';
 import {buildThinContentProduct} from '../lib/crawl-thin.js';
 
 const UIStrings = {
-  title: 'The page has enough text content',
+  title: 'Text content of the page',
   failureTitle: 'The page has thin content',
   description:
-    'Fails when the audited page has fewer than 200 words of visible text in its server HTML. The ' +
+    'Informational (never fails a build): flags when the audited page has fewer than 200 words of visible text in its server HTML. The ' +
     'text-to-HTML ratio is shown for information and never fails. Other crawled pages under 200 words are ' +
     'listed, not judged. Words are counted from the HTML the site crawl received, so a page built by ' +
     'JavaScript can read as thin; when a browser clearly shows far more text, the audit is not ' +
@@ -30,6 +30,7 @@ class ThinContent extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       // @ts-expect-error - see the class-level @ts-expect-error above.
       requiredArtifacts: ['SiteCrawl'],
     };

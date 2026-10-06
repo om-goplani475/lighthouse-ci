@@ -8,10 +8,10 @@ import {Audit} from 'lighthouse/core/audits/audit.js';
 import {buildCrawlDepthProduct} from '../lib/crawl-link-audits.js';
 
 const UIStrings = {
-  title: 'The page is within 3 clicks of the homepage',
+  title: 'Click depth from the homepage',
   failureTitle: 'The page is more than 3 clicks from the homepage',
   description:
-    'Fails when the audited page needs more than 3 clicks from the homepage, along the followable links the crawl saw. A depth within the limit is always reliable; a larger one is only judged when the crawl saw the whole site, since a shorter path may run through a page not crawled. Links are read from the server HTML of the pages the site crawl reached, so a page built by ' +
+    'Informational (never fails a build): flags when the audited page needs more than 3 clicks from the homepage, along the followable links the crawl saw. A depth within the limit is always reliable; a larger one is only judged when the crawl saw the whole site, since a shorter path may run through a page not crawled. Links are read from the server HTML of the pages the site crawl reached, so a page built by ' +
     'JavaScript is not applicable. See crawl-coverage for how much of the site was seen.',
 };
 
@@ -27,6 +27,7 @@ class CrawlDepth extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       // @ts-expect-error - see the class-level @ts-expect-error above.
       requiredArtifacts: ['SiteCrawl'],
     };

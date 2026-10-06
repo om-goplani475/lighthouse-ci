@@ -9,10 +9,10 @@ import {evaluateHsts, hstsProduct} from '../lib/transport-security.js';
 import {resolveMainDocumentSecurity} from '../lib/transport-security-sources.js';
 
 const UIStrings = {
-  title: 'HSTS is set and strong enough',
+  title: 'HSTS header strength',
   failureTitle: 'HSTS is missing or too weak',
   description:
-    'The Strict-Transport-Security header tells browsers to use only HTTPS for this host. It fails ' +
+    'Informational (never fails a build). The Strict-Transport-Security header tells browsers to use only HTTPS for this host. It fails ' +
     'here when the header is absent, `max-age` is missing, zero or under one year (31,536,000 ' +
     'seconds), or `preload` is set without the `includeSubDomains` and one-year `max-age` the ' +
     'preload list requires. A missing `includeSubDomains` is a note, not a failure. Only the first ' +
@@ -32,6 +32,7 @@ class HstsQuality extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       requiredArtifacts: ['DevtoolsLog', 'URL'],
       supportedModes: ['navigation'],
     };

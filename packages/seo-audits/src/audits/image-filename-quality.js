@@ -8,10 +8,10 @@ import {Audit} from 'lighthouse/core/audits/audit.js';
 import {buildFilenameProduct} from '../lib/images.js';
 
 const UIStrings = {
-  title: 'Image file names are descriptive',
+  title: 'Image file names',
   failureTitle: 'Some images have non-descriptive file names',
   description:
-    'Fails when a content image (at least 50 x 50 px, including CSS background images) has a file name that is a camera or tool default (IMG_1234, DSC0001, Screenshot 12), a number only, a hash or ID, or a generic word such as image or banner.',
+    'Informational (never fails a build): flags when a content image (at least 50 x 50 px, including CSS background images) has a file name that is a camera or tool default (IMG_1234, DSC0001, Screenshot 12), a number only, a hash or ID, or a generic word such as image or banner.',
 };
 
 class ImageFilenameQuality extends Audit {
@@ -24,6 +24,7 @@ class ImageFilenameQuality extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       requiredArtifacts: ['ImageElements'],
     };
   }

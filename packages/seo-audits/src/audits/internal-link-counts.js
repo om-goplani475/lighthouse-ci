@@ -8,10 +8,10 @@ import {Audit} from 'lighthouse/core/audits/audit.js';
 import {buildLinkCountsProduct} from '../lib/crawl-link-audits.js';
 
 const UIStrings = {
-  title: 'The page has a reasonable number of internal links',
+  title: 'Internal link counts',
   failureTitle: 'The page has an unusual number of internal links',
   description:
-    'Fails when the audited page has more than 150 internal links on it, or exactly one crawled page linking to it (fewer than 2; none at all is orphan-pages). The low side is only judged when the crawl saw the whole site, since a link from a page it did not read would be missed. Other pages outside the thresholds are listed, not judged. Links are read from the server HTML of the pages the site crawl reached, so a page built by ' +
+    'Informational (never fails a build): flags when the audited page has more than 150 internal links on it, or exactly one crawled page linking to it (fewer than 2; none at all is orphan-pages). The low side is only judged when the crawl saw the whole site, since a link from a page it did not read would be missed. Other pages outside the thresholds are listed, not judged. Links are read from the server HTML of the pages the site crawl reached, so a page built by ' +
     'JavaScript is not applicable. See crawl-coverage for how much of the site was seen.',
 };
 
@@ -27,6 +27,7 @@ class InternalLinkCounts extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       // @ts-expect-error - see the class-level @ts-expect-error above.
       requiredArtifacts: ['SiteCrawl'],
     };

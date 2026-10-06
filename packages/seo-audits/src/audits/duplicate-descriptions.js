@@ -8,10 +8,10 @@ import {Audit} from 'lighthouse/core/audits/audit.js';
 import {buildDuplicateProduct} from '../lib/crawl-duplicates.js';
 
 const UIStrings = {
-  title: 'The meta description is unique across the crawled pages',
+  title: 'Meta description across the crawled pages',
   failureTitle: 'Another crawled page has the same meta description',
   description:
-    'Fails when another crawled page has the same meta description as the audited page. Compared with the other pages the site crawl reached (the audited page, the homepage, the sitemap URLs and the pages ' +
+    'Informational (never fails a build): flags when another crawled page has the same meta description as the audited page. Compared with the other pages the site crawl reached (the audited page, the homepage, the sitemap URLs and the pages ' +
     'they link to, up to 3 hops, same origin, from server HTML), equal after trimming and ignoring case. A missing ' +
     'value is not counted here. See crawl-coverage for how much of the site was seen.',
 };
@@ -28,6 +28,7 @@ class DuplicateDescriptions extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       // @ts-expect-error - see the class-level @ts-expect-error above.
       requiredArtifacts: ['SiteCrawl'],
     };

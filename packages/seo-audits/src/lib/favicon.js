@@ -78,6 +78,7 @@ function buildManifestIconsResult(manifest) {
   if (manifest instanceof Error) {
     return {
       score: 0,
+      displayValue: 'Manifest could not be read',
       explanation: `Could not fetch or parse the web app manifest: ${manifest.message}`,
     };
   }
@@ -86,6 +87,7 @@ function buildManifestIconsResult(manifest) {
   if (!Array.isArray(icons) || icons.length === 0) {
     return {
       score: 0,
+      displayValue: 'No icons in the manifest',
       explanation: 'The web app manifest has no "icons" array, or it is empty.',
     };
   }
@@ -96,6 +98,7 @@ function buildManifestIconsResult(manifest) {
   if (!adequate) {
     return {
       score: 0,
+      displayValue: 'No icon large enough to install',
       explanation:
         `None of the manifest's icons are at least ${MIN_INSTALLABLE_ICON_SIZE}x` +
         `${MIN_INSTALLABLE_ICON_SIZE} — Chrome's minimum for PWA installability.`,

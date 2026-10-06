@@ -8,10 +8,10 @@ import {Audit} from 'lighthouse/core/audits/audit.js';
 import {buildPaginationLinksProduct} from '../lib/crawl-pagination.js';
 
 const UIStrings = {
-  title: 'The rel=next and rel=prev links work and agree',
+  title: 'rel=next and rel=prev links',
   failureTitle: 'The rel=next or rel=prev links are broken or inconsistent',
   description:
-    'Fails when the audited page has a rel=next or rel=prev link whose target is broken, is the page itself or does not link back, or when the rel=next chain loops. A redirecting target is a note. The targets are status-checked even when the crawl did not read them. Other crawled pages with problems are listed, not judged. Google no longer uses rel=next/prev, but other search engines and tools do. Read from the server HTML of the pages the site crawl reached. See crawl-coverage for how much of the site was seen.',
+    'Informational (never fails a build): flags when the audited page has a rel=next or rel=prev link whose target is broken, is the page itself or does not link back, or when the rel=next chain loops. A redirecting target is a note. The targets are status-checked even when the crawl did not read them. Other crawled pages with problems are listed, not judged. Google no longer uses rel=next/prev, but other search engines and tools do. Read from the server HTML of the pages the site crawl reached. See crawl-coverage for how much of the site was seen.',
 };
 
 // @ts-expect-error - SiteCrawl isn't part of Lighthouse's own closed Artifacts type from an
@@ -26,6 +26,7 @@ class PaginationLinks extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       // @ts-expect-error - see the class-level @ts-expect-error above.
       requiredArtifacts: ['SiteCrawl'],
     };

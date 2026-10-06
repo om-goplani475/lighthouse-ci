@@ -14,10 +14,10 @@ import {manifestLink, buildManifestIconsResult} from '../lib/favicon.js';
 import {safeFetchJson} from '../lib/safe-fetch.js';
 
 const UIStrings = {
-  title: 'Web app manifest has an adequately-sized icon',
+  title: 'Web app manifest icons',
   failureTitle: 'Web app manifest is missing an adequately-sized icon',
   description:
-    'Chrome requires at least one icon of 192x192px or larger (or a scalable SVG) in the web ' +
+    'Informational (never fails a build). Chrome requires at least one icon of 192x192px or larger (or a scalable SVG) in the web ' +
     'app manifest before it will offer to install the page as an app. Not-applicable when the ' +
     'page has no `<link rel="manifest">` at all — most pages aren\'t meant to be installable, ' +
     "and that's a legitimate choice, not a problem to flag.",
@@ -35,6 +35,7 @@ class ManifestIcons extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       // @ts-expect-error - see the class-level @ts-expect-error above.
       requiredArtifacts: ['FaviconLinks'],
     };

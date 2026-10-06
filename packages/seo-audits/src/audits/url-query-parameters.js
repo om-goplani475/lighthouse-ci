@@ -8,10 +8,10 @@ import {Audit} from 'lighthouse/core/audits/audit.js';
 import {buildUrlRuleProduct, RULES} from '../lib/url-quality.js';
 
 const UIStrings = {
-  title: 'The URL has few query parameters',
+  title: 'Query parameters in the URL',
   failureTitle: 'The URL has too many query parameters',
   description:
-    'Fails when the audited page URL has more than 3 query parameters, which tends to create many URLs for one page. Other crawled URLs are listed, not judged.',
+    'Informational (never fails a build): flags when the audited page URL has more than 3 query parameters, which tends to create many URLs for one page. Other crawled URLs are listed, not judged.',
 };
 
 // @ts-expect-error - SiteCrawl isn't part of Lighthouse's own closed Artifacts type from an
@@ -26,6 +26,7 @@ class UrlQueryParameters extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       // @ts-expect-error - see the class-level @ts-expect-error above.
       requiredArtifacts: ['SiteCrawl'],
     };

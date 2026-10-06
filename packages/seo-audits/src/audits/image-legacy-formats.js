@@ -9,10 +9,10 @@ import {NetworkRecords} from 'lighthouse/core/computed/network-records.js';
 import {buildLegacyFormatProduct} from '../lib/images.js';
 
 const UIStrings = {
-  title: 'Large images use modern formats',
+  title: 'Image formats',
   failureTitle: 'Some large images use JPEG, PNG or GIF',
   description:
-    'Fails when a loaded image is a JPEG, PNG or GIF over 10 KiB. WebP, AVIF and SVG pass. Read from the page-load network log, no extra request; stricter than core modern-image-formats, which only estimates savings.',
+    'Informational (never fails a build): flags when a loaded image is a JPEG, PNG or GIF over 10 KiB. WebP, AVIF and SVG pass. Read from the page-load network log, no extra request; stricter than core modern-image-formats, which only estimates savings.',
 };
 
 class ImageLegacyFormats extends Audit {
@@ -25,6 +25,7 @@ class ImageLegacyFormats extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       requiredArtifacts: ['DevtoolsLog'],
     };
   }

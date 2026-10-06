@@ -8,10 +8,10 @@ import {Audit} from 'lighthouse/core/audits/audit.js';
 import {parseRobotsTxt, robotsTxtState, findRuleConflicts} from '../lib/robots-txt.js';
 
 const UIStrings = {
-  title: 'robots.txt has no contradictory Allow/Disallow rules',
+  title: 'robots.txt Allow and Disallow rules',
   failureTitle: 'robots.txt lists the same path as both Allow and Disallow',
   description:
-    'When the same path is both allowed and disallowed for a crawler, the file says two opposite ' +
+    'Informational (never fails a build). When the same path is both allowed and disallowed for a crawler, the file says two opposite ' +
     'things. Google resolves it in favor of `Allow` (the least restrictive rule), so the ' +
     '`Disallow` silently does nothing — almost never what the author meant — and other crawlers ' +
     'may resolve it differently. Groups naming the same user-agent are merged before checking. ' +
@@ -29,6 +29,7 @@ class RobotsTxtRuleConflicts extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       requiredArtifacts: ['RobotsTxt'],
     };
   }
@@ -66,6 +67,7 @@ class RobotsTxtRuleConflicts extends Audit {
 
     return {
       score: 0,
+      displayValue: `${conflicts.length} conflicting path(s)`,
       explanation: `${conflicts.length} path(s) are both allowed and disallowed for the same user-agent.`,
       details: Audit.makeTableDetails(headings, items),
     };

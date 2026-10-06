@@ -9,10 +9,10 @@
 import {Audit} from 'lighthouse/core/audits/audit.js';
 
 const UIStrings = {
-  title: 'XML sitemap lists no duplicate URLs',
+  title: 'Duplicate URLs in the XML sitemap',
   failureTitle: 'XML sitemap lists the same URL more than once',
   description:
-    'A URL listed twice in one sitemap wastes crawl budget and usually points to a bug in how the ' +
+    'Informational (never fails a build). A URL listed twice in one sitemap wastes crawl budget and usually points to a bug in how the ' +
     'sitemap is generated. Search engines tolerate duplicates, so this is a hygiene check. URLs ' +
     'are compared as exact strings: `/a` and `/a/`, or differing letter case, are different URLs ' +
     'and are not flagged, since they are not equivalent in general. Each sitemap file is checked ' +
@@ -36,6 +36,7 @@ class SitemapDuplicateUrls extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       // @ts-expect-error - see the class-level @ts-expect-error above.
       requiredArtifacts: ['SitemapDocuments'],
     };
@@ -88,6 +89,7 @@ class SitemapDuplicateUrls extends Audit {
     const more = duplicates.length > MAX_ROWS ? ` (showing the first ${MAX_ROWS})` : '';
     return {
       score: 0,
+      displayValue: `${duplicates.length} duplicate URL(s)`,
       explanation: `${duplicates.length} URL(s) are listed more than once${more}.${partialNote}`,
       details: Audit.makeTableDetails(headings, shown),
     };

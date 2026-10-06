@@ -8,10 +8,10 @@ import {Audit} from 'lighthouse/core/audits/audit.js';
 import {faviconLinks} from '../lib/favicon.js';
 
 const UIStrings = {
-  title: 'Page has a favicon',
+  title: 'Favicon link',
   failureTitle: 'Page does not declare a favicon',
   description:
-    'A favicon (`<link rel="icon">`) helps users identify your site among browser tabs and ' +
+    'Informational (never fails a build). A favicon (`<link rel="icon">`) helps users identify your site among browser tabs and ' +
     'bookmarks. This audit only checks for an explicit favicon `<link>` — most browsers fall ' +
     'back to requesting `/favicon.ico` from the site root when none is declared, which this ' +
     'audit does not verify actually exists (that would require a network fetch this check ' +
@@ -30,6 +30,7 @@ class FaviconPresence extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       // @ts-expect-error - see the class-level @ts-expect-error above.
       requiredArtifacts: ['FaviconLinks'],
     };
@@ -45,6 +46,7 @@ class FaviconPresence extends Audit {
       ? {score: 1}
       : {
           score: 0,
+          displayValue: 'No favicon link (browsers try /favicon.ico)',
           explanation: 'No <link rel="icon"> or <link rel="shortcut icon"> element was found.',
         };
   }

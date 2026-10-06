@@ -8,10 +8,10 @@ import {Audit} from 'lighthouse/core/audits/audit.js';
 import {buildAnchorDiversityProduct} from '../lib/crawl-anchors.js';
 
 const UIStrings = {
-  title: 'The internal links to the page use varied anchor text',
+  title: 'Anchor text of internal links to the page',
   failureTitle: 'One anchor text makes up most of the internal links to the page',
   description:
-    'Fails when one exact anchor text is 60% or more of at least 5 editorial internal links to the audited page (the homepage is not judged). Links that appear with the same anchor on at least 80% of the crawled pages are site-wide navigation (a menu, a footer) and are left out; links with no anchor text are left out too. Other crawled pages with the same pattern are listed, not judged. Counted among the pages the crawl reached. Links are read from the server HTML of the pages the site crawl reached, so a page built by ' +
+    'Informational (never fails a build): flags when one exact anchor text is 60% or more of at least 5 editorial internal links to the audited page (the homepage is not judged). Links that appear with the same anchor on at least 80% of the crawled pages are site-wide navigation (a menu, a footer) and are left out; links with no anchor text are left out too. Other crawled pages with the same pattern are listed, not judged. Counted among the pages the crawl reached. Links are read from the server HTML of the pages the site crawl reached, so a page built by ' +
     'JavaScript is not applicable. See crawl-coverage for how much of the site was seen.',
 };
 
@@ -27,6 +27,7 @@ class AnchorTextDiversity extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       // @ts-expect-error - see the class-level @ts-expect-error above.
       requiredArtifacts: ['SiteCrawl'],
     };

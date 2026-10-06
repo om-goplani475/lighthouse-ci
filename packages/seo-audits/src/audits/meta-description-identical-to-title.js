@@ -7,10 +7,10 @@
 import {Audit} from 'lighthouse/core/audits/audit.js';
 
 const UIStrings = {
-  title: 'Meta description is not just a copy of the page title',
+  title: 'Meta description compared with the title',
   failureTitle: 'Meta description duplicates the page title',
   description:
-    'A meta description that just repeats the page title wastes an opportunity: search ' +
+    'Informational (never fails a build). A meta description that just repeats the page title wastes an opportunity: search ' +
     'engines show the title and description as two separate pieces of the result snippet, so a ' +
     'duplicate description gives searchers no new information to decide whether to click.',
 };
@@ -67,6 +67,7 @@ class MetaDescriptionIdenticalToTitle extends Audit {
       title: UIStrings.title,
       failureTitle: UIStrings.failureTitle,
       description: UIStrings.description,
+      scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       // @ts-expect-error - see the class-level @ts-expect-error above.
       requiredArtifacts: ['PixelWidth'],
     };
@@ -90,6 +91,8 @@ class MetaDescriptionIdenticalToTitle extends Audit {
 
     return {
       score: 0,
+      displayValue:
+        duplication === 'identical' ? 'Identical to the title' : 'Nearly identical to the title',
       explanation:
         duplication === 'identical'
           ? 'The meta description is identical to the page title.'
