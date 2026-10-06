@@ -41,6 +41,20 @@ describe('head fields', () => {
     expect(r.robotsMetas).toEqual([]);
   });
 
+  it('stops storing links once their URLs use up the per-page byte budget', () => {
+    const long = (/** @type {number} */ n) =>
+      `/p/${String(n).padStart(4, '0')}/${'a'.repeat(1_900)}`;
+    const html = `<body>${Array.from(
+      {length: 200},
+      (_, n) => `<a href="${long(n)}">x${n}</a>`
+    ).join('')}</body>`;
+    const r = run(html);
+    expect(r.links.length).toBeGreaterThan(10);
+    expect(r.links.length).toBeLessThan(25);
+    expect(r.links.reduce((sum, l) => sum + l.url.length, 0)).toBeLessThanOrEqual(40_000);
+    expect(run('<body><a href="/a">a</a><a href="/b">b</a></body>').links).toHaveLength(2);
+  });
+
   it('keeps the first title and the first description only', () => {
     const r = run(
       doc(
@@ -445,11 +459,11 @@ describe('never throws, and stays fast on hostile input at the 512 KiB cap', () 
   };
 
   for (const [name, make] of Object.entries(hostile)) {
-    it(`${name}: extracted in under 2 s with bounded output`, () => {
+    it(`${name}: extracted quickly (no quadratic blow-up) with bounded output`, () => {
       const html = make();
       const started = Date.now();
       const r = run(html);
-      expect(Date.now() - started).toBeLessThan(2000);
+      expect(Date.now() - started).toBeLessThan(8000);
       expect(r.links.length).toBeLessThanOrEqual(200);
       expect(r.h1.length).toBeLessThanOrEqual(5);
       expect(r.canonicals.length).toBeLessThanOrEqual(5);

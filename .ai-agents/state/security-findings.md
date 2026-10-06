@@ -739,7 +739,7 @@ homepage, same origin), and more page-controlled strings in the snapshot (anchor
   to 2,000 characters) and anchor text. A site whose pages each have 200 links, every one a 1,900-character URL, gives a snapshot of **20 MiB at the default
   50 pages (about 360 MB resident, 1.5 s)** and **81 MiB at 200 pages (about 750 MB, 5 s)**. The cache refuses a file over 16 MiB, so each Lighthouse run of
   that collect crawls again (still inside its own bounds). It needs a hostile or very odd site that the developer chose to audit; no exposure beyond cost.
-- status: open, accepted for now. A follow-up would be a byte budget for stored links per snapshot (or a lower URL length for stored links). Recorded in
+- status: **fixed 2026-10-06**: a per-page budget of 40,000 characters of stored link URLs in `crawl-extract.js`. Earlier note: open, accepted. Recorded in
   `.ai-agents/state/ci-backlog.md` and `docs/open-items.md`.
 
 ### Not verified

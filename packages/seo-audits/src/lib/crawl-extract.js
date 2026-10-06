@@ -56,6 +56,9 @@ const MAX_H1_CHARS = 300;
 const MAX_ANCHOR_BUFFER_CHARS = MAX_ANCHOR_CHARS * 4;
 const MAX_ROBOTS_METAS = 20;
 const MAX_URL_CHARS = 2_000;
+// A byte budget for the stored link URLs of one page (about 200 links of 200 characters), so a hostile page of
+// 200 links of 1,900 characters cannot push the snapshot over the cache's size cap (security Finding 10).
+const MAX_LINK_URL_CHARS_PER_PAGE = 40_000;
 const MAX_TEXT_BUFFER_CHARS = 4 * 1024 * 1024;
 const ROBOTS_META_NAMES = new Set(['robots', 'googlebot', 'bingbot']);
 const NOT_VISIBLE = new Set(['script', 'style', 'noscript', 'template']);
@@ -229,6 +232,7 @@ function parse(html, pageUrl) {
   };
 
   /** Ends the open anchor: records it as an internal or an external link, once per target and anchor text. */
+  let linkUrlChars = 0;
   const finishAnchor = () => {
     if (!anchor) return;
     const done = anchor;
@@ -240,8 +244,13 @@ function parse(html, pageUrl) {
     const nofollow = done.rel.includes('nofollow');
     if (done.internal) {
       const key = `${done.url}\n${text}`;
-      if (links.length < MAX_LINKS_PER_PAGE && !seenLinks.has(key)) {
+      if (
+        links.length < MAX_LINKS_PER_PAGE &&
+        linkUrlChars + done.url.length <= MAX_LINK_URL_CHARS_PER_PAGE &&
+        !seenLinks.has(key)
+      ) {
         seenLinks.add(key);
+        linkUrlChars += done.url.length;
         links.push({
           url: done.url,
           nofollow,
