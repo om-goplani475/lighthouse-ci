@@ -84,6 +84,9 @@ async function createSeoService(context, deps, limits = {}) {
   const store = await createSeoStore(context.storageMethod._sql().sequelize);
   await store.failOrphans();
   const replay = deps.createReplayGuard();
+  // Failed signatures are logged so an owner can see them, but anyone who knows a project's webhook URL can send them, so
+  // the log writes are capped: an unauthenticated caller must not be able to fill the database.
+  const rejectedLogLimiter = createRateLimiter({max: 20, windowMs: 60 * 1000});
   const limiter = createRateLimiter({max: limits.rateMax, windowMs: limits.rateWindowMs});
   const jobTimeoutMs = limits.jobTimeoutMs || JOB_TIMEOUT_MS;
 
@@ -241,7 +244,9 @@ async function createSeoService(context, deps, limits = {}) {
         secret: seo.webhookSecret,
       });
       if (!verdict.ok) {
-        await log({...base, outcome: 'rejected', reason: verdict.reason});
+        if (rejectedLogLimiter.take(projectId)) {
+          await log({...base, outcome: 'rejected', reason: verdict.reason});
+        }
         return res.status(401).json({message: 'unauthorized'});
       }
       if (verdict.replayKey && replay.seen(`${projectId}:${verdict.replayKey}`)) {

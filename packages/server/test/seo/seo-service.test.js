@@ -6,7 +6,6 @@
 'use strict';
 
 /* eslint-env jest */
-/* global fetch */
 
 const fs = require('fs');
 const os = require('os');
@@ -30,26 +29,55 @@ async function openStorage(dbPath) {
   return storageMethod;
 }
 
-/** Calls the app over real HTTP. @param {number} port */
+/**
+ * Calls the app over real HTTP. Plain `http.request` with no keep-alive rather than `fetch`: on Node 18, `server.close()`
+ * waits for the idle keep-alive connections `fetch` leaves open (Node 19+ closes them), which made every test wait 5 s.
+ * @param {number} port
+ */
 function client(port) {
-  const call = async (method, urlPath, {body, headers = {}, raw} = {}) => {
-    const res = await fetch(`http://127.0.0.1:${port}${urlPath}`, {
-      method,
-      headers: {
-        ...(raw === undefined && body !== undefined ? {'content-type': 'application/json'} : {}),
-        ...headers,
-      },
-      body: raw !== undefined ? raw : body === undefined ? undefined : JSON.stringify(body),
+  const call = (method, urlPath, {body, headers = {}, raw} = {}) =>
+    new Promise((resolve, reject) => {
+      const payload =
+        raw !== undefined ? raw : body === undefined ? undefined : JSON.stringify(body);
+      const req = http.request(
+        {
+          host: '127.0.0.1',
+          port,
+          method,
+          path: urlPath,
+          agent: false,
+          headers: {
+            ...(raw === undefined && body !== undefined
+              ? {'content-type': 'application/json'}
+              : {}),
+            ...(payload !== undefined ? {'content-length': Buffer.byteLength(payload)} : {}),
+            ...headers,
+          },
+        },
+        res => {
+          let text = '';
+          res.setEncoding('utf8');
+          res.on('data', chunk => (text += chunk));
+          res.on('end', () => {
+            let json;
+            try {
+              json = JSON.parse(text);
+            } catch (_) {
+              json = undefined;
+            }
+            resolve({
+              status: res.statusCode,
+              json,
+              text,
+              headers: {get: name => res.headers[name.toLowerCase()] || null},
+            });
+          });
+        }
+      );
+      req.on('error', reject);
+      if (payload !== undefined) req.write(payload);
+      req.end();
     });
-    const text = await res.text();
-    let json;
-    try {
-      json = JSON.parse(text);
-    } catch (_) {
-      json = undefined;
-    }
-    return {status: res.status, json, text, headers: res.headers};
-  };
   return {
     get: (p, headers) => call('GET', p, {headers}),
     post: (p, body, headers, raw) => call('POST', p, {body, headers, raw}),
@@ -177,6 +205,28 @@ describe('SEO webhook service', () => {
       ).toBe(403);
     });
 
+    it('answers odd project ids and hostile bodies with a clean client error, never a 500', async () => {
+      t = await startService({});
+      const h = {'x-lhci-admin-token': t.project.adminToken};
+      for (const id of ['not-a-uuid', '..%2F..%2Fetc', "'%20OR%201=1", '%00', 'a'.repeat(300)]) {
+        const res = await t.api.get(`/api/v1/seo/projects/${id}/config`, h);
+        expect(res.status).toBeLessThan(500);
+      }
+      for (const body of [
+        null,
+        5,
+        'x',
+        [],
+        {provider: {}},
+        {provider: 'lhci', allowedHosts: {length: 99}},
+        {provider: 'lhci', allowedHosts: ['a.example.com'], config: {audits: {__proto__: 'off'}}},
+        {provider: 'lhci', allowedHosts: ['a.example.com'], defaultUrl: {}},
+      ]) {
+        const res = await t.api.put(`${t.base}/config`, body, t.admin);
+        expect(res.status).toBeLessThan(500);
+      }
+    });
+
     it('creates settings, shows the secret once, and never returns it again', async () => {
       t = await startService({});
       const created = await t.api.put(
@@ -296,6 +346,21 @@ describe('SEO webhook service', () => {
       expect(dump).not.toContain(secret);
       expect(dump).not.toContain(headers['x-lhci-signature']);
       expect((await t.api.get(`${t.base}/runs`, t.admin)).json).toEqual([]);
+    });
+
+    it('caps how many failed signatures are logged, so an unauthenticated caller cannot fill the log', async () => {
+      t = await startService({});
+      const secret = await t.setUp();
+      for (let i = 0; i < 40; i++) {
+        const body = eventBody({sha: String(i % 10).repeat(40)});
+        const res = await t.api.post(t.hook, undefined, signLhci('wrong-secret', body), body);
+        expect(res.status).toBe(401);
+      }
+      const logs = (await t.api.get(`${t.base}/webhook-logs?limit=200`, t.admin)).json;
+      expect(logs.filter(l => l.outcome === 'rejected')).toHaveLength(20);
+      // a genuine delivery is still accepted and logged while the flood is being dropped
+      const body = eventBody();
+      expect((await t.api.post(t.hook, undefined, signLhci(secret, body), body)).status).toBe(202);
     });
 
     it('answers unknown, malformed or removed projects with 404', async () => {
