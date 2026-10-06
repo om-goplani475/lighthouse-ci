@@ -919,6 +919,25 @@ Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
 
+### The summary command (Phase 16)
+
+`lhci assert` tells you pass or fail per audit. To see the whole picture, run the summary command on the folder `lhci collect` wrote:
+
+```
+node packages/seo-audits/src/summary/cli.js .lighthouseci
+node packages/seo-audits/src/summary/cli.js .lighthouseci --compare previous/.lighthouseci
+node packages/seo-audits/src/summary/cli.js .lighthouseci --format json --out summary.json
+```
+
+It reads the `lhr-*.json` files (the latest run of each page), sends nothing anywhere, and prints markdown (or JSON with `--format json`):
+
+- **A score and a grade per category and overall.** 12 categories (page metadata, structured data, social sharing, robots and sitemaps, crawlability and indexability, duplicates and coverage, internal linking, URL quality, images, hreflang, rendering and performance, content and AI search). The score is the weighted share of the applicable scored audits that pass: an error-tier audit weighs **3**, a warn-tier audit **1** (the tiers are the levels in `recommended-assertions.json`), a partial score of 0.5 counts as half, not-applicable audits are left out, and informational audits are never scored. Grades: A from 90, B from 80, C from 70, D from 60, otherwise F. The weights are this fork's own: compare scores of one site over time, not across sites.
+- **The issues, most important first:** error tier before warn tier, then by how many items the audit found (its `numericValue`, else its table rows). `--top N` limits the list (default 25).
+- **Fix guidance** for the top issues (`--guidance N`, default 10): the audit's own explanation of what is wrong and its description.
+- **`--compare <earlier folder>`:** per page, the score change, the **new** issues, the **fixed** ones and how many are **still failing** (worse or better). Pages are paired by URL; pages in only one of the two folders are named.
+
+It always exits 0 when it can read the reports (it reports; `lhci assert` gates) and 2 on a usage error. The A3 workflow (`.github/workflows/seo-audit.yml`) appends its output to the job summary.
+
 ### Audit index (all 99 audits)
 
 Phase is the fork's own phase number. **Scoring** is what the audit reports; **Recommended assertion** is the severity `src/recommended-assertions.json` uses (`error` for objective defects, `warn` for the rest;

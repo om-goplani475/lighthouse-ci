@@ -655,3 +655,11 @@ Found by running the audits on five real sites (MDN, BBC News, apple.com, ikea.c
 ## 2026-10-06 — A3 workflow
 
 A manual workflow, `.github/workflows/seo-audit.yml`, runs the fork's audits on a GitHub runner in two ways (the fork's own `lhci` and a global `@lhci/cli@0.15.x`) and writes a summary; see `docs/open-items.md`, A3. No change to the audits.
+
+## 2026-10-06 — summary-command (Phase 16)
+
+New command `node packages/seo-audits/src/summary/cli.js <folder>`: reads the `lhr-*.json` files `lhci collect` wrote and prints a summary of the fork's audits: a score and grade per category and overall (error-tier audits weigh 3, warn-tier 1, partial scores count as half, informational audits are left out), the issues ranked by tier and then by how many items each found, and each audit's own explanation as fix guidance. `--compare <earlier folder>` adds what is new, fixed and still failing since an earlier run; `--format json`, `--top N`, `--guidance N` and `--out file` are options. It reads local files only, always exits 0 on success (gating stays with `lhci assert`) and 2 on bad usage. No new dependency or environment variable.
+
+## 2026-10-06 — A3 result
+
+The A3 workflow ran on a GitHub runner (web.dev, Node 18): both install paths (the fork's own `lhci` and a global `@lhci/cli` 0.15) ran all 57 scored audits with identical results; a 71 s run. The workflow now records its elapsed time even when assertions fail. No change to the audits.

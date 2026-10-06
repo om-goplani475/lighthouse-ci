@@ -925,3 +925,13 @@ No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10
 in `crawl-extract.js`, with a unit test; it was not re-run against a full hostile site. Findings 1 to 9 were fixed earlier. The calibration (2026-10-06) changed what the audits score and added no new request surface, apart from reading
 Open Graph tags written with `name=` and listing four more AI crawler names (data only). **One risk is accepted, not fixed:** `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control.
 
+## 2026-10-06 — summary-command (Phase 16, lightweight)
+
+No new request, gatherer, dependency or environment variable: the command only reads local `lhr-*.json` files and prints. Risks looked at:
+
+- **Resource use on hostile input.** Reads at most 200 files of at most 50 MiB each; anything that is not JSON or not a Lighthouse result is skipped and named, never thrown. A malformed result (null, no `audits`) yields an empty summary.
+- **Page-controlled text in the output.** Audit display values and explanations can contain text from the audited page (titles, URLs). They are clipped to 400 characters and, in markdown table cells, to 140 and escaped: pipes, angle brackets, square brackets and backticks cannot break a table, start HTML, a link or a code span (a hostile page cannot plant a link in a CI step summary). A bare URL can still autolink, as GitHub does for any URL. JSON output is plain data.
+- **Paths.** The folder and `--out` come from the command line the developer types or the workflow sets; nothing page-controlled reaches a path.
+
+No `critical`, `high`, `medium` or `low` finding.
+
