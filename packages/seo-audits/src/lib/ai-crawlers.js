@@ -7,11 +7,12 @@
  * robots.txt tokens the site's robots.txt allows on the audited page. Blocking an AI crawler is a legitimate
  * choice, so this only reports and never fails. It reads the same `RobotsTxt` artifact as the Phase 4 crawler
  * audit and the same parsers, with a longer list. Vendor names change: the list is data to keep current. Checked
- * against the vendors' own pages on 2026-10-06: OpenAI (GPTBot, OAI-SearchBot, ChatGPT-User; also OAI-AdsBot, not listed),
- * Anthropic (ClaudeBot, Claude-User, Claude-SearchBot), Perplexity (PerplexityBot, Perplexity-User), Google-Extended (a
- * robots.txt token only) and Applebot-Extended. Not re-checked: CCBot, Bytespider, Amazonbot, Meta-ExternalAgent,
- * DuckAssistBot. No I/O,
- * never throws.
+ * against the vendors' own pages on 2026-10-06: OpenAI (GPTBot, OAI-SearchBot, OAI-AdsBot, ChatGPT-User), Anthropic
+ * (ClaudeBot, Claude-User, Claude-SearchBot), Perplexity (PerplexityBot, Perplexity-User), Google-Extended (a robots.txt
+ * token only), Applebot-Extended, CCBot, Amazon (Amazonbot, Amzn-SearchBot, Amzn-User), Meta (Meta-ExternalAgent,
+ * Meta-ExternalFetcher) and DuckAssistBot. Not verified: Bytespider (ByteDance publishes no reachable vendor page; it
+ * is documented only by third parties). The user-initiated fetchers (ChatGPT-User, Perplexity-User, Amzn-User,
+ * Meta-ExternalFetcher) may ignore robots.txt. No I/O, never throws.
  */
 
 import robotsParser from 'robots-parser';
@@ -24,6 +25,7 @@ import {parseRobotsTxt, robotsTxtState} from './robots-txt.js';
 const AI_CRAWLERS = [
   {name: 'GPTBot', operator: 'OpenAI', purpose: 'model training'},
   {name: 'OAI-SearchBot', operator: 'OpenAI', purpose: 'search results'},
+  {name: 'OAI-AdsBot', operator: 'OpenAI', purpose: 'checks pages submitted as ads in ChatGPT'},
   {
     name: 'ChatGPT-User',
     operator: 'OpenAI',
@@ -50,9 +52,28 @@ const AI_CRAWLERS = [
   },
   {name: 'CCBot', operator: 'Common Crawl', purpose: 'a public web archive used to train models'},
   {name: 'Bytespider', operator: 'ByteDance', purpose: 'model training'},
-  {name: 'Amazonbot', operator: 'Amazon', purpose: 'Alexa and AI features'},
-  {name: 'Meta-ExternalAgent', operator: 'Meta', purpose: 'model training'},
-  {name: 'DuckAssistBot', operator: 'DuckDuckGo', purpose: 'AI answers'},
+  {
+    name: 'Amazonbot',
+    operator: 'Amazon',
+    purpose: 'improves Amazon products and services; may train Amazon AI models',
+  },
+  {name: 'Amzn-SearchBot', operator: 'Amazon', purpose: 'search (Alexa); not used for AI training'},
+  {
+    name: 'Amzn-User',
+    operator: 'Amazon',
+    purpose: 'a user asked Alexa to open the page (Amazon: may not follow robots.txt)',
+  },
+  {
+    name: 'Meta-ExternalAgent',
+    operator: 'Meta',
+    purpose: 'model training, or indexing content directly',
+  },
+  {
+    name: 'Meta-ExternalFetcher',
+    operator: 'Meta',
+    purpose: 'a user asked a Meta AI to open the page (Meta: may bypass robots.txt)',
+  },
+  {name: 'DuckAssistBot', operator: 'DuckDuckGo', purpose: 'AI answers (not used for training)'},
 ];
 
 const NOTE =
