@@ -74,9 +74,9 @@ describe('structured-data-json-ld audit', () => {
     expect(result.score).toBe(1);
   }, 30000);
 
-  it('fails when there are no blocks at all', async () => {
+  it('is not applicable when the page has no JSON-LD (structured data is optional)', async () => {
     const result = await runAudit([]);
-    expect(result.score).toBe(0);
+    expect(result.notApplicable).toBe(true);
   }, 30000);
 
   it('fails on malformed JSON', async () => {

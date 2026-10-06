@@ -14,12 +14,12 @@ const schemaOrgRuleset = resolveSchemaOrgRuleset();
 
 const UIStrings = {
   title: 'Structured data (JSON-LD) is valid',
-  failureTitle: 'Structured data (JSON-LD) is missing or invalid',
+  failureTitle: 'Structured data (JSON-LD) is invalid',
   description:
     'Validates every <script type="application/ld+json"> block on the page: it must ' +
     "be parseable JSON and include the required @context and @type fields. This fork's own " +
     'check — Lighthouse\'s built-in "structured-data" audit is a manual placeholder and does ' +
-    'not validate anything automatically.',
+    'not validate anything automatically. A page with no JSON-LD at all is not applicable (structured data is optional).',
   reasonInvalidJson: 'Invalid JSON',
   reasonMissingFields: 'Missing @context or @type',
 };
@@ -104,7 +104,8 @@ class StructuredDataJsonLd extends Audit {
     const blocks = artifacts.StructuredDataJsonLd;
 
     if (blocks.length === 0) {
-      return {score: 0};
+      // Structured data is optional: a page without any is not broken, so there is nothing to validate.
+      return {score: null, notApplicable: true};
     }
 
     const results = blocks.map(evaluateBlock);
