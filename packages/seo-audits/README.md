@@ -803,6 +803,20 @@ Four **informational** audits (they never score or fail) about being found and q
 | `LHCI_SEO_CRAWL_CACHE_DIR` | `<tmp>/lhci-seo-crawl-<uid>` | where the snapshot cache lives (its parent must already exist) |
 | `LHCI_SEO_CRAWL_CACHE_TTL_SECONDS` | 600 (0 to 86,400) | how long a snapshot is reused; `0` disables the cache |
 
+**Requests sent to the audited site (the budget).** Every request is bounded and most can be switched off, but a team with a WAF or rate limit should know the total:
+
+| When | Requests (upper bound) | Switch |
+|---|---|---|
+| Once per collect (cached for `LHCI_SEO_CRAWL_CACHE_TTL_SECONDS`, 10 min) | the site crawl: up to about 150 (50 pages by default, 5 at a time, 120 s) | `LHCI_SEO_CRAWL_MAX_PAGES`, `LHCI_SEO_CRAWL_TIME_BUDGET_SECONDS` |
+| Per Lighthouse run, not cached | up to 100 internal link checks | `LHCI_SEO_CRAWL_MAX_LINK_CHECKS=0` |
+| Per run | up to 20 external link checks (2 per host, other sites) | the external-link setting above |
+| Per run | up to 10 hreflang alternates (at most 20 s) | `LHCI_SEO_HREFLANG_MAX_CHECKS=0` |
+| Per run | 2 device-parity fetches, 1 AMP version, 3 URL-variant probes, 2 soft-404 probes | `LHCI_SEO_DEVICE_PARITY=0`, `LHCI_SEO_AMP_CHECK=0` |
+| Per run | up to 25 sitemap URLs, robots.txt, sitemaps, llms.txt, the favicon and og:image | |
+| Per run, only with a key | 1 or 2 calls to Google (CrUX) | `LHCI_SEO_CRUX_API_KEY` unset |
+
+With `numberOfRuns: 3` over 10 URLs the non-cached part is on the order of 4,000 extra requests per CI run to the audited site; the crawl itself is shared. To reduce it, lower `LHCI_SEO_CRAWL_MAX_LINK_CHECKS` and `LHCI_SEO_HREFLANG_MAX_CHECKS`, or use fewer runs. (Caching the per-run link checks by audited URL is not done: the checks belong to one page, and a shared cache would hide a link that broke between runs.)
+
 `LHCI_SEO_ALLOW_PRIVATE_NETWORK` applies as everywhere (auditing `localhost` or a private staging host needs it; without
 it the crawl cannot run and the report carries a warning naming the setting).
 

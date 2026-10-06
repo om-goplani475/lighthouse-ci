@@ -98,9 +98,9 @@ CI pins Node 18. The Phase 5, Phase 6 and Phase 7 crawler suites were run there;
 Phase 8 (so far the crawler extension) were not. `nvm use 18 && npx jest packages/seo-audits`. **Pass when** all 75 suites pass. The risky spots are
 `server.closeAllConnections()` (Node 18.2+) and the crawler's integration test, which waits for a real 10 s budget.
 
-### G. Calibration of 2026-10-06 needs a real-site check
+### G. Calibration of 2026-10-06: real-site check (PARTLY DONE)
 
-The tiers, warn scores and thresholds were set from the review and unit tests plus one planted-site `lhci collect`/`assert` run. Run the A6 spot check on real sites (a multilingual site, a language-chooser `x-default`, a developer-docs site, a news site with JSON-LD, a retail home page with a carousel) and look for audits that still fire on healthy pages.
+**Done 2026-10-06** on MDN, BBC News, apple.com, ikea.com and Wikipedia (5 `lhci collect` runs, crawl limited to 15 pages): it found and fixed 6 false positives (JSON-LD absence, SVG titles, a 403 on the http probe, sitemap timeouts, 3x images, `name="og:*"` tags); what remains on those sites looked genuine (missing og tags, a noindex page in MDN's sitemap, IKEA blocking some JS for Googlebot, generic anchors, links to redirects). **Still to do:** a multilingual site with an `x-default` language chooser, a retail site with a carousel and a site with JSON-LD Article plus Review. Original text: Run the A6 spot check on real sites (a multilingual site, a language-chooser `x-default`, a developer-docs site, a news site with JSON-LD, a retail home page with a carousel) and look for audits that still fire on healthy pages.
 
 ### F. Verify the structured-data types against Google's live documentation (DONE 2026-10-06)
 
