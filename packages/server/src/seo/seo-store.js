@@ -9,6 +9,8 @@
  * - `seo_projects`: one row per LHCI project that uses the service (the LHCI project id is the key). Holds the webhook
  *   secret, which must be readable (an HMAC cannot be checked against a hash); it is never sent out except once, when it
  *   is created or rotated. Same exposure as the build `token` the upstream `projects` table already stores in clear.
+ * - `seo_notifications`: where a project's results go (GitHub/GitLab token, Slack/Teams webhook URL). Secrets, stored like
+ *   the webhook secret and never returned by the API.
  * - `seo_runs`: one row per queued audit.
  * - `seo_webhook_logs`: one row per delivery, with the outcome. Never stores headers or bodies, so no secret or
  *   signature can end up in it.
@@ -47,6 +49,12 @@ async function createSeoStore(sequelize) {
     config: {type: Sequelize.TEXT()},
     allowedHosts: {type: Sequelize.TEXT()},
     defaultUrl: {type: Sequelize.STRING(2048)},
+    createdAt: {type: Sequelize.DATE(6)},
+    updatedAt: {type: Sequelize.DATE(6)},
+  });
+  const Notifications = sequelize.define('seo_notifications', {
+    projectId: {type: Sequelize.UUID(), primaryKey: true},
+    config: {type: Sequelize.TEXT()},
     createdAt: {type: Sequelize.DATE(6)},
     updatedAt: {type: Sequelize.DATE(6)},
   });
@@ -92,7 +100,7 @@ async function createSeoStore(sequelize) {
     {indexes: [{fields: ['projectId', 'createdAt']}]}
   );
 
-  await Promise.all([Project.sync(), Run.sync(), Log.sync()]);
+  await Promise.all([Project.sync(), Notifications.sync(), Run.sync(), Log.sync()]);
 
   let lastPrune = 0;
 
@@ -131,6 +139,26 @@ async function createSeoStore(sequelize) {
     /** @param {string} projectId */
     async deleteProject(projectId) {
       await Project.destroy({where: {projectId}});
+      await Notifications.destroy({where: {projectId}});
+    },
+
+    /** @param {string} projectId @return {Promise<any | null>} */
+    async getNotifications(projectId) {
+      const row = await Notifications.findByPk(projectId);
+      if (!row) return null;
+      try {
+        return JSON.parse(row.toJSON().config) || null;
+      } catch (_) {
+        return null;
+      }
+    },
+
+    /** @param {string} projectId @param {any} config */
+    async saveNotifications(projectId, config) {
+      const text = JSON.stringify(config || {});
+      const existing = await Notifications.findByPk(projectId);
+      if (existing) await existing.update({config: text});
+      else await Notifications.create({projectId, config: text});
     },
 
     /** @param {any} fields @return {Promise<any>} */
@@ -182,7 +210,7 @@ async function createSeoStore(sequelize) {
      * The latest finished run of the same page on a branch, for comparing a new run against. Preview hosts change per
      * pull request, so the page is matched by path, not by host.
      * @param {{projectId: string, branch: string | null, url: string, excludeRunId?: string}} criteria
-     * @return {Promise<{id: string, summary: any} | null>}
+     * @return {Promise<{id: string, summary: any, signals: any} | null>}
      */
     async latestDone({projectId, branch, url, excludeRunId}) {
       const pathOf = (/** @type {string} */ u) => {
@@ -206,7 +234,9 @@ async function createSeoStore(sequelize) {
         if (pathOf(run.url) !== wanted) continue;
         try {
           const result = JSON.parse(run.result);
-          if (result && result.summary) return {id: run.id, summary: result.summary};
+          if (result && result.summary) {
+            return {id: run.id, summary: result.summary, signals: result.signals || null};
+          }
         } catch (_) {
           // an unreadable result is skipped; the next older run may be fine
         }

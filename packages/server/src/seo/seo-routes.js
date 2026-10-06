@@ -24,6 +24,7 @@ const UUID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{
 const PROVIDERS = ['github', 'gitlab', 'lhci'];
 const EVENT_HEADERS = {github: 'x-github-event', gitlab: 'x-gitlab-event', lhci: ''};
 const JOB_TIMEOUT_MS = 10 * 60 * 1000;
+const DISPATCH_TIMEOUT_MS = 60 * 1000;
 
 /**
  * @typedef {{
@@ -33,6 +34,11 @@ const JOB_TIMEOUT_MS = 10 * 60 * 1000;
  *   checkAuditUrl: (url: string, hosts: string[]) => any,
  *   validateAllowList: (list: unknown) => string[],
  *   validateConfig: (config: any) => string[],
+ *   validateNotifications?: (config: any) => string[],
+ *   mergeNotifications?: (existing: any, patch: any) => any,
+ *   publicNotifications?: (config: any) => object,
+ *   dispatchRun?: (input: any) => Promise<Array<{kind: string, target: string, ok: boolean, detail: string}>>,
+ *   send?: Function,
  *   runAudit?: (input: any) => Promise<unknown>,
  * }} SeoDeps
  */
@@ -80,6 +86,53 @@ async function createSeoService(context, deps, limits = {}) {
   const limiter = createRateLimiter({max: limits.rateMax, windowMs: limits.rateWindowMs});
   const jobTimeoutMs = limits.jobTimeoutMs || JOB_TIMEOUT_MS;
 
+  /**
+   * Posts the comment and sends the alerts for a finished run. A failure here is logged and never changes the run: the
+   * audit succeeded, only the messenger did not.
+   * @param {any} run
+   * @param {any} result
+   */
+  const dispatch = async (run, result) => {
+    if (!deps.dispatchRun || !deps.send) return;
+    try {
+      const notifications = await store.getNotifications(run.projectId);
+      if (!notifications) return;
+      const publicUrl = String(process.env.LHCI_SEO_PUBLIC_URL || '').replace(/\/+$/, '');
+      const actions = await Promise.race([
+        deps.dispatchRun({
+          projectId: run.projectId,
+          run,
+          result,
+          notifications,
+          send: deps.send,
+          reportUrl: publicUrl ? `${publicUrl}/app/seo/${run.projectId}/runs/${run.id}` : null,
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('sending took too long')), DISPATCH_TIMEOUT_MS).unref()
+        ),
+      ]);
+      for (const a of /** @type {any[]} */ (actions)) {
+        await log({
+          projectId: run.projectId,
+          provider: run.provider,
+          event: a.target,
+          outcome: `${a.kind}-${a.ok ? (a.kind === 'comment' ? 'posted' : 'sent') : 'failed'}`,
+          reason: a.detail,
+          runId: run.id,
+        });
+      }
+    } catch (err) {
+      await log({
+        projectId: run.projectId,
+        provider: run.provider,
+        event: 'dispatch',
+        outcome: 'comment-failed',
+        reason: /** @type {Error} */ (err).message,
+        runId: run.id,
+      });
+    }
+  };
+
   /** @param {{runId: string, projectId: string}} job */
   const execute = async job => {
     const run = await store.getRun(job.runId);
@@ -111,6 +164,7 @@ async function createSeoService(context, deps, limits = {}) {
         aborted,
       ]);
       await store.updateRun(run.id, {status: 'done', result, finishedAt: new Date()});
+      await dispatch(run, result);
     } catch (err) {
       await store.updateRun(run.id, {
         status: 'failed',
@@ -326,6 +380,51 @@ async function createSeoService(context, deps, limits = {}) {
       }
       const {project, secret} = await store.saveProject(req.params.projectId, {}, {rotate: true});
       return res.json({...publicProject(project), webhookSecret: secret});
+    })
+  );
+
+  // Where results go. Secrets (tokens, webhook URLs) go in and are never shown again: only which destinations are set up.
+  management.get(
+    '/projects/:projectId/notifications',
+    admin,
+    handleAsyncError(async (req, res) => {
+      if (!(await store.getProject(req.params.projectId))) {
+        return res.status(404).json({message: 'not set up'});
+      }
+      return res.json(
+        deps.publicNotifications
+          ? deps.publicNotifications(await store.getNotifications(req.params.projectId))
+          : {}
+      );
+    })
+  );
+
+  management.put(
+    '/projects/:projectId/notifications',
+    admin,
+    handleAsyncError(async (req, res) => {
+      const projectId = req.params.projectId;
+      if (!deps.validateNotifications || !deps.mergeNotifications || !deps.publicNotifications) {
+        return res.status(501).json({message: 'notifications are not available on this server'});
+      }
+      if (!(await store.getProject(projectId))) {
+        return res.status(404).json({message: 'not set up'});
+      }
+      const patch =
+        req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : null;
+      if (!patch) {
+        return res
+          .status(422)
+          .json({message: 'invalid settings', problems: ['send a JSON object']});
+      }
+      const problems = deps.validateNotifications(patch);
+      if (problems.length) return res.status(422).json({message: 'invalid settings', problems});
+      const merged = deps.mergeNotifications(await store.getNotifications(projectId), patch);
+      // The merged result is checked too, not only the patch.
+      const after = deps.validateNotifications(merged);
+      if (after.length) return res.status(422).json({message: 'invalid settings', problems: after});
+      await store.saveNotifications(projectId, merged);
+      return res.json(deps.publicNotifications(merged));
     })
   );
 

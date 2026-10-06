@@ -29,6 +29,7 @@ import {summarizeRun} from '../summary/run-summary.js';
 import {compareRuns} from '../summary/compare.js';
 import {loadLhrs} from '../summary/load.js';
 import {serializeRun, reviveRun} from './run-result.js';
+import {SIGNAL_IDS} from './notifier.js';
 
 const PASS_THROUGH = [
   'PATH',
@@ -158,6 +159,26 @@ function spawnCollect({lhciCli, lighthouseConfig, url, cwd, env, chromeFlags, si
 }
 
 /**
+ * @param {any} lhr
+ * @return {Record<string, {score: number | null, title: string, displayValue: string}>}
+ */
+function signalsOf(lhr) {
+  /** @type {Record<string, {score: number | null, title: string, displayValue: string}>} */
+  const out = {};
+  for (const id of SIGNAL_IDS) {
+    const a = lhr.audits && lhr.audits[id];
+    if (a) {
+      out[id] = {
+        score: typeof a.score === 'number' ? a.score : null,
+        title: String(a.title || id).slice(0, 200),
+        displayValue: String(a.displayValue || '').slice(0, 200),
+      };
+    }
+  }
+  return out;
+}
+
+/**
  * @param {{
  *   recommended: Record<string, [string, {minScore: number}]>,
  *   lhciCli: string,
@@ -237,6 +258,8 @@ function createRunAudit(deps) {
       /** @type {object | null} */
       let comparison = null;
       let baselineNote = 'no earlier run to compare with';
+      /** @type {any} */
+      let baselineSignals = null;
       if (findBaseline) {
         try {
           const found = await findBaseline({
@@ -249,6 +272,7 @@ function createRunAudit(deps) {
           const earlier = found ? reviveRun(found.summary || found) : null;
           if (earlier) {
             comparison = compareRuns(earlier, summary);
+            baselineSignals = found.signals || null;
             baselineNote = '';
           }
         } catch (_) {
@@ -261,6 +285,9 @@ function createRunAudit(deps) {
         finalUrl: summary.url,
         durationMs: Date.now() - started,
         summary: serializeRun(summary),
+        // Lighthouse's own crawlability and status audits, for the "page stopped being crawlable" alert.
+        signals: signalsOf(lhr),
+        baselineSignals,
         comparison,
         baselineNote,
         blockedHosts: [...new Set(proxy.blocked.map(b => b.host))].slice(0, 20),

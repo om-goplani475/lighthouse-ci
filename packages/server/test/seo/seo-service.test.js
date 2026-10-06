@@ -80,14 +80,25 @@ const eventBody = (extra = {}) =>
   });
 
 /** @param {Record<string, any>} limits @param {(input: any) => Promise<unknown>} [runAudit] */
-async function startService(limits, runAudit) {
+async function startService(limits, runAudit, send) {
   const dbPath = path.join(
     os.tmpdir(),
     `seo-service-${process.pid}-${Math.random().toString(36).slice(2)}.sqlite`
   );
   const storageMethod = await openStorage(dbPath);
   // Never the real runner (it would start Chrome): a test gets the fake it passes, or no runner at all.
-  const deps = {...(await loadSeoDeps()), runAudit};
+  // Nor the real sender: nothing in a test may leave the machine.
+  const sent = [];
+  const deps = {
+    ...(await loadSeoDeps()),
+    runAudit,
+    send:
+      send ||
+      (async request => {
+        sent.push(request);
+        return {status: 200, headers: {}, json: [], text: ''};
+      }),
+  };
   const service = await createSeoService({storageMethod}, deps, limits);
   const app = express();
   app.use('/api/v1/webhooks', service.webhooks);
@@ -116,6 +127,7 @@ async function startService(limits, runAudit) {
   const admin = {'x-lhci-admin-token': project.adminToken};
   const base = `/api/v1/seo/projects/${project.id}`;
   return {
+    sent,
     api,
     admin,
     base,
@@ -600,6 +612,194 @@ describe('SEO webhook service', () => {
           ).toBeNull();
         }
       }
+    });
+  });
+
+  describe('notifications and dispatch', () => {
+    const TOKEN = 'ghp_supersecret_token_value';
+    const HOOK = 'https://hooks.slack.com/services/T000/B000/SECRETPART';
+    /** A fake GitHub/Slack: lists no comments, accepts a new one, accepts alerts. */
+    const friendly = log => async request => {
+      log.push(request);
+      if (request.method === 'GET') return {status: 200, headers: {}, json: [], text: ''};
+      return {status: request.url.includes('slack') ? 200 : 201, headers: {}, json: {}, text: ''};
+    };
+    const criticalResult = {
+      summary: {overall: {score: 70, grade: 'C'}, categories: [], audits: []},
+      comparison: {
+        overallDelta: -5,
+        categories: [],
+        newIssues: [
+          {
+            id: 'canonical-https',
+            title: 'Canonical',
+            tier: 'error',
+            status: 'fail',
+            displayValue: 'x',
+          },
+        ],
+        fixed: [],
+        stillFailing: [],
+      },
+    };
+    const logsOf = async t => (await t.api.get(`${t.base}/webhook-logs`, t.admin)).json;
+
+    it('needs the admin token and a set-up project, and validates what it is given', async () => {
+      t = await startService({});
+      expect((await t.api.get(`${t.base}/notifications`, t.admin)).status).toBe(404);
+      await t.setUp();
+      expect((await t.api.put(`${t.base}/notifications`, {comment: false})).status).toBe(403);
+      const bad = await t.api.put(
+        `${t.base}/notifications`,
+        {slack: {webhookUrl: 'https://evil.example.com/x'}, github: {token: 'a b'}, mystery: 1},
+        t.admin
+      );
+      expect(bad.status).toBe(422);
+      expect(bad.json.problems).toHaveLength(3);
+      expect((await t.api.put(`${t.base}/notifications`, [1], t.admin)).status).toBe(422);
+    });
+
+    it('stores secrets, never shows them again, and a later patch keeps the stored token', async () => {
+      t = await startService({});
+      await t.setUp();
+      const put = await t.api.put(
+        `${t.base}/notifications`,
+        {github: {token: TOKEN}, slack: {webhookUrl: HOOK}},
+        t.admin
+      );
+      expect(put.status).toBe(200);
+      for (const text of [put.text, (await t.api.get(`${t.base}/notifications`, t.admin)).text]) {
+        for (const secret of [TOKEN, 'SECRETPART', 'T000']) expect(text).not.toContain(secret);
+      }
+      expect(put.json).toMatchObject({
+        github: {tokenSet: true},
+        slack: {webhookHost: 'hooks.slack.com'},
+      });
+      await t.api.put(
+        `${t.base}/notifications`,
+        {github: {apiBase: 'https://ghe.example.com'}, slack: null},
+        t.admin
+      );
+      expect(await t.service.store.getNotifications(t.project.id)).toEqual({
+        github: {token: TOKEN, apiBase: 'https://ghe.example.com'},
+      });
+    });
+
+    it('comments on a github pull request using the stored token', async () => {
+      const log = [];
+      t = await startService(
+        {},
+        async () => ({
+          url: GOOD_URL,
+          summary: {overall: {score: 91, grade: 'A'}, categories: [], audits: []},
+          comparison: null,
+        }),
+        friendly(log)
+      );
+      const created = await t.api.put(
+        `${t.base}/config`,
+        {provider: 'github', allowedHosts: ['*.stage.example.org'], defaultUrl: GOOD_URL},
+        t.admin
+      );
+      await t.api.put(`${t.base}/notifications`, {github: {token: TOKEN}}, t.admin);
+      const raw = JSON.stringify({
+        action: 'opened',
+        number: 5,
+        repository: {full_name: 'acme/site'},
+        pull_request: {draft: false, head: {sha: SHA, ref: 'f'}, base: {ref: 'main'}},
+      });
+      const res = await t.api.post(
+        t.hook,
+        undefined,
+        {
+          'content-type': 'application/json',
+          'x-github-event': 'pull_request',
+          'x-hub-signature-256': `sha256=${hmacHex(created.json.webhookSecret, raw)}`,
+        },
+        raw
+      );
+      expect(res.status).toBe(202);
+      await t.service.queue.idle();
+      expect(log.map(r => r.method)).toEqual(['GET', 'POST']);
+      expect(log[1].url).toBe('https://api.github.com/repos/acme/site/issues/5/comments');
+      expect(log[1].body.body).toContain('SEO audit: 91.0 (A)');
+      expect((await logsOf(t)).map(l => l.outcome)).toEqual(
+        expect.arrayContaining(['accepted', 'comment-posted'])
+      );
+      expect((await t.api.get(`${t.base}/runs/${res.json.runId}`, t.admin)).json.status).toBe(
+        'done'
+      );
+    });
+
+    it('a sending failure is logged without the token and does not fail the run', async () => {
+      t = await startService(
+        {},
+        async () => criticalResult,
+        async () => ({status: 401, headers: {}, json: null, text: `bad credentials ${TOKEN}`})
+      );
+      const created = await t.api.put(
+        `${t.base}/config`,
+        {provider: 'github', allowedHosts: ['*.stage.example.org'], defaultUrl: GOOD_URL},
+        t.admin
+      );
+      await t.api.put(`${t.base}/notifications`, {github: {token: TOKEN}}, t.admin);
+      const raw = JSON.stringify({
+        action: 'opened',
+        number: 5,
+        repository: {full_name: 'acme/site'},
+        pull_request: {draft: false, head: {sha: SHA, ref: 'f'}, base: {ref: 'main'}},
+      });
+      const res = await t.api.post(
+        t.hook,
+        undefined,
+        {
+          'content-type': 'application/json',
+          'x-github-event': 'pull_request',
+          'x-hub-signature-256': `sha256=${hmacHex(created.json.webhookSecret, raw)}`,
+        },
+        raw
+      );
+      await t.service.queue.idle();
+      expect((await t.api.get(`${t.base}/runs/${res.json.runId}`, t.admin)).json.status).toBe(
+        'done'
+      );
+      const logs = await logsOf(t);
+      expect(logs.find(l => l.outcome === 'comment-failed').reason).toMatch(/GitHub answered 401/);
+      expect(JSON.stringify(logs)).not.toContain(TOKEN);
+    });
+
+    it('sends a Slack alert for a new critical regression on a deployment, not for a pull request comment-only run', async () => {
+      const log = [];
+      t = await startService({}, async () => criticalResult, friendly(log));
+      const secret = await t.setUp();
+      await t.api.put(`${t.base}/notifications`, {slack: {webhookUrl: HOOK}}, t.admin);
+      const body = eventBody({prNumber: undefined, branch: 'main', baseBranch: undefined});
+      await t.api.post(t.hook, undefined, signLhci(secret, body), body);
+      await t.service.queue.idle();
+      expect(log).toHaveLength(1);
+      expect(log[0].url).toBe(HOOK);
+      expect(log[0].body.text).toContain('SEO regression');
+      expect((await logsOf(t)).find(l => l.event === 'slack')).toMatchObject({
+        outcome: 'alert-sent',
+      });
+
+      // a pull request run does not raise an alert by default
+      const pr = eventBody({sha: 'd'.repeat(40), prNumber: 6});
+      await t.api.post(t.hook, undefined, signLhci(secret, pr, Date.now() + 1000), pr);
+      await t.service.queue.idle();
+      expect(log).toHaveLength(1);
+    });
+
+    it('sends nothing when the project has no notifications set up, and removing the config removes them', async () => {
+      t = await startService({}, async () => criticalResult);
+      const secret = await t.setUp();
+      const body = eventBody({prNumber: undefined});
+      await t.api.post(t.hook, undefined, signLhci(secret, body), body);
+      await t.service.queue.idle();
+      expect(t.sent).toHaveLength(0);
+      await t.api.put(`${t.base}/notifications`, {slack: {webhookUrl: HOOK}}, t.admin);
+      await t.api.del(`${t.base}/config`, t.admin);
+      expect(await t.service.store.getNotifications(t.project.id)).toBeNull();
     });
   });
 
