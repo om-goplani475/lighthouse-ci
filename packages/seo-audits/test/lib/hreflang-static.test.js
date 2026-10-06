@@ -148,3 +148,16 @@ describe('buildLocaleMetaProduct (informational)', () => {
     expect(regionOf('en')).toBeNull();
   });
 });
+
+describe('the page URL with tracking parameters', () => {
+  it('still lists itself when it carries utm parameters and has no canonical', () => {
+    const d = data({pageUrl: 'https://example.com/en/?utm_source=x&gclid=1', canonical: null});
+    expect(selfEntries(d)).toHaveLength(1);
+    expect(buildCodesProduct(d).score).toBe(1);
+  });
+
+  it('keeps a real query parameter significant', () => {
+    const d = data({pageUrl: 'https://example.com/en/?page=2', canonical: null});
+    expect(buildCodesProduct(d).score).toBe(0);
+  });
+});

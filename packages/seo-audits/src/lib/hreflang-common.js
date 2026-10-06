@@ -9,6 +9,7 @@
 
 import {Audit} from 'lighthouse/core/audits/audit.js';
 import {looseKey} from './url-key.js';
+import {isSessionParam, isTrackingParam} from './url-quality.js';
 
 /** @typedef {import('lighthouse/types/audit.js').default.Product} Product */
 /** @typedef {import('../gatherers/hreflang-data.js').HreflangDataArtifact} HreflangDataArtifact */
@@ -71,21 +72,44 @@ function gate(data) {
 }
 
 /**
- * @param {HreflangDataArtifact} data
- * @return {string | null} The loose key of the page's own URL.
+ * The loose key of a URL with its tracking and session parameters removed, so `?utm_source=x` does not make a page
+ * look different from its own hreflang entry.
+ * @param {unknown} href
+ * @return {string | null}
  */
-function selfKeyOf(data) {
-  return looseKey(data.pageUrl);
+function cleanKey(href) {
+  const key = looseKey(href);
+  if (key === null || typeof href !== 'string') return key;
+  try {
+    const url = new URL(href.trim());
+    for (const [name, value] of Array.from(url.searchParams)) {
+      if (isTrackingParam(name) || isSessionParam(name, value)) url.searchParams.delete(name);
+    }
+    return looseKey(url.href);
+  } catch {
+    return key;
+  }
 }
 
 /**
- * The page's own entries: the hreflang links that name the page's URL, or its canonical.
+ * @param {HreflangDataArtifact} data
+ * @return {string | null} The loose key of the page's own URL, without tracking parameters.
+ */
+function selfKeyOf(data) {
+  return cleanKey(data.pageUrl);
+}
+
+/**
+ * The page's own entries: the hreflang links that name the page's URL (with or without tracking parameters), or its
+ * canonical.
  * @param {HreflangDataArtifact} data
  * @return {Array<{hreflang: string, href: string}>}
  */
 function selfEntries(data) {
-  const keys = new Set([looseKey(data.pageUrl), looseKey(data.canonical)].filter(Boolean));
-  return data.alternates.filter(a => keys.has(looseKey(a.href)));
+  const keys = new Set(
+    [looseKey(data.pageUrl), cleanKey(data.pageUrl), looseKey(data.canonical)].filter(Boolean)
+  );
+  return data.alternates.filter(a => keys.has(looseKey(a.href)) || keys.has(cleanKey(a.href)));
 }
 
 export {clip, notApplicable, table, gate, selfKeyOf, selfEntries, MAX_ROWS};
