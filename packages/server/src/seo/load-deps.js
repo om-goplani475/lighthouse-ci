@@ -20,6 +20,7 @@ async function loadSeoDeps() {
     import(`${base}/notifier.js`),
     import(`${base}/outbound.js`),
   ]);
+  const recommended = require('@lhci/seo-audits/src/recommended-assertions.json');
   return {
     verifyWebhook: signature.verifyWebhook,
     createReplayGuard: signature.createReplayGuard,
@@ -27,13 +28,17 @@ async function loadSeoDeps() {
     checkAuditUrl: hosts.checkAuditUrl,
     validateAllowList: hosts.validateAllowList,
     validateConfig: config.validateConfig,
+    describeProject: projectConfig => ({
+      ...config.describeOptions(recommended),
+      effective: config.resolveSeverities(projectConfig, recommended),
+    }),
     validateNotifications: notifier.validateNotifications,
     mergeNotifications: notifier.mergeNotifications,
     publicNotifications: notifier.publicNotifications,
     dispatchRun: notifier.dispatchRun,
     send: outbound.createOutbound(),
     runAudit: runner.createRunAudit({
-      recommended: require('@lhci/seo-audits/src/recommended-assertions.json'),
+      recommended,
       lhciCli: require.resolve('@lhci/cli/src/cli.js'),
       lighthouseConfig: require.resolve('@lhci/seo-audits/src/lighthouse-config.js'),
     }),

@@ -53,6 +53,24 @@ export const App = () => {
           }
         />
         <LazyRoute
+          path="/app/projects/:projectSlug/seo"
+          loading={() => (
+            <Page>
+              <LoadingSpinner />
+            </Page>
+          )}
+          getComponent={() => import('./routes/seo/seo-project.jsx').then(m => m.SeoProject)}
+        />
+        <LazyRoute
+          path="/app/seo/:projectId/runs/:runId"
+          loading={() => (
+            <Page>
+              <LoadingSpinner />
+            </Page>
+          )}
+          getComponent={() => import('./routes/seo/seo-run.jsx').then(m => m.SeoRun)}
+        />
+        <LazyRoute
           path="/app/projects/:projectSlug/dashboard"
           loading={() => (
             <Page>

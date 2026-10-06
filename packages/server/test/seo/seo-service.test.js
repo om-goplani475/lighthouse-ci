@@ -615,6 +615,60 @@ describe('SEO webhook service', () => {
     });
   });
 
+  describe('dashboard support', () => {
+    it('describes what the settings form offers and what the saved settings come to', async () => {
+      t = await startService({});
+      expect((await t.api.get(`${t.base}/meta`)).status).toBe(403);
+      await t.setUp({config: {preset: 'internal-portal', audits: {'canonical-https': 'warn'}}});
+      const meta = (await t.api.get(`${t.base}/meta`, t.admin)).json;
+      expect(meta.presets.map(p => p.name)).toContain('ecommerce');
+      expect(meta.categories.flatMap(c => c.audits).length).toBeGreaterThan(50);
+      expect(meta.effective['canonical-https']).toBe('warn');
+      expect(meta.effective['broken-images']).toBe('off');
+      expect(meta.effective['llms-txt-structure']).toBeUndefined();
+    });
+
+    it('lists runs with their score, grade and change, without the report itself', async () => {
+      const result = {
+        summary: {overall: {score: 88.5, grade: 'B'}, categories: [], audits: []},
+        comparison: {overallDelta: -2.5},
+      };
+      t = await startService({}, async () => result);
+      await t.setUp();
+      const res = await t.api.post(`${t.base}/runs`, {url: GOOD_URL}, t.admin);
+      await t.service.queue.idle();
+      const list = (await t.api.get(`${t.base}/runs`, t.admin)).json;
+      expect(list[0]).toMatchObject({
+        id: res.json.runId,
+        status: 'done',
+        score: 88.5,
+        grade: 'B',
+        delta: -2.5,
+      });
+      expect(list[0].result).toBeUndefined();
+    });
+
+    it('lists a failed run with no score, and survives a damaged stored result', async () => {
+      t = await startService({});
+      await t.setUp();
+      const run = await t.service.store.createRun({
+        trigger: 'manual',
+        projectId: t.project.id,
+        url: GOOD_URL,
+      });
+      await t.service.store.updateRun(run.id, {status: 'done', result: 'not json at all'});
+      const failed = await t.service.store.createRun({
+        trigger: 'manual',
+        projectId: t.project.id,
+        url: GOOD_URL,
+      });
+      await t.service.store.updateRun(failed.id, {status: 'failed', error: 'boom'});
+      const list = (await t.api.get(`${t.base}/runs`, t.admin)).json;
+      expect(list.map(r => r.score)).toEqual([null, null]);
+      expect(list.map(r => r.status).sort()).toEqual(['done', 'failed']);
+    });
+  });
+
   describe('notifications and dispatch', () => {
     const TOKEN = 'ghp_supersecret_token_value';
     const HOOK = 'https://hooks.slack.com/services/T000/B000/SECRETPART';

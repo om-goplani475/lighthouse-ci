@@ -195,15 +195,36 @@ async function createSeoStore(sequelize) {
       return row ? row.toJSON() : null;
     },
 
-    /** @param {string} projectId @param {number} [limit] @return {Promise<any[]>} Newest first, without the result body. */
+    /**
+     * @param {string} projectId
+     * @param {number} [limit]
+     * @return {Promise<any[]>} Newest first. The report itself is left out; a finished run carries its `score`, `grade` and
+     *   `delta` (the change since its baseline) so a list can show them. Read from the stored result, so keep `limit` small.
+     */
     async listRuns(projectId, limit = 50) {
       const rows = await Run.findAll({
         where: {projectId},
-        attributes: {exclude: ['result']},
         order: [['createdAt', 'DESC']],
         limit: Math.min(Math.max(1, limit | 0), MAX_LIST),
       });
-      return rows.map(r => r.toJSON());
+      return rows.map(row => {
+        const {result, ...run} = row.toJSON();
+        /** @type {{score: number | null, grade: string | null, delta: number | null}} */
+        let brief = {score: null, grade: null, delta: null};
+        if (run.status === 'done' && result) {
+          try {
+            const parsed = JSON.parse(result);
+            brief = {
+              score: parsed.summary.overall.score,
+              grade: parsed.summary.overall.grade,
+              delta: parsed.comparison ? parsed.comparison.overallDelta : null,
+            };
+          } catch (_) {
+            // an unreadable result just has no score in the list
+          }
+        }
+        return {...run, ...brief};
+      });
     },
 
     /**

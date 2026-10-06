@@ -46,6 +46,13 @@ export const PageSidebar = props => {
                       {project.name}
                     </Link>
                     <Link
+                      href={`/app/projects/${project.slug}/seo`}
+                      title="SEO service"
+                      onClick={() => props.setIsOpen(false)}
+                    >
+                      <i className="material-icons">travel_explore</i>
+                    </Link>
+                    <Link
                       href={`/app/projects/${project.slug}/settings`}
                       onClick={() => props.setIsOpen(false)}
                     >

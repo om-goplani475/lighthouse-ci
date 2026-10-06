@@ -39,6 +39,7 @@ const DISPATCH_TIMEOUT_MS = 60 * 1000;
  *   publicNotifications?: (config: any) => object,
  *   dispatchRun?: (input: any) => Promise<Array<{kind: string, target: string, ok: boolean, detail: string}>>,
  *   send?: Function,
+ *   describeProject?: (config: any) => object,
  *   runAudit?: (input: any) => Promise<unknown>,
  * }} SeoDeps
  */
@@ -323,6 +324,19 @@ async function createSeoService(context, deps, limits = {}) {
         return res.status(404).json({message: 'the SEO service is not set up for this project'});
       }
       return res.json(publicProject(seo));
+    })
+  );
+
+  // What the settings form offers (presets, categories, audits) and what the saved settings come to, audit by audit.
+  management.get(
+    '/projects/:projectId/meta',
+    admin,
+    handleAsyncError(async (req, res) => {
+      if (!deps.describeProject) {
+        return res.status(501).json({message: 'not available on this server'});
+      }
+      const seo = await store.getProject(req.params.projectId);
+      return res.json(deps.describeProject(seo ? parseJson(seo.config, {}) : {}));
     })
   );
 

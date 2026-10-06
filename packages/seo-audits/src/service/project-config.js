@@ -170,4 +170,32 @@ function resolveAssertions(config, recommended) {
   return assertions;
 }
 
-export {PRESETS, DEFAULT_PRESET, SEVERITIES, validateConfig, resolveSeverities, resolveAssertions};
+/**
+ * What a settings form needs: the presets, and the audits a project can switch, grouped by category, each with its
+ * recommended severity. Informational audits are left out (they cannot be asserted).
+ * @param {Recommended} recommended
+ * @return {{defaultPreset: string, severities: string[], presets: Array<{name: string, description: string}>, categories: Array<{name: string, audits: Array<{id: string, recommended: string}>}>}}
+ */
+function describeOptions(recommended) {
+  return {
+    defaultPreset: DEFAULT_PRESET,
+    severities: [...SEVERITIES],
+    presets: Object.entries(PRESETS).map(([name, p]) => ({name, description: p.description})),
+    categories: CATEGORIES.map(c => ({
+      name: c.name,
+      audits: c.audits
+        .filter(id => recommended[id])
+        .map(id => ({id, recommended: recommended[id][0]})),
+    })).filter(c => c.audits.length > 0),
+  };
+}
+
+export {
+  PRESETS,
+  DEFAULT_PRESET,
+  SEVERITIES,
+  describeOptions,
+  validateConfig,
+  resolveSeverities,
+  resolveAssertions,
+};

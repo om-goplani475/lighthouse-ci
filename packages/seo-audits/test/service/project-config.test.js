@@ -8,6 +8,7 @@
 
 const {
   PRESETS,
+  describeOptions,
   validateConfig,
   resolveSeverities,
   resolveAssertions,
@@ -132,5 +133,23 @@ describe('project config', () => {
         /unknown preset "x".*unknown audit "y"/
       );
     });
+  });
+});
+
+describe('describeOptions', () => {
+  const options = describeOptions(recommended);
+
+  it('lists every preset with a description, and the default one', () => {
+    expect(options.presets.map(p => p.name)).toEqual(Object.keys(PRESETS));
+    expect(options.presets.every(p => p.description.length > 10)).toBe(true);
+    expect(options.defaultPreset).toBe('seo:recommended');
+    expect(options.severities).toEqual(['error', 'warn', 'off']);
+  });
+
+  it('lists exactly the audits that can be switched, each once, with its recommended severity', () => {
+    const listed = options.categories.flatMap(c => c.audits);
+    expect(listed.map(a => a.id).sort()).toEqual(Object.keys(recommended).sort());
+    for (const a of listed) expect(a.recommended).toBe(recommended[a.id][0]);
+    expect(options.categories.every(c => c.audits.length > 0)).toBe(true);
   });
 });
