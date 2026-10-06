@@ -211,6 +211,15 @@ const CATEGORIES = [
       'video-thumbnail-reachable',
     ],
   },
+  {
+    name: 'Entity and identity',
+    audits: [
+      'entity-same-as-values',
+      'entity-same-as-reachable',
+      'entity-identity-consistency',
+      'entity-disambiguation',
+    ],
+  },
 ];
 
 /**

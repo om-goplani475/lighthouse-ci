@@ -174,6 +174,10 @@ const config = {
     './audits/video-sitemap-valid.js',
     './audits/video-discoverability.js',
     './audits/video-thumbnail-reachable.js',
+    './audits/entity-same-as-values.js',
+    './audits/entity-same-as-reachable.js',
+    './audits/entity-identity-consistency.js',
+    './audits/entity-disambiguation.js',
   ],
   categories: {
     'seo-extended': {
@@ -300,6 +304,10 @@ const config = {
         {id: 'video-sitemap-valid', weight: 1},
         {id: 'video-discoverability', weight: 0.5},
         {id: 'video-thumbnail-reachable', weight: 0.5},
+        {id: 'entity-same-as-values', weight: 0.5},
+        {id: 'entity-same-as-reachable', weight: 0.5},
+        {id: 'entity-identity-consistency', weight: 0.5},
+        {id: 'entity-disambiguation', weight: 1},
       ],
     },
   },
