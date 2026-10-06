@@ -7,8 +7,9 @@
  * region code exists is answered by the runtime's own locale data (`Intl.DisplayNames`), so no list of codes is
  * kept here. No I/O, never throws.
  *
- * Rules: the language is a two-letter code (ISO 639-1); a three-letter code is refused with the two-letter
- * suggestion where one is known; a script is any four letters; a region is a two-letter code that the locale data
+ * Rules: the language is a two-letter code (ISO 639-1); a three-letter code that has a two-letter form is refused
+ * with that suggestion, and one without (fil, yue, haw) is accepted when the locale data knows it, as Lighthouse
+ * core does; a script is any four letters; a region is a two-letter code that the locale data
  * knows, or three digits (a UN M.49 area such as `es-419`); an underscore is refused with the hyphen form; case is
  * not significant. The common mistake `UK` is refused with `GB`.
  */
@@ -140,20 +141,22 @@ function parseHreflang(value) {
     });
   }
   const [language, ...rest] = parts;
-  if (!/^[a-z]{2}$/.test(language)) {
-    const known = /** @type {Record<string, string>} */ (THREE_LETTER)[language];
+  const suggested = /** @type {Record<string, string>} */ (THREE_LETTER)[language];
+  if (suggested) {
     return result(raw, {
-      problem: /^[a-z]{3}$/.test(language)
-        ? 'hreflang needs a two-letter language code (ISO 639-1), not a three-letter one'
-        : 'the language part is not a two-letter language code',
-      suggestion: known ? [known, ...rest].join('-') : null,
+      problem: 'hreflang needs a two-letter language code (ISO 639-1), not a three-letter one',
+      suggestion: [suggested, ...rest].join('-'),
     });
+  }
+  if (!/^[a-z]{2,3}$/.test(language)) {
+    return result(raw, {problem: 'the language part is not a two-letter language code'});
   }
   if (!isKnownLanguage(language)) {
     return result(raw, {
-      problem: isKnownRegion(language)
-        ? `"${raw}" looks like a country code; hreflang needs the language first (for example en-${language.toUpperCase()})`
-        : `"${language}" is not a language code`,
+      problem:
+        language.length === 2 && isKnownRegion(language)
+          ? `"${raw}" looks like a country code; hreflang needs the language first (for example en-${language.toUpperCase()})`
+          : `"${language}" is not a language code`,
       language,
     });
   }

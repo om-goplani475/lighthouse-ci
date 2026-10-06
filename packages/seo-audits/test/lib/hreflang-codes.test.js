@@ -65,7 +65,12 @@ describe('parseHreflang: invalid values and suggestions', () => {
     expect(ok('eng')).toMatchObject({valid: false, suggestion: 'en'});
     expect(ok('fra-CA')).toMatchObject({valid: false, suggestion: 'fr-ca'});
     expect(ok('xyz').suggestion).toBeNull();
+    expect(ok('xyz').problem).toMatch(/not a language code/);
     expect(ok('eng').problem).toMatch(/two-letter language code/);
+  });
+
+  it('accepts a three-letter language that has no two-letter form, as Lighthouse core does', () => {
+    for (const code of ['fil', 'yue', 'haw', 'fil-PH']) expect(ok(code).valid).toBe(true);
   });
 
   it('refuses a bare country code and tells the author to put the language first', () => {
