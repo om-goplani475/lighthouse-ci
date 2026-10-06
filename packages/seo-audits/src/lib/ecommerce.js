@@ -15,10 +15,20 @@
  * the others are advice (a partial score, the warn tier).
  */
 
-import {Audit} from 'lighthouse/core/audits/audit.js';
 import {hasType, isProduct} from './structured-facts.js';
 import {buildGraph, crawlCompleteness} from './crawl-graph.js';
 import {scriptBuiltContent} from './crawl-coverage.js';
+import {
+  clip,
+  count,
+  notApplicable,
+  table,
+  usableSnapshot,
+  auditedPageProblem,
+  sitemapCoverageProduct,
+  listedUrls,
+  isIndexablePage,
+} from './vertical-common.js';
 import {looseKey} from './url-key.js';
 import {isTrackingParam, isSessionParam} from './url-quality.js';
 
@@ -28,8 +38,6 @@ import {isTrackingParam, isSessionParam} from './url-quality.js';
 /** @typedef {import('lighthouse/types/audit.js').default.Product} Product */
 /** @typedef {{product: string, check: string, detail: string}} Finding */
 
-const MAX_ROWS = 50;
-const MAX_CELL_CHARS = 200;
 const MIN_FACET_URLS = 20;
 const MIN_FACET_PARAMS = 2;
 const MIN_LISTING_LINKS = 3;
@@ -64,21 +72,6 @@ const VARIES_BY = new Set([
   'suggestedgender',
 ]);
 const PAGINATION_PARAMS = new Set(['page', 'p', 'pg', 'paged', 'pagenumber', 'offset', 'start']);
-
-/** @param {string} text @return {string} */
-function clip(text) {
-  return text.length <= MAX_CELL_CHARS ? text : `${text.slice(0, MAX_CELL_CHARS)}...`;
-}
-
-/** @param {number} n @param {string} noun @return {string} */
-function count(n, noun) {
-  return `${n} ${noun}${n === 1 ? '' : 's'}`;
-}
-
-/** @param {string} explanation @return {Product} */
-function notApplicable(explanation) {
-  return {score: 1, notApplicable: true, explanation};
-}
 
 /** @param {Entity} e @return {string} */
 function label(e) {
@@ -124,18 +117,6 @@ function gtinProblem(key, value) {
     return `${key} has ${value.length} digits (expected ${want.join(' or ')})`;
   }
   return gtinCheckDigitOk(value) ? null : `${key} "${value}" has an invalid check digit`;
-}
-
-/**
- * @param {Array<{heading: string, key: string}>} columns
- * @param {Array<Record<string, string>>} rows
- * @return {import('lighthouse/types/audit.js').default.Details.Table}
- */
-function table(columns, rows) {
-  return Audit.makeTableDetails(
-    columns.map(c => ({key: c.key, valueType: /** @type {const} */ ('text'), label: c.heading})),
-    rows.slice(0, MAX_ROWS)
-  );
 }
 
 // ---------------------------------------------------------------- product-identifiers
@@ -535,46 +516,7 @@ function variantsProduct(entities) {
  * @return {boolean} Whether the crawled page is a product page worth judging: read, status 200, not noindex, with product markup.
  */
 function isProductPage(page) {
-  if (page.extraction !== 'ok' || page.status !== 200) return false;
-  if (page.robotsMetas.some(m => /noindex|none/i.test(m.content))) return false;
-  if (page.xRobotsTag.some(v => /noindex|none/i.test(v))) return false;
-  return (page.entities || []).some(isProduct);
-}
-
-/**
- * @param {SiteCrawlArtifact} artifact
- * @return {{snapshot: NonNullable<SiteCrawlArtifact['snapshot']>} | {reason: string}}
- */
-function usableSnapshot(artifact) {
-  if (!artifact || !artifact.snapshot) {
-    return {
-      reason:
-        artifact && artifact.state === 'disabled'
-          ? 'The site crawl is switched off.'
-          : 'The site crawl was not collected.',
-    };
-  }
-  return {snapshot: artifact.snapshot};
-}
-
-/**
- * @param {NonNullable<SiteCrawlArtifact['snapshot']>} snapshot
- * @return {string | null} Why the audited page cannot be used to judge product markup, or null when it was read in full.
- */
-function auditedPageProblem(snapshot) {
-  const audited = snapshot.pages.find(p => p.source === 'audited');
-  if (!audited) return 'The crawl did not include the audited page.';
-  if (audited.extraction === 'error' || audited.status === null) {
-    return 'The crawler could not fetch the audited page.';
-  }
-  if (!(audited.status >= 200 && audited.status < 300)) {
-    return `The crawler got status ${audited.status} for the audited page (a site can answer a crawler differently from a browser), so its product markup was not read.`;
-  }
-  if (audited.extraction !== 'ok') return 'The crawler could not read the audited page as HTML.';
-  if (audited.truncated) {
-    return 'The crawler read only the start of the audited page (it is larger than the size cap), so markup near its end may be missing.';
-  }
-  return null;
+  return isIndexablePage(page) && (page.entities || []).some(isProduct);
 }
 
 /**
@@ -662,87 +604,6 @@ function facetedProduct(artifact) {
       }))
     ),
   };
-}
-
-/**
- * @param {import('./sitemap-parse.js').SitemapDocumentsArtifact | null | undefined} sitemaps
- * @return {{listed: Set<string>} | {reason: string}} The set of listed URLs, or why a "not listed" verdict cannot be trusted.
- */
-function listedUrls(sitemaps) {
-  if (!sitemaps || sitemaps.discovery === 'none' || sitemaps.discovery === 'unavailable') {
-    return {reason: 'No sitemap was found, so there is nothing to compare with.'};
-  }
-  if (sitemaps.documentsTruncated) {
-    return {
-      reason:
-        'The sitemap has more files than were read, so a page missing from it cannot be proved.',
-    };
-  }
-  const docs = sitemaps.documents || [];
-  if (docs.some(d => d.outcome !== 'ok' || d.entriesTruncated || d.kind === 'invalid')) {
-    return {
-      reason:
-        'A sitemap file could not be read in full, so a page missing from it cannot be proved.',
-    };
-  }
-  /** @type {Set<string>} */
-  const listed = new Set();
-  for (const d of docs) {
-    if (d.kind !== 'urlset') continue;
-    for (const loc of d.locs) {
-      const key = looseKey(loc);
-      if (key) listed.add(key);
-    }
-  }
-  return listed.size ? {listed} : {reason: 'The sitemap lists no URLs.'};
-}
-
-/**
- * @param {SiteCrawlArtifact} artifact
- * @param {import('./sitemap-parse.js').SitemapDocumentsArtifact | null | undefined} sitemaps
- * @param {(page: CrawlPage) => boolean} isTarget Which crawled pages are the ones that should be listed.
- * @param {string} noun For messages, for example "product".
- * @return {Product}
- */
-function sitemapCoverageProduct(artifact, sitemaps, isTarget, noun) {
-  const usable = usableSnapshot(artifact);
-  if (!('snapshot' in usable)) return notApplicable(usable.reason);
-  const targets = usable.snapshot.pages.filter(isTarget);
-  if (targets.length === 0) {
-    const problem = auditedPageProblem(usable.snapshot);
-    return notApplicable(problem || `The crawl found no ${noun} pages.`);
-  }
-  const listed = listedUrls(sitemaps);
-  if (!('listed' in listed)) return notApplicable(listed.reason);
-  const audited = usable.snapshot.pages.find(p => p.source === 'audited');
-  const missing = targets.filter(
-    p => !listed.listed.has(looseKey(p.finalUrl) || '') && !listed.listed.has(looseKey(p.url) || '')
-  );
-  if (missing.length === 0) {
-    return {score: 1, displayValue: `${count(targets.length, `${noun} page`)} listed`};
-  }
-  const auditedMissing = !!audited && missing.includes(audited);
-  /** @type {Product} */
-  const product = {
-    // As the other cross-page audits: the audited page is what is judged; the rest are listed.
-    score: auditedMissing ? 0.5 : 1,
-    displayValue: `${missing.length} of ${targets.length} ${noun} pages not listed`,
-    details: table(
-      [
-        {key: 'url', heading: 'Page'},
-        {key: 'note', heading: 'Note'},
-      ],
-      missing.map(p => ({url: clip(p.finalUrl), note: p === audited ? 'The audited page' : ''}))
-    ),
-  };
-  if (auditedMissing) {
-    product.explanation = `This ${noun} page is not in any sitemap. Sitemaps help crawlers find and recrawl pages; list every page you want indexed.`;
-  } else {
-    product.explanation = `${missing.length} other crawled ${noun} page${
-      missing.length === 1 ? ' is' : 's are'
-    } not in any sitemap (listed below, not judged). The audited page is listed.`;
-  }
-  return product;
 }
 
 /** @param {SiteCrawlArtifact} artifact @param {import('./sitemap-parse.js').SitemapDocumentsArtifact | null | undefined} sitemaps @return {Product} */
