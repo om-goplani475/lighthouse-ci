@@ -1,6 +1,6 @@
 # Phase 17: CI/DevOps and webhook platform
 
-Status: **slices 1-4 built** on branch `phase-17-ci-devops`. Build mode: full pipeline, in slices; each slice is tested, then committed on approval.
+Status: **slices 1-5 built** on branch `phase-17-ci-devops`. Build mode: full pipeline, in slices; each slice is tested, then committed on approval.
 
 ## Goal
 
@@ -25,7 +25,7 @@ Other repositories do not install `@lhci/cli` or run Chrome. They send a webhook
 2. **Webhook verification** *(done)* (`src/service/webhook-signature.js`, `webhook-payload.js`, `host-allow-list.js`): HMAC check, replay window, GitHub/GitLab payload normalisation to `{repo, prNumber, sha, url}`.
 3. **Storage and routes** *(done)* (`packages/server/src/seo/`): tables `seo_projects`, `seo_runs`, `seo_webhook_logs`; routes; queue; three lines in `server.js`.
 4. **Runner** *(done)*: executes `collect` for the URL with the resolved config, runs Phase 16 summary and compare against the baseline.
-5. **Dispatcher**: PR comment (GitHub first, GitLab second), Slack/Teams alerts.
+5. **Dispatcher** *(done)*: PR comment (GitHub first, GitLab second), Slack/Teams alerts.
 6. **Dashboard** (server UI, new route directory): on-demand run, rules editor, webhook log, run history.
 7. **Docs, QA against a real run, security review.**
 
@@ -56,3 +56,13 @@ Other repositories do not install `@lhci/cli` or run Chrome. They send a webhook
 - **Real end-to-end run** (real server, signed webhook, queue, runner, Chrome, `web.dev`): done in about 2 minutes while the machine was busy; a second run on a `feat` branch with `baseBranch: main` came back with a comparison (delta 0); a private URL was refused with 422.
 - **Server wiring:** `load-deps.js` builds the real runner; `@lhci/cli` was added to the server's dependencies (no cycle; `yarn install --frozen-lockfile` passes).
 - **Not covered:** a hostile page cannot be stopped from using Chrome's CPU for the whole run timeout (10 minutes); the queue and rate limits bound how many such runs happen. A site that serves different content to the proxy's address cannot be told apart from one that does not.
+
+## Slice 5 as built: the dispatcher
+
+- **`outbound.js`** is the only way the service sends a request: https only, no credentials in the URL, public addresses only (same lookup guard as the audits; the connection goes to the address that was checked), **no redirects followed** (a redirect could carry a token to another host), a 10 s timeout and a 1 MB response cap. Checked against real `api.github.com` over TLS; `localhost` and `127.0.0.1` are refused.
+- **`notifier.js`** decides where a project may send things: Slack only to `hooks.slack.com`; Teams only to `*.webhook.office.com`, `outlook.office.com`, `*.logic.azure.com` or `*.environment.api.powerplatform.com`; GitHub and GitLab to their cloud API, or a self-hosted `apiBase` that is https, a public host name, with no query. Tokens must be printable ASCII with no spaces (no header injection). Every error text passes through `redact`, so a token or webhook URL never reaches a result, a log row or the API.
+- **Sticky pull request comment** (`pr-comment.js`): the first line is a hidden marker `<!-- lhci-seo-audit:<projectId> -->`. The service lists the pull request's comments (up to 5 pages of 100), edits the one with the marker, or posts a new one; if the marked comment cannot be edited (403/404, for example someone else pasted the marker) it posts its own. GitHub uses `PATCH`, GitLab `PUT` with `PRIVATE-TOKEN`. It shows the score and grade, the change since the baseline, per-category movement, new / fixed / still-failing issues (10 per list), a link to the report when `LHCI_SEO_PUBLIC_URL` is set (the dashboard route comes in slice 6), and stays under 60,000 characters (GitHub's limit is 65,536).
+- **Text from the audited page is hostile.** It goes through the table-cell escaper; `@` is broken with a zero-width space so a page cannot make a comment notify a user or team; Slack control sequences (`<!channel>`, links, `&`) are escaped; a report link is percent-encoded including parentheses (`encodeURIComponent` leaves them alone, which would have broken the markdown link: caught by a test).
+- **Alerts** go to Slack and/or Teams for a **new critical regression**: an error-tier audit from a fixed list (`robots-directives-conflict`, `indexability-conflicts`, `robots-txt-crawler-access`, `canonical-conflicts`, `canonical-https`, `redirect-loop`, `sitemap-valid`, `mixed-content`, `ssl-certificate-expiry`; a project can pick its own list) that fails now and did not in the baseline, **or** a page whose Lighthouse `is-crawlable` score fell from 1 to 0 (an accidental `noindex` or robots block; `indexability-verdict` is informational, so the runner records Lighthouse's own `is-crawlable` and `http-status-code` as signals). Needs a baseline: on a first audit nothing is "new", so a site that was already broken does not page anyone. By default only runs that are not pull requests alert (`alerts.includePullRequests` turns it on). Teams gets a legacy MessageCard for `webhook.office.com` and an Adaptive Card for Workflows hosts.
+- **Server:** a new table `seo_notifications` (secrets, stored like the webhook secret, never returned) and routes `GET|PUT /api/v1/seo/projects/:id/notifications` (admin token; a patch merges, `null` removes, the merged result is validated too). Dispatch happens after a run is saved as done; a failure is logged (`comment-posted`, `comment-failed`, `alert-sent`, `alert-failed`) and **never changes the run's status**. One retry on a network error, 429 or 5xx; at most 60 s for all sending.
+- **Not verified:** posting to a real GitHub or GitLab pull request and sending to a real Slack or Teams webhook. That needs your tokens and webhook URLs; the requests are tested against fakes of the documented APIs. A GitHub App installation token works as the token; GitHub App registration itself is not built.
