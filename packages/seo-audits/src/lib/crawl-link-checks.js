@@ -10,7 +10,8 @@
  * Rules, chosen with the developer:
  *   - every link on every crawled page is judged, not only the audited page's (a broken link on another crawled
  *     page fails the run, and the audited page's rows come first);
- *   - broken: the target answered 4xx or 5xx, or did not answer at all;
+ *   - broken: the target answered 4xx or 5xx, or did not answer at all; except 401, 403 and 429, which usually mean
+ *     bot protection or a rate limit rather than a dead link, so they are counted and not judged;
  *   - redirecting: the target redirects exactly once; only a permanent redirect (301 or 308) fails, a temporary
  *     one (302, 303, 307) is listed with a note;
  *   - chain: the target redirects two or more times, or in a circle: fails whatever the statuses.
@@ -34,6 +35,7 @@ import {normalizeUrl} from './crawl-snapshot.js';
 const MAX_ROWS = 50;
 const MAX_CELL_CHARS = 200;
 const PERMANENT = new Set([301, 308]);
+const NOT_JUDGED = new Set([401, 403, 429]);
 
 /**
  * @param {string} text
@@ -308,8 +310,16 @@ function pagesText(problems) {
 function buildBrokenLinksProduct(artifact) {
   const collected = collectOutcomes(artifact);
   if ('product' in collected) return collected.product;
-  const broken = collected.outcomes.filter(o => o.status === null || o.status >= 400);
-  const coverage = coverageText(collected);
+  const failing = collected.outcomes.filter(o => o.status === null || o.status >= 400);
+  const broken = failing.filter(o => !NOT_JUDGED.has(Number(o.status)));
+  const blocked = failing.length - broken.length;
+  const coverage =
+    coverageText(collected) +
+    (blocked
+      ? `; ${count(blocked, 'link')} answered 401, 403 or 429 (often bot protection) and ${
+          blocked === 1 ? 'was' : 'were'
+        } not judged`
+      : '');
   if (broken.length === 0) {
     return {score: 1, displayValue: `No broken links (${coverage})`};
   }

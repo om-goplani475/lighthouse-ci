@@ -124,6 +124,25 @@ describe('broken-internal-links', () => {
     ]);
   });
 
+  it('does not judge 401, 403 and 429 (bot protection), and says how many it skipped', () => {
+    const blockedOnly = run([
+      audited('/', {links: ['/a', '/b', '/c']}),
+      page('/a', {status: 403, extraction: 'skipped-status'}),
+      page('/b', {status: 429, extraction: 'skipped-status'}),
+      page('/c', {status: 401, extraction: 'skipped-status'}),
+    ]);
+    expect(blockedOnly.score).toBe(1);
+    expect(blockedOnly.displayValue).toMatch(/3 links answered 401, 403 or 429/);
+    const mixed = run([
+      audited('/', {links: ['/a', '/b']}),
+      page('/a', {status: 403, extraction: 'skipped-status'}),
+      page('/b', {status: 404, extraction: 'skipped-status'}),
+    ]);
+    expect(mixed.score).toBe(0);
+    expect(mixed.displayValue).toBe('1 broken link on 1 page');
+    expect(mixed.details.items).toHaveLength(1);
+  });
+
   it('judges every crawled page’s links and puts the audited page’s rows first', () => {
     const product = run([
       audited('/', {links: ['/ok', '/gone1']}),

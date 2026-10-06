@@ -11,7 +11,7 @@ const UIStrings = {
   title: 'No internal link points at a page that is broken',
   failureTitle: 'Internal links point at pages that are broken',
   description:
-    'Fails when an internal link on any crawled page points at a page that answers 4xx or 5xx, or does not answer. Links on the audited page that the crawl did not read are status-checked too (up to 100, no bodies read; LHCI_SEO_CRAWL_MAX_LINK_CHECKS). Links are read from the server HTML of the pages the site crawl reached; a target the crawl did not ' +
+    'Fails when an internal link on any crawled page points at a page that answers 4xx or 5xx, or does not answer (401, 403 and 429 usually mean bot protection and are counted, not judged). Links on the audited page that the crawl did not read are status-checked too (up to 100, no bodies read; LHCI_SEO_CRAWL_MAX_LINK_CHECKS). Links are read from the server HTML of the pages the site crawl reached; a target the crawl did not ' +
     'read or check is not judged, and the result says how many. See crawl-coverage for how much of the site was seen.',
 };
 
