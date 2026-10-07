@@ -1,7 +1,8 @@
 # Current feature
 
-- slug: vertical-audits
-- stage: built vertical by vertical (full pipeline, one approval per vertical, then blanket approval for the rest of the branch), QA'd live; merge into main pending approval
-- spec: docs/phases/phase-18-vertical-audits.md
+- slug: sarif-export
+- stage: next slice of Phase 19 (slice 1, secrets at rest, is built and committed; slice 2 not started)
+- spec: docs/phases/phase-19-reporting-and-hardening.md
 - base_branch: main
-- phase: 18 (vertical audits), branch phase-18-vertical-audits: security headers, e-commerce, local, news, video and entity, 26 audits
+- phase: 19 (reporting and hardening), branch phase-19-reporting-and-hardening
+- previous: Phase 18 (vertical audits) merged into main 2026-10-07 (125 audits); Phase 17 (webhook platform) merged 2026-10-06

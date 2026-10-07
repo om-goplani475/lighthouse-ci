@@ -682,3 +682,11 @@ New: `packages/seo-audits/src/service/` (project config, webhook signature, payl
 - **Entity (4):** `entity-same-as-values`, `entity-same-as-reachable`, `entity-identity-consistency`, `entity-disambiguation`.
 
 **Changes that affect existing behaviour:** the crawl snapshot is version 3 (each crawled page records its structured-data `entities`; an old cache is simply not used); the crawler's per-page body cap is 2 MiB, up from 512 KiB, because structured data often sits at the end of a heavy page; the sitemap gatherer's documents now also carry the Google News and video extension entries. New variable: `LHCI_SEO_SAMEAS_MAX_CHECKS` (default 8; `0` switches the `sameAs` probe off). New requests, to other sites: up to 8 `sameAs` addresses and up to 5 video thumbnails per run, status only. See `docs/phases/phase-18-vertical-audits.md`, `docs/qa/vertical-audits.md` and the README.
+
+## 2026-10-07 — test-webhook tool and workflow pin (after Phase 17)
+
+New command `send-test-webhook` (`packages/seo-audits/src/service/send-test-webhook.js`): sends one signed test delivery to a project's webhook so a setup can be checked without a real pull request. The manual workflow `.github/workflows/seo-audit.yml` now pins its runner to `ubuntu-24.04` (a new default image can no longer change Chrome and system libraries unnoticed) and uses the Node 24 majors of `checkout`, `setup-node` and `upload-artifact` (v7). It has not been re-run on GitHub yet. No change to the audits.
+
+## 2026-10-07 — secrets at rest (Phase 19, slice 1)
+
+The webhook service can now encrypt what it stores: each project's webhook secret and its notification settings (GitHub/GitLab tokens, Slack and Teams URLs) are sealed with AES-256-GCM when `LHCI_SEO_SECRET_KEY` is set (`openssl rand -hex 32`). Plain rows are sealed at the next start; `LHCI_SEO_SECRET_KEY_PREVIOUS` rotates the key. With a wrong or missing key a project's webhooks answer 503 and nothing falls back to plain text. Without a key nothing changes except a start-up warning. The `webhookSecret` column is now 255 wide (an existing MySQL table needs an `ALTER TABLE`, see `.ai-agents/state/security-findings.md`).

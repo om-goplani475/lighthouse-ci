@@ -1049,7 +1049,7 @@ The LHCI server (`packages/server`) can run the audits for other repositories, s
 ### Audit index (all 125 audits)
 
 Phase is the fork's own phase number. **Scoring** is what the audit reports; **Recommended assertion** is the severity `src/recommended-assertions.json` uses (`error` for objective defects, `warn` for the rest;
-informational audits are reports and cannot be asserted at all). 57 are scored (28 recommended at `error`, 29 at `warn`) and 42 are informational.
+informational audits are reports and cannot be asserted at all). 79 are scored (31 recommended at `error`, 48 at `warn`) and 46 are informational.
 
 | Phase | Audit | Scoring | Recommended assertion |
 |---|---|---|---|

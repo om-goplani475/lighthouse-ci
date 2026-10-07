@@ -1,6 +1,6 @@
 # Phase 17: CI/DevOps and webhook platform
 
-Status: **complete (slices 1-7); merge into main pending approval** on branch `phase-17-ci-devops`. Build mode: full pipeline, in slices; each slice is tested, then committed on approval.
+Status: **Done (slices 1-7), merged into `main`** (2026-10-06; the branch `phase-17-ci-devops` is deleted). The test-webhook tool was added afterwards and merged too. Build mode: full pipeline, in slices; each slice is tested, then committed on approval.
 
 ## Goal
 

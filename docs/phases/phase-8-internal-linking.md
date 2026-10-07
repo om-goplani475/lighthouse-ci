@@ -6,7 +6,7 @@ not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
-**Status: in progress (2026-10-05).** Items 0 (the crawler extension), 1 and 2 (the link-graph audits) 3 (the internal link checks), 4 (anchor text) and 5 (pagination) are built and QA'd live; item 6 (broken external links) is the last.
+**Status: Done (2026-10-05), merged into `main`.** Items 0 (the crawler extension), 1 and 2 (the link-graph audits), 3 (the internal link checks), 4 (anchor text), 5 (pagination) and 6 (broken external links) are built and QA'd live.
 
 ## Planning decisions (2026-10-05)
 

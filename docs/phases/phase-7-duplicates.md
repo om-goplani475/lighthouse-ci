@@ -6,7 +6,7 @@ deferred, to-do-later, or marked not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
-**Status: complete (2026-10-02).** All four audits and the crawler core are done, QA'd live and security-reviewed (`docs/qa/site-crawler.md`, `docs/qa/phase-7-cross-page-audits.md`); see "Closing record" at the bottom.
+**Status: Done (2026-10-02), merged into `main`.** All four audits and the crawler core are done, QA'd live and security-reviewed (`docs/qa/site-crawler.md`, `docs/qa/phase-7-cross-page-audits.md`); see "Closing record" at the bottom.
 
 ## Planning decisions (2026-10-01)
 

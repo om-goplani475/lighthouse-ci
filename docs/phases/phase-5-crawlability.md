@@ -6,7 +6,7 @@ every item is done, deferred, to-do-later, or marked not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
-**Status: complete (2026-10-01).** All five items done (1-3 `transport-security`, 5 `soft-not-found`, 4 `url-variants`), merged into this branch and QA'd live. **Merged into `main`** (`--ff-only`, 2026-10-01, branch deleted; see "Closing record" at the bottom).
+**Status: Done (2026-10-01).** All five items done (1-3 `transport-security`, 5 `soft-not-found`, 4 `url-variants`), merged into this branch and QA'd live. **Merged into `main`** (`--ff-only`, 2026-10-01, branch deleted; see "Closing record" at the bottom).
 
 ## Planning decisions (2026-10-01)
 

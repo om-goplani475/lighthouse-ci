@@ -12,6 +12,8 @@ picked up after this point should still go through the normal `feat/{slug}` → 
 used throughout, not a phase branch — phase 2 is staying on the pre-phase-branch model for
 consistency with its own history, not because the new convention doesn't apply to it.
 
+**Status: Done. Merged into `main`** (all five features, directly, before the phase-branch convention).
+
 Status values: **done** (merged + QA'd live, not just unit-tested) · **in progress** · **planned**.
 See the three buckets below for everything intentionally not built, and why.
 

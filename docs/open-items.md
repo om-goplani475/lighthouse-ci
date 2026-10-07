@@ -1,8 +1,8 @@
 # Open items
 
-Rewritten 2026-10-06 at `main` = `16ab82d` (Phases 1-15 merged, calibration rounds 1-3 merged). This file lists only what is **still open**: checks not yet
+Reconciled 2026-10-07 at `main` = `7ce76db`: Phases 1 to 18 are built and merged (Phase 19 is in progress on its own branch). This file lists only what is **still open**: checks not yet
 done, decisions waiting, and deferred features. What was finished is in `docs/phases/`, `docs/qa/`, `.ai-agents/state/changelog-draft.md`,
-`.ai-agents/state/security-findings.md` and `seo-audits-review-2026-10-05.md` (the review and its status notes).
+`.ai-agents/state/security-findings.md` and `docs/seo-audits-phase-0-to-15-review.md` (the review of Phases 0 to 15, kept as a historical record).
 
 ## 1. Where things stand
 
@@ -10,33 +10,20 @@ done, decisions waiting, and deferred features. What was finished is in `docs/ph
 |------|-------|
 | Webhook platform | Phase 17 (`packages/server/src/seo/`, `packages/seo-audits/src/service/`, the dashboard): built and QA'd live; see the README and `docs/qa/webhook-platform.md`. |
 | Summary command | `packages/seo-audits/src/summary/cli.js` (Phase 16) scores, ranks and compares the reports; see the README. |
-| Audits | 125 in the `seo-extended` category (Phase 18 on its branch, merge pending): 79 scored (31 error tier, 48 warn tier) and 46 informational. `packages/seo-audits/src/recommended-assertions.json` asserts the scored ones. |
-| `seo-audits` tests | 117 suites / 2,027 tests pass, on Node 24 and on Node 18.20.8 (what CI pins), checked 2026-10-06. Typecheck, lint and prettier clean. |
+| Audits | 125 in the `seo-extended` category (Phase 18 merged 2026-10-07), from 18 gatherers: 79 scored (31 error tier, 48 warn tier) and 46 informational. `packages/seo-audits/src/recommended-assertions.json` asserts the scored ones. |
+| Tests | The `seo-audits` suites (138 suites / 2,439 tests) pass on Node 24 and on Node 18.20.8 (what CI pins), checked 2026-10-06; a full-repository run on 2026-10-07 had only the known failures below plus two load timeouts that pass alone. Typecheck and lint clean. |
 | Security findings | **None open.** Findings 1-10 are fixed. One risk is *accepted*, not fixed: `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control (the README says so). |
 | Viewer | `@lhci/viewer` renders all 34 audits that had tables in five real reports (2026-10-06); the server and `seed-database` path was checked on 2026-10-05. |
-| Phase 17 not built | Per-template grouping of pages, scheduled crawl diffs with alerting, SARIF output, GitHub App registration, a stored score column for the run list. (Secrets at rest: built in Phase 19.) See `docs/phases/phase-17-webhook-platform.md`. |
+| Not built yet | Phase 19 (in progress): SARIF, reporting and history, SERP preview, template detection (secrets at rest is built). Phase 20: scheduled monitoring and the GitHub App. AI-generated fixes are not planned. See `docs/phases/phase-19-reporting-and-hardening.md`. |
 | Failing suites outside `seo-audits` | 6 screenshot suites in `server` and `viewer` fail on this machine only (see section 4); the rest pass. Not caused by this work. |
-| Not verified at all | The CrUX success path with a real key (E). A real pull request comment, Slack and Teams alert and GitHub/GitLab webhook delivery (H). The real GitHub Actions run (A3) passed on 2026-10-06. |
+| Not verified at all | The CrUX success path with a real key (E). A real pull request comment, Slack and Teams alert and GitHub/GitLab webhook delivery (H). The workflow after the 2026-10-07 change (actions v7, runner `ubuntu-24.04`) has not run on GitHub yet (A3). |
 
 ## 2. Checks still to do
 
-### A3. A real GitHub Actions run with the fork config (DONE 2026-10-06 on web.dev; two follow-ups are yours)
+### A3. Re-run the GitHub Actions workflow after the 2026-10-07 change (needs you)
 
-**Result** (the manual workflow `.github/workflows/seo-audit.yml`, `ubuntu-latest`, Node 18, page `https://web.dev/`, crawl limited to 30 pages / 60 s):
-
-| Check | Result |
-|---|---|
-| Fork's own `lhci` after `yarn install --frozen-lockfile` | passed; `yarn.lock` unchanged; "Extended SEO (fork)" present, **57 of 57** scored audits ran, no runtime error |
-| Global `@lhci/cli@0.15.x` (its own Lighthouse 12.6.1 copy) with the fork config | passed: same category, 57 of 57, no "audit not found"; comparing its report with the fork-checkout report: **0 differences** |
-| Egress and DNS | fine: web.dev, its sitemap and its alternates were all reached |
-| Cost and time | crawl of 28 of 30 pages in 28 to 30 s; sitemap 20 s; hreflang 4 to 5 s; whole run **71 s** in both jobs (local: 95 s); `yarn install` about 6 min once |
-| Job result | red, by design: the assertions fail on genuine findings (`hreflang-codes`: an invalid `pt-BR-cn`, an `x-default` pointing at two URLs; noindex alternates) |
-
-Found and fixed along the way: the reports were not uploaded because `upload-artifact` skips hidden folders (`include-hidden-files: true`), and the elapsed time came out blank when `lhci` failed.
-
-**Still yours (optional):** run it on **your own site**, and once with `runs: 3`, to see the per-run requests repeat and whether your site's WAF tolerates them. If it does not, lower `LHCI_SEO_CRAWL_MAX_PAGES`,
-`LHCI_SEO_CRAWL_MAX_LINK_CHECKS`, `LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS` and `LHCI_SEO_HREFLANG_MAX_CHECKS` (the README's request-budget table lists them all). Not verified on a runner: a site with a known dead external link failing
-`broken-external-links`, and a runner with no outbound access degrading to "unreliable" rather than to false "broken" links.
+The first real run (2026-10-06, `https://web.dev/`) passed every check: the fork's `lhci` and the global `@lhci/cli` gave identical reports (0 differences), 57 of 57 scored audits ran then, the whole run took 71 s. Since then the workflow moved its actions to v7 and pinned the runner to `ubuntu-24.04`. **Run "SEO audit (A3 check)" once more** after pushing `main`: it should pass the same way, and print the `collect+assert took N s` line. A red job from real findings (assertions failing on web.dev's own issues) is expected, not a failure of the workflow.
+Optional: run it on **your own site**, and once with `runs: 3`, to see whether your site's WAF tolerates the repeated requests; if not, lower `LHCI_SEO_CRAWL_MAX_PAGES`, `LHCI_SEO_CRAWL_MAX_LINK_CHECKS`, `LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS` and `LHCI_SEO_HREFLANG_MAX_CHECKS` (the README's request-budget table lists them all).
 
 ### E. Phase 13: verify `core-web-vitals-field` with a real key (needs you)
 
@@ -53,16 +40,6 @@ The webhook service was built and run end to end with real Chrome and a real ser
 ### I. Phase 18: more real sites for the new audits
 
 The Phase 18 audits were checked live on real pages where they could be (IKEA and Allbirds product pages, the real New York Times news and video sitemaps, GitHub, web.dev, the Guardian) and on purpose-built sites with known defects for every positive path, which is how most of the defects in `docs/phases/phase-18-vertical-audits.md` were found. **Not covered live:** a real shop whose crawl is complete enough for `product-category-linking` and `product-pages-in-sitemap` to judge (Etsy refuses headless Chrome; IKEA's crawl and sitemap are too big); a real local-business site with several locations; a real video watch page. Run `lhci collect` on your own shop, local-business and publisher sites and read the six groups in `docs/qa/vertical-audits.md`. Anything that fires on a site you know to be correct is a `fix(seo-audits)` commit with a test.
-
-### G. Real-site spot check (done twice; more sites always help)
-
-Done 2026-10-06 on 15 real sites in two rounds. Round 1: MDN, BBC News, apple.com, ikea.com, Wikipedia (six false positives fixed). Round 2: spotify.com, lego.com, nike.com, rottentomatoes.com,
-theguardian.com, nextjs.org, react.dev, angular.dev, lipsum.com, paulgraham.com (no runtime error and no audit error row on any; four false positives fixed: a 406 or 403 on a probe read as a
-defect in `url-variant-consistency` and `indexability-conflicts`, a lazy image at the very bottom of the first screen, and Next.js app-router pages not recognised in `rendering-mode`).
-What fired afterwards looked genuine (missing og tags, no `<h1>`, a sitemap URL that 404s or redirects, SPAs answering 200 for any path, `sitemap.xml` serving HTML).
-**Known and accepted:** `placeholder-content` fails a page that is itself about lorem ipsum (lipsum.com), as its description says.
-**Round 3 (hreflang chooser):** ikea.com's root (a real country chooser with `x-default`) and stripe.com (89 alternates) were run: the `x-default` exemption works, the audits stay quiet on a healthy set, and the real error IKEA ships (`es-CE`, not a region code) is reported. The hreflang requests added 7 to 9 s per run, inside the 20 s budget.
-**Not covered:** a site whose hreflang is only in the sitemap.
 
 ## 3. Decisions and limits worth knowing
 

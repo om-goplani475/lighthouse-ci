@@ -3,7 +3,7 @@
 Live tracker for this phase's work in `packages/seo-audits`. Branch: `phase-9-url-quality` (off `main`), the eighth phase to use the
 phase-branch workflow in `AGENTS.md`. Merges into `main` once every item is done.
 
-**Status: done (2026-10-05): built, QA'd live and merged into `main`; recalibrated on 2026-10-06 (`url-length` is a note above 115 characters, `url-query-parameters` and `url-normalization` are informational).**
+**Status: Done (2026-10-05): built, QA'd live and merged into `main`; recalibrated on 2026-10-06 (`url-length` is a note above 115 characters, `url-query-parameters` and `url-normalization` are informational).**
 
 ## Planning decisions (2026-10-05, lightweight with a short design conversation)
 

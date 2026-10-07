@@ -9,6 +9,8 @@ possible — not on any earlier cadence.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
+**Status: Done. Merged into `main`.**
+
 **Branch status: complete.** `phase-1-page-metadata` was completed and merged into `main` (`--ff-only`,
 2026-09-30) and the branch deleted; every item below is done, deferred, to-do-later or marked not possible.
 
@@ -22,8 +24,7 @@ filed under "Not possible without new infrastructure" below instead of being fol
 single-page features.
 
 **Update 2026-10-06:** the crawler now exists (a `SiteCrawl` gatherer built in Phase 7, extended in
-Phase 8) and the exact-match duplicates were built on it; see the table below. The roadmap's later
-"Phase 16" is a different thing (the summary and product layer, not the crawler).
+Phase 8) and the exact-match duplicates were built on it; see the table below.
 
 ## Features
 

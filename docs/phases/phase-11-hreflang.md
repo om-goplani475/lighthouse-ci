@@ -2,7 +2,7 @@
 
 Live tracker for this phase's work in `packages/seo-audits`. Branch: `phase-11-hreflang` (off `main` at the Phase 12 merge, `7704251`). The ninth phase branch to be started after Phase 8; Phase 11 was first skipped (the developer started Phase 12 instead), then started on 2026-10-05.
 
-**Status: done (2026-10-05).** It was paused at about 30% (the sitemap capture, `looseKey` and the head extractor) while Phase 13 was built, then resumed and finished on the same day. The sections below that describe "still to build" are kept as the record of the plan; all of it is now built.
+**Status: Done (2026-10-05), merged into `main`.** It was paused at about 30% (the sitemap capture, `looseKey` and the head extractor) while Phase 13 was built, then resumed and finished on the same day. The sections below that describe "still to build" are kept as the record of the plan; all of it is now built.
 
 ## Planning decisions (2026-10-05, lightweight with a short design conversation, all four confirmed)
 

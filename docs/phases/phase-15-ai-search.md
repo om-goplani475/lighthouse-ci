@@ -2,7 +2,7 @@
 
 Live tracker for this phase's work in `packages/seo-audits`. Branch: `phase-15-ai-search` (off `main`).
 
-**Status: done (2026-10-05).** Everything is informational by decision.
+**Status: Done (2026-10-05), merged into `main`.** Everything is informational by decision.
 
 ## Planning decisions (2026-10-05, lightweight with a plain-language design conversation)
 

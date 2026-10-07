@@ -1,9 +1,11 @@
 # Current phase
 
-- phase: 18 (vertical audits: security headers, e-commerce, local, news, video, entity): built, waiting for the merge into main; see docs/phases/phase-18-vertical-audits.md
-- branch: phase-18-vertical-audits
+- phase: 19 (reporting, SARIF, SERP preview, template detection, encrypted secrets): in progress, one approval per slice; slice 1 (secrets at rest) built and committed; see docs/phases/phase-19-reporting-and-hardening.md
+- branch: phase-19-reporting-and-hardening
 - roadmap: docs/master-roadmap.md and docs/open-items.md
-- status: complete, merge pending approval
+- status: Phases 1 to 18 are done and merged into main (125 audits, 18 gatherers). Phase 20 (scheduled monitoring, GitHub App) is planned after 19.
+
+<!-- Phase 18 (vertical audits) closed 2026-10-07, ff-merged into main. See docs/phases/phase-18-vertical-audits.md. -->
 
 <!-- Phase 17 (CI/DevOps and webhook platform) closed 2026-10-06, ff-merged into main. See docs/phases/phase-17-webhook-platform.md. -->
 

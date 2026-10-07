@@ -2,7 +2,7 @@
 
 Live tracker for this phase's work in `packages/seo-audits`. Branch: `phase-14-content` (off `main`). The tenth phase to use the phase-branch workflow.
 
-**Status: done (2026-10-05).**
+**Status: Done (2026-10-05), merged into `main`.**
 
 ## Planning decisions (2026-10-05, lightweight with a plain-language design conversation)
 

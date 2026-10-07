@@ -16,7 +16,7 @@ different kind of feature — not a pass/fail or informational-table check like 
 this package — and got a short design conversation before any code, which surfaced a real
 architectural constraint (see "Not possible" below) and reshaped what item 5 actually became.
 
-**Status: all five items resolved 2026-09-30.**
+**Status: Done. All five items resolved 2026-09-30; merged into `main`.**
 
 | # | Feature | Status | Slug / spec |
 |---|---------|--------|--------------|

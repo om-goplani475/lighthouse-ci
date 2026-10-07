@@ -6,7 +6,7 @@ done, deferred, to-do-later, or marked not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
-**Status: complete (2026-10-01).** Items 1-3 built together as one feature (`indexability`), QA'd live; see `docs/qa/indexability.md`. **Merged into `main`** (`--ff-only`, 2026-10-01, branch deleted).
+**Status: Done (2026-10-01).** Items 1-3 built together as one feature (`indexability`), QA'd live; see `docs/qa/indexability.md`. **Merged into `main`** (`--ff-only`, 2026-10-01, branch deleted).
 
 ## Planning decisions (2026-10-01)
 

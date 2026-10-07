@@ -8,7 +8,7 @@
 > in the first version: the totals (it said 100 audits and 1,949 tests), "7 audits" for Phase 1 (there are 11), "weight 0" for informational audits (every audit is registered at weight 1;
 > informational ones use `scoreDisplayMode: informative`), the claim that `placeholder-content` fails on `TODO:` (it does not), the claim that hreflang validates ISO 15924 scripts (any four
 > letters passed; it now checks them against the runtime's locale data), a pending-checks list that still showed finished work, and a description of every phase as it was *before* the
-> calibration of 2026-10-06. For the detailed audit-by-audit findings and the reasoning behind each change, see `seo-audits-review-2026-10-05.md` (Part A and Part B).
+> calibration of 2026-10-06. For the detailed audit-by-audit findings and the reasoning behind each change, the longer review file it summarised was removed on 2026-10-06 once its findings were fixed; they are in the git history and in `docs/phases/`.
 
 ---
 

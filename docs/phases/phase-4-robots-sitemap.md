@@ -6,8 +6,8 @@ once every item is done, deferred, to-do-later, or marked not possible.
 
 Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
-**Status: all ten tracker rows (the roadmap's twelve bullets) resolved 2026-10-01; no security finding
-open.** Ten audits shipped, taking the fork to 31. **Merged into `main`** (`--ff-only`, 2026-10-01,
+**Status: Done. All ten tracker rows (the roadmap's twelve bullets) resolved 2026-10-01; no security finding
+open.** Ten audits shipped, taking the fork to 31 at that point (125 now, after Phase 18). **Merged into `main`** (`--ff-only`, 2026-10-01,
 branch deleted; see "Closing record" at the bottom).
 
 ## Planning decisions (2026-09-30)

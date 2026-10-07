@@ -1,6 +1,6 @@
 # Phase 18: vertical audits (security headers, e-commerce, local, news, video, entity)
 
-Branch `phase-18-vertical-audits`. Build mode: full pipeline per vertical, one approval per vertical (agreed 2026-10-06). Decisions taken with the developer: all six verticals in one branch; the crawl snapshot is extended so cross-page checks are possible; monitoring, reporting, template detection and AI-generated fixes are **not** part of this branch (they are product features that need design: storage, a scheduler, an LLM key).
+**Status: Done. Merged into `main` (2026-10-07, `--ff-only`); the branch is deleted.** Branch `phase-18-vertical-audits`. Build mode: full pipeline per vertical, one approval per vertical (agreed 2026-10-06). Decisions taken with the developer: all six verticals in one branch; the crawl snapshot is extended so cross-page checks are possible; monitoring, reporting, template detection and AI-generated fixes are **not** part of this branch (they are product features that need design: storage, a scheduler, an LLM key).
 
 ## Rules for every audit here
 
