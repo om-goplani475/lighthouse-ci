@@ -83,6 +83,7 @@ const CATEGORIES = [
       'duplicate-content',
       'thin-content',
       'crawl-coverage',
+      'template-groups-report',
     ],
   },
   {

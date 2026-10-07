@@ -998,7 +998,7 @@ module.exports = {
 };
 ```
 
-This adds all 125 audits (listed with their phase, scoring and recommended assertion in the audit index below) on top of
+This adds all 126 audits (listed with their phase, scoring and recommended assertion in the audit index below) on top of
 Lighthouse's default audits (via `extends: 'lighthouse:default'`
 — see `src/lighthouse-config.js`), in a new `seo-extended` category, without replacing or altering
 any of Lighthouse's own defaults.
@@ -1059,10 +1059,10 @@ The LHCI server (`packages/server`) can run the audits for other repositories, s
 
 **Run it behind a reverse proxy** that rate-limits by address (the signature check is cheap but not free) and give the container limits on memory and CPU: a page can keep Chrome busy for the 10-minute run limit. The webhook routes are mounted before the server's basic-auth; the management routes are behind it and the project admin token. Webhook secrets, GitHub/GitLab tokens and Slack/Teams URLs are encrypted in the database when `LHCI_SEO_SECRET_KEY` is set (without it they are stored in clear, like the project build token, and the server warns at start-up). If the key is lost or wrong, a project's secrets cannot be read: its webhooks answer `503`, its alerts are not sent, and nothing is ever treated as unsigned or plain. Rotate the key with `LHCI_SEO_SECRET_KEY_PREVIOUS`.
 
-### Audit index (all 125 audits)
+### Audit index (all 126 audits)
 
 Phase is the fork's own phase number. **Scoring** is what the audit reports; **Recommended assertion** is the severity `src/recommended-assertions.json` uses (`error` for objective defects, `warn` for the rest;
-informational audits are reports and cannot be asserted at all). 79 are scored (31 recommended at `error`, 48 at `warn`) and 46 are informational.
+informational audits are reports and cannot be asserted at all). 79 are scored (31 recommended at `error`, 48 at `warn`) and 47 are informational.
 
 | Phase | Audit | Scoring | Recommended assertion |
 |---|---|---|---|
@@ -1112,6 +1112,7 @@ informational audits are reports and cannot be asserted at all). 79 are scored (
 | 7 | `duplicate-descriptions` | informational | none (informational audits cannot be asserted) |
 | 7 | `duplicate-titles` | pass or fail | `warn` |
 | 7 | `thin-content` | informational | none (informational audits cannot be asserted) |
+| 19 | `template-groups-report` | informational | none (informational audits cannot be asserted) |
 | 8 | `anchor-text-diversity` | informational | none (informational audits cannot be asserted) |
 | 8 | `broken-external-links` | pass or fail | `error` |
 | 8 | `broken-internal-links` | pass or fail | `error` |
@@ -1202,7 +1203,7 @@ Since the calibration of 2026-10-06 each audit belongs to one of three tiers (se
 | **Warn** | Best practice with real but moderate impact (a long redirect chain, a link to a 301, a missing `<h1>`, text or links only after JavaScript, generic anchor text) | **score 0.5**, weight 0.5 |
 | **Informational** | Advice, a heuristic or a report (thin content, click depth, link counts, anchor diversity, query parameters, duplicate descriptions, image file names and formats, `llms.txt`, HSTS strength, manifest icons, and others) | never scored; lhci cannot assert on it |
 
-As of Phase 18 there are **125 audits**: 79 scored (31 in the error tier, 48 in the warn tier) and 46 informational.
+As of Phase 19 there are **126 audits**: 79 scored (31 in the error tier, 48 in the warn tier) and 47 informational.
 
 `src/recommended-assertions.json` is a ready-made `assertions` object: the error tier at `error` (`minScore: 1`), the warn tier at `warn`, `ssl-certificate-expiry` at `error` with `minScore: 0.5` (0.5 means 15 days or fewer left), and no informational audit. A test keeps it in step with the audits (every scored audit is listed, no informational one is):
 
@@ -1219,9 +1220,9 @@ Override single entries by spreading it: `assertions: {...require('...'), 'url-l
 
 ### Assertion severity
 
-None of the 125 audits are part of this fork's shared `all`/`recommended` presets
+None of the 126 audits are part of this fork's shared `all`/`recommended` presets
 (`packages/utils/src/presets/`) — those presets are constrained to audits Lighthouse ships by
-default, and all 125 here are opt-in via `configPath`, so they can't be part of that
+default, and all 126 here are opt-in via `configPath`, so they can't be part of that
 guarantee. Set severity yourself in your own `.lighthouserc.js`:
 
 ```js
