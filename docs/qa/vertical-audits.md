@@ -30,3 +30,18 @@ See the table in the design doc. The most important: the thumbnail and `sameAs` 
 - The crawler skips query-string variants as unread, so on a shop with faceted navigation the crawl is incomplete and `product-category-linking` declines; `faceted-navigation-explosion` reports that trap.
 - The sitemap gatherer does not follow a redirect (a declared `http://` address that redirects to https is not read) and reads at most 10 files; the audits say so instead of claiming a sitemap does not exist.
 - Consistency checks (NAP, names, identity) are our judgement, not Google requirements.
+
+## Real-site round 6 (2026-10-07)
+
+Twelve real pages with real Chrome and the real crawler (`lhci collect`, the fork config): Glossier, Patagonia and Beardbrand products, a TED talk, NPR news, Vimeo, Mozilla, NASA, Wikipedia (TechCrunch, Shake Shack and Planet Fitness returned errors for the addresses used). No audit errored. Several sites answered the crawler with 403 or 429 (NPR, Beardbrand) or sent a page above the size cap (Glossier): the crawl audits said so in words instead of guessing. What fired and was right: Glossier's `Boy Brow` has no sku, gtin or mpn; NASA has no `X-Content-Type-Options`; TED's `/talks` is linked with 34 combinations of `q`, `sort` and `topics`.
+
+**Three false positives found and fixed:**
+
+| Found on | Defect | Fix |
+|---|---|---|
+| Patagonia | `structured-data-json-ld` (error tier) said "Missing @context or @type" for a block that is a top-level **array** of objects, which is valid JSON-LD; the typed-entity reader ignored arrays too, so the other structured-data audits saw nothing in such a block | arrays are judged element by element; entities of every element are read |
+| Patagonia | `structured-data-schema-properties` said every breadcrumb item lacks `name` because the name is inside `item` (`{"item": {"@id": ..., "name": ...}}`, the older form) | a required `name|item.name` is met by either place (the rule file `2026-10.json` was corrected in place; same month) |
+| Wikipedia | `faceted-navigation-explosion` warned about `/w/index.php` (574 combinations) although robots.txt disallows `/w/` | a path the crawl recorded as blocked by robots.txt is not warned about; the audit says how many it left out |
+
+Patagonia now passes both structured-data audits; Wikipedia passes the facet audit with the note (both re-run live after the fixes). **Not covered:** local businesses (see open-items I).
+

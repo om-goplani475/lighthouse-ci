@@ -706,3 +706,8 @@ The dashboard has a **History** tab per project: a score chart for one page acro
 ## 2026-10-07 — secrets at rest (Phase 19, slice 1)
 
 The webhook service can now encrypt what it stores: each project's webhook secret and its notification settings (GitHub/GitLab tokens, Slack and Teams URLs) are sealed with AES-256-GCM when `LHCI_SEO_SECRET_KEY` is set (`openssl rand -hex 32`). Plain rows are sealed at the next start; `LHCI_SEO_SECRET_KEY_PREVIOUS` rotates the key. With a wrong or missing key a project's webhooks answer 503 and nothing falls back to plain text. Without a key nothing changes except a start-up warning. The `webhookSecret` column is now 255 wide (an existing MySQL table needs an `ALTER TABLE`, see `.ai-agents/state/security-findings.md`).
+
+## 2026-10-07 — calibration, round 6 (real shops, a publisher, a video page, Wikipedia)
+
+Three fixes after running the audits on twelve real pages. **`structured-data-json-ld` and every audit that reads typed entities now accept a JSON-LD block that is a top-level array** (valid JSON-LD; the first called it invalid, the others ignored it). **A breadcrumb whose `name` is inside `item` is accepted** by `structured-data-schema-properties` (the rule `name|item.name`; the finding text now names both places). **`faceted-navigation-explosion` no longer warns about a path robots.txt already blocks** and says how many it left out. A test in the server suite got a wider timeout (it started a real server and flaked under load). No new audit.
+
