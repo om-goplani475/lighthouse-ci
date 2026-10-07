@@ -27,6 +27,7 @@ import {createGuardProxy, assertPublicHost} from './guard-proxy.js';
 import {resolveAssertions} from './project-config.js';
 import {summarizeRun} from '../summary/run-summary.js';
 import {compareRuns} from '../summary/compare.js';
+import {reviveSerpPreview, compareSerpPreviews} from '../lib/serp-preview.js';
 import {loadLhrs} from '../summary/load.js';
 import {serializeRun, reviveRun} from './run-result.js';
 import {SIGNAL_IDS} from './notifier.js';
@@ -160,6 +161,16 @@ function spawnCollect({lhciCli, lighthouseConfig, url, cwd, env, chromeFlags, si
 
 /**
  * @param {any} lhr
+ * @return {import('../lib/serp-preview.js').SerpPreview | null} The search snippet model the `pixel-width-truncation` audit
+ *   put in its details, or null when the page has neither a title nor a description (or the shape is not the expected one).
+ */
+function serpOf(lhr) {
+  const a = lhr && lhr.audits && lhr.audits['pixel-width-truncation'];
+  return reviveSerpPreview(a && a.details && a.details.serpPreview);
+}
+
+/**
+ * @param {any} lhr
  * @return {Record<string, {score: number | null, title: string, displayValue: string}>}
  */
 function signalsOf(lhr) {
@@ -255,11 +266,14 @@ function createRunAudit(deps) {
       }
 
       const summary = summarizeRun(lhr, /** @type {any} */ (tiers));
+      const serp = serpOf(lhr);
       /** @type {object | null} */
       let comparison = null;
       let baselineNote = 'no earlier run to compare with';
       /** @type {any} */
       let baselineSignals = null;
+      /** @type {any} */
+      let baselineSerp = null;
       if (findBaseline) {
         try {
           const found = await findBaseline({
@@ -273,6 +287,7 @@ function createRunAudit(deps) {
           if (earlier) {
             comparison = compareRuns(earlier, summary);
             baselineSignals = found.signals || null;
+            baselineSerp = reviveSerpPreview(found.serp);
             baselineNote = '';
           }
         } catch (_) {
@@ -287,6 +302,9 @@ function createRunAudit(deps) {
         summary: serializeRun(summary),
         // Lighthouse's own crawlability and status audits, for the "page stopped being crawlable" alert.
         signals: signalsOf(lhr),
+        // How the page may look in search results, and what changed since the baseline run.
+        serp,
+        serpChange: compareSerpPreviews(baselineSerp, serp),
         baselineSignals,
         comparison,
         baselineNote,

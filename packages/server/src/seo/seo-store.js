@@ -351,7 +351,12 @@ async function createSeoStore(sequelize, secretBox = createSecretBox()) {
         try {
           const result = JSON.parse(run.result);
           if (result && result.summary) {
-            return {id: run.id, summary: result.summary, signals: result.signals || null};
+            return {
+              id: run.id,
+              summary: result.summary,
+              signals: result.signals || null,
+              serp: result.serp || null,
+            };
           }
         } catch (_) {
           // an unreadable result is skipped; the next older run may be fine

@@ -145,6 +145,64 @@ describe('runAudit', () => {
     expect(result.baselineNote).toBe('');
   });
 
+  describe('search result preview', () => {
+    const {buildSerpPreview} = require('../../src/lib/serp-preview.js');
+    const budgets = {title: {desktop: 600, mobile: 580}, description: {desktop: 920, mobile: 680}};
+    const fonts = {title: '400 20px Arial', description: '400 14px Arial'};
+    const preview = title =>
+      buildSerpPreview({
+        url: 'https://example.com/',
+        title: {
+          text: title,
+          widthPx: title.length * 5,
+          prefixWidths: [...title].map((_, i) => (i + 1) * 5),
+        },
+        budgets,
+        fonts,
+      });
+    const withPreview = p => ({
+      'pixel-width-truncation': audit(null, {
+        scoreDisplayMode: 'informative',
+        details: {type: 'table', headings: [], items: [], serpPreview: p},
+      }),
+    });
+
+    it('stores the snippet the audit modelled, and what changed since the baseline', async () => {
+      const {runAudit} = make({
+        collect: fakeCollect({'canonical-https': audit(1), ...withPreview(preview('New title'))}),
+      });
+      const result = await runAudit(
+        input({
+          findBaseline: async () => ({
+            summary: serializeRun(summarizeRun(lhr({'canonical-https': audit(1)}), recommended)),
+            serp: preview('Old title'),
+          }),
+        })
+      );
+      expect(result.serp.devices.desktop.title.shown).toBe('New title');
+      expect(result.serpChange).toEqual({
+        titleChanged: true,
+        descriptionChanged: false,
+        urlChanged: false,
+      });
+    });
+
+    it('has no preview for a page without the audit result, and ignores a damaged one', async () => {
+      const none = await make({collect: fakeCollect({'canonical-https': audit(1)})}).runAudit(
+        input()
+      );
+      expect(none.serp).toBeNull();
+      expect(none.serpChange).toBeNull();
+      const damaged = await make({
+        collect: fakeCollect({
+          'canonical-https': audit(1),
+          ...withPreview({version: 9, hostile: '<b>'}),
+        }),
+      }).runAudit(input());
+      expect(damaged.serp).toBeNull();
+    });
+  });
+
   it('treats a missing, broken or throwing baseline as "no comparison", not a failed run', async () => {
     for (const findBaseline of [
       async () => null,
