@@ -11,15 +11,18 @@
 /** @return {Promise<import('./seo-routes.js').SeoDeps>} */
 async function loadSeoDeps() {
   const base = '@lhci/seo-audits/src/service';
-  const [signature, payload, hosts, config, runner, notifier, outbound] = await Promise.all([
-    import(`${base}/webhook-signature.js`),
-    import(`${base}/webhook-payload.js`),
-    import(`${base}/host-allow-list.js`),
-    import(`${base}/project-config.js`),
-    import(`${base}/run-audit.js`),
-    import(`${base}/notifier.js`),
-    import(`${base}/outbound.js`),
-  ]);
+  const [signature, payload, hosts, config, runner, notifier, outbound, sarif, result] =
+    await Promise.all([
+      import(`${base}/webhook-signature.js`),
+      import(`${base}/webhook-payload.js`),
+      import(`${base}/host-allow-list.js`),
+      import(`${base}/project-config.js`),
+      import(`${base}/run-audit.js`),
+      import(`${base}/notifier.js`),
+      import(`${base}/outbound.js`),
+      import('@lhci/seo-audits/src/summary/sarif.js'),
+      import(`${base}/run-result.js`),
+    ]);
   const recommended = require('@lhci/seo-audits/src/recommended-assertions.json');
   return {
     verifyWebhook: signature.verifyWebhook,
@@ -37,6 +40,10 @@ async function loadSeoDeps() {
     publicNotifications: notifier.publicNotifications,
     dispatchRun: notifier.dispatchRun,
     send: outbound.createOutbound(),
+    toSarif: sarif.toSarif,
+    isRepoPath: sarif.isRepoPath,
+    reviveRun: result.reviveRun,
+    toolVersion: require('@lhci/seo-audits/package.json').version,
     runAudit: runner.createRunAudit({
       recommended,
       lhciCli: require.resolve('@lhci/cli/src/cli.js'),

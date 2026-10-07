@@ -739,6 +739,94 @@ describe('SEO webhook service', () => {
       expect(list[0].result).toBeUndefined();
     });
 
+    describe('SARIF export', () => {
+      const sarifResult = {
+        summary: {
+          url: GOOD_URL,
+          fetchTime: '2026-10-07T10:00:00.000Z',
+          lighthouseVersion: '12.6.1',
+          overall: {name: 'Overall', score: 50, grade: 'F'},
+          categories: [],
+          auditErrors: 0,
+          audits: [
+            {
+              id: 'canonical-https',
+              title: 'Canonical uses https',
+              category: 'Metadata',
+              tier: 'error',
+              status: 'fail',
+              score: 0,
+              reach: 2,
+              displayValue: '2 pages',
+              explanation: '',
+              description: 'The canonical must use https.',
+            },
+            {
+              id: 'sitemap-valid',
+              title: 'Sitemap is valid',
+              category: 'Robots and sitemaps',
+              tier: 'error',
+              status: 'pass',
+              score: 1,
+              reach: 0,
+              displayValue: '',
+              explanation: '',
+              description: '',
+            },
+          ],
+        },
+      };
+
+      it('exports a finished run as SARIF, needs the admin token, and honours ?file=', async () => {
+        t = await startService({}, async () => sarifResult);
+        await t.setUp();
+        const queued = await t.api.post(`${t.base}/runs`, {url: GOOD_URL}, t.admin);
+        await t.service.queue.idle();
+        const path = `${t.base}/runs/${queued.json.runId}/sarif`;
+
+        expect((await t.api.get(path)).status).toBe(403);
+        const res = await t.api.get(path, t.admin);
+        expect(res.status).toBe(200);
+        expect(res.headers.get('content-type')).toContain('application/sarif+json');
+        const log = res.json;
+        expect(log.version).toBe('2.1.0');
+        expect(log.runs[0].results.map(r => r.ruleId)).toEqual(['canonical-https']);
+        expect(log.runs[0].results[0].level).toBe('error');
+        expect(log.runs[0].results[0].locations[0].physicalLocation.artifactLocation.uri).toBe(
+          GOOD_URL
+        );
+
+        const filed = await t.api.get(`${path}?file=lighthouserc.js`, t.admin);
+        expect(
+          filed.json.runs[0].results[0].locations[0].physicalLocation.artifactLocation.uri
+        ).toBe('lighthouserc.js');
+        for (const bad of ['..%2Fetc%2Fpasswd', '%2Fetc%2Fpasswd', 'a%5Cb', 'file%3A%2F%2Fx']) {
+          expect((await t.api.get(`${path}?file=${bad}`, t.admin)).status).toBe(422);
+        }
+      });
+
+      it('refuses a run that has no finished report, or one of another project', async () => {
+        t = await startService({});
+        await t.setUp();
+        const failed = await t.service.store.createRun({
+          trigger: 'manual',
+          projectId: t.project.id,
+          url: GOOD_URL,
+        });
+        await t.service.store.updateRun(failed.id, {status: 'failed', error: 'boom'});
+        expect((await t.api.get(`${t.base}/runs/${failed.id}/sarif`, t.admin)).status).toBe(409);
+        const done = await t.service.store.createRun({
+          trigger: 'manual',
+          projectId: t.project.id,
+          url: GOOD_URL,
+        });
+        await t.service.store.updateRun(done.id, {status: 'done', result: 'not json'});
+        expect((await t.api.get(`${t.base}/runs/${done.id}/sarif`, t.admin)).status).toBe(409);
+        const missing = '11111111-1111-4111-8111-111111111111';
+        expect((await t.api.get(`${t.base}/runs/${missing}/sarif`, t.admin)).status).toBe(404);
+      });
+    });
+
     it('lists a failed run with no score, and survives a damaged stored result', async () => {
       t = await startService({});
       await t.setUp();

@@ -42,6 +42,10 @@ const DISPATCH_TIMEOUT_MS = 60 * 1000;
  *   send?: Function,
  *   describeProject?: (config: any) => object,
  *   runAudit?: (input: any) => Promise<unknown>,
+ *   toSarif?: (runs: any[], options?: {toolVersion?: string, fileUri?: string | null}) => object,
+ *   reviveRun?: (data: any) => any,
+ *   isRepoPath?: (value: unknown) => boolean,
+ *   toolVersion?: string,
  * }} SeoDeps
  */
 
@@ -492,6 +496,40 @@ async function createSeoService(context, deps, limits = {}) {
         return res.status(404).json({message: 'not found'});
       }
       return res.json({...run, result: parseJson(run.result, null)});
+    })
+  );
+
+  // The run's issues as SARIF 2.1.0 (for GitHub code scanning and other dashboards). `?file=<repo path>` attaches every
+  // result to a file in the repository, which is what GitHub needs to show an alert; without it the location is the page.
+  management.get(
+    '/projects/:projectId/runs/:runId/sarif',
+    admin,
+    handleAsyncError(async (req, res) => {
+      if (!deps.toSarif || !deps.reviveRun || !deps.isRepoPath) {
+        return res.status(501).json({message: 'SARIF export is not available on this server'});
+      }
+      const run = await store.getRun(req.params.runId);
+      if (!run || run.projectId !== req.params.projectId) {
+        return res.status(404).json({message: 'not found'});
+      }
+      const file = req.query.file;
+      if (file !== undefined && !deps.isRepoPath(file)) {
+        return res.status(422).json({
+          message: 'file must be a relative path inside the repository, without ".." or a scheme',
+        });
+      }
+      const result = run.status === 'done' ? parseJson(run.result, null) : null;
+      const summary = result && deps.reviveRun(result.summary);
+      if (!summary) return res.status(409).json({message: 'this run has no finished report'});
+      res.type('application/sarif+json');
+      return res.send(
+        JSON.stringify(
+          deps.toSarif([summary], {
+            toolVersion: deps.toolVersion,
+            fileUri: file === undefined ? null : String(file),
+          })
+        )
+      );
     })
   );
 
