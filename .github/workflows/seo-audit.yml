@@ -2,6 +2,8 @@ name: SEO audit (A3 check)
 
 # A manual run of the fork's SEO audits on a GitHub runner. It answers the open points of docs/open-items.md A3:
 # the two Lighthouse copies, yarn.lock, environment variables, crawl cost and time, the cache directory, Node 18.
+# The runner image is pinned (not ubuntu-latest) so a new default image cannot change the Chrome and system libraries
+# the audits run on without anyone choosing it; move it on purpose. The actions are on their Node 24 majors.
 on:
   workflow_dispatch:
     inputs:
@@ -24,10 +26,10 @@ env:
 jobs:
   fork-checkout:
     name: Fork checkout (yarn install, the fork's own lhci)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 18
           cache: yarn
@@ -56,7 +58,7 @@ jobs:
         run: |
           node .github/seo-audit/summarize.mjs .lighthouseci >> "$GITHUB_STEP_SUMMARY"
           node packages/seo-audits/src/summary/cli.js .lighthouseci >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: fork-checkout-reports
@@ -69,10 +71,10 @@ jobs:
 
   global-cli:
     name: Global @lhci/cli 0.15 with the fork config
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 18
           cache: yarn
@@ -98,7 +100,7 @@ jobs:
           echo "collect+assert took ${{ steps.audit.outputs.seconds }} s" >> "$GITHUB_STEP_SUMMARY"
           node .github/seo-audit/summarize.mjs .lighthouseci >> "$GITHUB_STEP_SUMMARY"
           node packages/seo-audits/src/summary/cli.js .lighthouseci >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: global-cli-reports
