@@ -3,7 +3,7 @@
 - phase: 19 (reporting, SARIF, SERP preview, template detection, encrypted secrets): in progress, one approval per slice; slice 1 (secrets at rest) built and committed; see docs/phases/phase-19-reporting-and-hardening.md
 - branch: phase-19-reporting-and-hardening
 - roadmap: docs/master-roadmap.md and docs/open-items.md
-- status: Phases 1 to 18 are done and merged into main (125 audits, 18 gatherers). Phase 20 (scheduled monitoring, GitHub App) is planned after 19.
+- status: Phases 1 to 18 are done and merged into main (125 audits, 18 gatherers; Phase 19 adds a 126th). Phase 20 (scheduled monitoring, GitHub App) is planned after 19.
 
 <!-- Phase 18 (vertical audits) closed 2026-10-07, ff-merged into main. See docs/phases/phase-18-vertical-audits.md. -->
 

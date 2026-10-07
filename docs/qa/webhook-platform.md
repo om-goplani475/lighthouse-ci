@@ -34,6 +34,10 @@ Design: `docs/phases/phase-17-webhook-platform.md`. What was checked on 2026-10-
 - Secrets are stored in clear unless `LHCI_SEO_SECRET_KEY` is set (Phase 19).
 - The run list reads each finished run's stored report to show its score (25 rows).
 
+## Template detection (Phase 19, slice 5), checked live 2026-10-07
+
+Real `lhci collect` (Chrome and the real crawler, private-network opt-in on) on a local site of 18 pages: home, about, 10 blog posts (none with a meta description, three sharing a title) and 6 shop pages (all under 200 words, two without an h1). `template-groups-report` found two templates and 2 single pages: `/blog/:slug` (10 pages: no meta description 10 of 10, one fix in the template; shared title 3 of 10, not shared) and `/shop/:slug` (6 pages: thin text 6 of 6, one fix; no h1 2 of 6, not). Rendered from a stored run on the run page by Chrome as a **Templates** table. Unit tests cover the grouping (numeric ids, a fixed middle part, single pages, query strings, odd addresses, two pages are not a template), the counting and the 80% rule, damaged stored data and hostile text. **Not checked:** a large real site (the default crawl reaches 30 pages, so only large templates are seen).
+
 ## Search result preview (Phase 19, slice 4), checked live 2026-10-07
 
 Real `lhci collect` (Chrome) on a page with a 140-character title and a 330-character description: the audit's details carried the preview; the title was cut at "...Handmade Leather Boots Online…" on desktop (600 px) and one word earlier on mobile (580 px), the description at the ruleset's budget. The real preview was stored with a run and rendered on the run page by Chrome: two cards, "Changed since the earlier run: title", and the note that it is an approximation. Unit tests cover the cut (emoji never split, trailing punctuation dropped, a long word backed up to the previous word, no title or description, hostile text kept as plain strings, a huge text bounded) and the service test covers the stored preview and the change flags. **Not checked:** how close the cut is to what Google really shows (Google does not publish it).

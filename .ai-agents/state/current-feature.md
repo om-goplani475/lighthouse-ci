@@ -1,7 +1,7 @@
 # Current feature
 
-- slug: sarif-export
-- stage: next slice of Phase 19 (slice 1, secrets at rest, is built and committed; slice 2 not started)
+- slug: phase-19-reporting-and-hardening
+- stage: all five slices built (secrets at rest, SARIF, history, SERP preview, template detection); the last (templates) awaiting commit approval, then the merge into main
 - spec: docs/phases/phase-19-reporting-and-hardening.md
 - base_branch: main
 - phase: 19 (reporting and hardening), branch phase-19-reporting-and-hardening

@@ -19,7 +19,7 @@ Status values: **done** (merged + QA'd live) · **in progress** · **planned**.
 
 | # | Item | Status | Notes |
 |---|---|---|---|
-| 1 | Per-run summary: category scores, overall score and grade, ranked issues | **done** | `src/summary/run-summary.js`, `categories.js` (12 categories, every one of the 99 audits of the time (125 now) mapped once; a test enforces it) |
+| 1 | Per-run summary: category scores, overall score and grade, ranked issues | **done** | `src/summary/run-summary.js`, `categories.js` (12 categories, every one of the 99 audits of the time (126 now) mapped once; a test enforces it) |
 | 2 | Compare two report folders | **done** | `src/summary/compare.js` (pairs pages by URL, trailing slash ignored) |
 | 3 | Markdown and JSON output, fix guidance | **done** | `src/summary/render.js`; table cells escape pipes, angle brackets, square brackets and backticks |
 | 4 | The command | **done** | `src/summary/cli.js`, `load.js`: `--compare`, `--format`, `--top`, `--guidance`, `--out`; exits 0 (reporting, not gating), 2 on bad usage |

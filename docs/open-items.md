@@ -10,7 +10,7 @@ done, decisions waiting, and deferred features. What was finished is in `docs/ph
 |------|-------|
 | Webhook platform | Phase 17 (`packages/server/src/seo/`, `packages/seo-audits/src/service/`, the dashboard): built and QA'd live; see the README and `docs/qa/webhook-platform.md`. |
 | Summary command | `packages/seo-audits/src/summary/cli.js` (Phase 16) scores, ranks and compares the reports; see the README. |
-| Audits | 125 in the `seo-extended` category (Phase 18 merged 2026-10-07), from 18 gatherers: 79 scored (31 error tier, 48 warn tier) and 46 informational. `packages/seo-audits/src/recommended-assertions.json` asserts the scored ones. |
+| Audits | 126 in the `seo-extended` category (Phase 18 merged 2026-10-07, plus `template-groups-report` of Phase 19), from 18 gatherers: 79 scored (31 error tier, 48 warn tier) and 47 informational. `packages/seo-audits/src/recommended-assertions.json` asserts the scored ones. |
 | Tests | The `seo-audits` suites (138 suites / 2,439 tests) pass on Node 24 and on Node 18.20.8 (what CI pins), checked 2026-10-06; a full-repository run on 2026-10-07 had only the known failures below plus two load timeouts that pass alone. Typecheck and lint clean. |
 | Security findings | **None open.** Findings 1-10 are fixed. One risk is *accepted*, not fixed: `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control (the README says so). |
 | Viewer | `@lhci/viewer` renders all 34 audits that had tables in five real reports (2026-10-06); the server and `seed-database` path was checked on 2026-10-05. |

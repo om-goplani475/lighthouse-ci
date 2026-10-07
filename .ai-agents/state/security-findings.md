@@ -989,3 +989,7 @@ No new request surface and no new storage: three admin-token routes that read th
 
 No new request surface. The preview is made from text the page itself supplies (title, description, address), so it is hostile input: it is built only as plain strings (clipped to 400 characters, an address trail of at most two clipped path parts), stored in the run result, shape-checked when read back (`reviveSerpPreview` refuses anything that is not the expected version and shape, so a damaged or forged stored value cannot reach the dashboard), and rendered by Preact as text (never as HTML; tested with a markup-looking title). The gatherer's extra work is bounded (at most 400 measurements per text, in the page's own isolated context). Report size grows by a few kilobytes per run. No open finding.
 
+## 2026-10-07 — template detection (Phase 19, slice 5)
+
+No new request surface: the audit only reads the crawl snapshot that already exists. Its input is text chosen by the audited site (page addresses, titles), so it is hostile: path parts are decoded in a try/catch (a malformed percent-escape cannot throw), clipped to 40 characters, and compared, never run or put in a query; the number of templates (20), examples (3) and problems per template (10) is bounded; the groups stored with a run are shape-checked on the way in (`reviveTemplates` drops anything else, tested with a string, a number and wrong-typed fields) and rendered by Preact as text. Grouping is linear in the number of crawled pages (at most 200). No open finding.
+

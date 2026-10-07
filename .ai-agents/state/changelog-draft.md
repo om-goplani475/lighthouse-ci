@@ -687,6 +687,10 @@ New: `packages/seo-audits/src/service/` (project config, webhook signature, payl
 
 New command `send-test-webhook` (`packages/seo-audits/src/service/send-test-webhook.js`): sends one signed test delivery to a project's webhook so a setup can be checked without a real pull request. The manual workflow `.github/workflows/seo-audit.yml` now pins its runner to `ubuntu-24.04` (a new default image can no longer change Chrome and system libraries unnoticed) and uses the Node 24 majors of `checkout`, `setup-node` and `upload-artifact` (v7). It has not been re-run on GitHub yet. No change to the audits.
 
+## 2026-10-07 — template detection (Phase 19, slice 5)
+
+New informational audit **`template-groups-report`** (126 audits in all, 47 informational): groups the crawled pages by the shape of their address (`/blog/:slug`) and counts the page-level problems each group has, marking a problem on most of a template's pages as "one fix in the template". The webhook service's run page shows the same as a **Templates** table. Reads the crawl only; no new request.
+
 ## 2026-10-07 — SERP preview (Phase 19, slice 4)
 
 The run page of the webhook service shows how the page may look in search results (desktop and mobile), cut at the pixel budget of `pixel-width-truncation`, and says if the title, description or address changed since the baseline run. The preview comes from the existing `pixel-width-truncation` audit (its details now carry it; the gatherer also records prefix widths), so there is no new audit and no new request. See the README.
