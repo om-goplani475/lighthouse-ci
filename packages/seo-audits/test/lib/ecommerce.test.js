@@ -449,7 +449,7 @@ describe('faceted-navigation-explosion', () => {
 
   it('warns when one path is linked with 20 or more combinations of 2 or more parameters', () => {
     const snap = snapshot([page('https://shop.example/', {links: facetLinks(30)})]);
-    const found = findFacetExplosions(snap);
+    const {found} = findFacetExplosions(snap);
     expect(found).toHaveLength(1);
     expect(found[0]).toMatchObject({
       path: 'https://shop.example/shoes',
@@ -471,7 +471,7 @@ describe('faceted-navigation-explosion', () => {
       page('https://shop.example/', {links: facetLinks(12, '/shoes')}),
       page('https://shop.example/a', {links: [...other, ...facetLinks(40, '/boots')]}),
     ]);
-    expect(findFacetExplosions(snap).map(f => [f.path, f.urls])).toEqual([
+    expect(findFacetExplosions(snap).found.map(f => [f.path, f.urls])).toEqual([
       ['https://shop.example/boots', 40],
       ['https://shop.example/shoes', 24],
     ]);
@@ -480,30 +480,85 @@ describe('faceted-navigation-explosion', () => {
       page('https://shop.example/', {links: facetLinks(12)}),
       page('https://shop.example/a', {links: facetLinks(12)}),
     ]);
-    expect(findFacetExplosions(same)).toEqual([]);
+    expect(findFacetExplosions(same).found).toEqual([]);
   });
 
   it('does not flag fewer than 20 combinations, a single parameter, or tracking, session and pagination parameters', () => {
     expect(
-      findFacetExplosions(snapshot([page('https://shop.example/', {links: facetLinks(19)})]))
+      findFacetExplosions(snapshot([page('https://shop.example/', {links: facetLinks(19)})])).found
     ).toEqual([]);
     const oneParam = Array.from({length: 50}, (_, i) => link(`https://shop.example/item?id=${i}`));
     expect(
-      findFacetExplosions(snapshot([page('https://shop.example/', {links: oneParam})]))
+      findFacetExplosions(snapshot([page('https://shop.example/', {links: oneParam})])).found
     ).toEqual([]);
     const noise = Array.from({length: 50}, (_, i) =>
       link(`https://shop.example/list?utm_source=a${i}&page=${i}&PHPSESSID=${i}&gclid=${i}`)
     );
-    expect(findFacetExplosions(snapshot([page('https://shop.example/', {links: noise})]))).toEqual(
-      []
+    expect(
+      findFacetExplosions(snapshot([page('https://shop.example/', {links: noise})])).found
+    ).toEqual([]);
+  });
+
+  it('does not warn about a path robots.txt already keeps the crawler out of, and says so', () => {
+    // found on Wikipedia: /w/index.php is linked with hundreds of combinations but robots.txt disallows /w/
+    const snap = snapshot(
+      [
+        page('https://shop.example/', {
+          links: [...facetLinks(30, '/w/index.php'), ...facetLinks(25, '/shoes')],
+        }),
+      ],
+      {
+        skipped: [
+          {
+            url: 'https://shop.example/w/index.php?color=c1&size=s0',
+            reason: 'blocked-by-robots',
+            detail: null,
+          },
+        ],
+      }
     );
+    const {found, blocked} = findFacetExplosions(snap);
+    expect(found.map(f => f.path)).toEqual(['https://shop.example/shoes']);
+    expect(blocked).toBe(1);
+
+    const onlyBlocked = snapshot(
+      [page('https://shop.example/', {links: facetLinks(30, '/w/index.php')})],
+      {
+        skipped: [
+          {
+            url: 'https://shop.example/w/index.php?x=1&y=2',
+            reason: 'blocked-by-robots',
+            detail: null,
+          },
+        ],
+      }
+    );
+    const result = facetedProduct(artifact(onlyBlocked));
+    expect(result.score).toBe(1);
+    expect(result.displayValue).toBe(
+      'No open facet explosion seen (1 path with many combinations is blocked by robots.txt)'
+    );
+  });
+
+  it('still warns when the skipped URLs are for another reason or another path', () => {
+    const snap = snapshot([page('https://shop.example/', {links: facetLinks(30)})], {
+      skipped: [
+        {url: 'https://shop.example/shoes?color=c1&size=s1', reason: 'over-page-cap', detail: null},
+        {url: 'https://shop.example/admin?a=1&b=2', reason: 'blocked-by-robots', detail: null},
+        {url: 'not a url', reason: 'blocked-by-robots', detail: null},
+      ],
+    });
+    expect(findFacetExplosions(snap).found).toHaveLength(1);
+    expect(facetedProduct(artifact(snap)).score).toBe(0.5);
   });
 
   it('treats the same parameters in another order as one combination', () => {
     const links = Array.from({length: 40}, (_, i) =>
       link(`https://shop.example/s?${i % 2 ? 'a=1&b=2' : 'b=2&a=1'}`)
     );
-    expect(findFacetExplosions(snapshot([page('https://shop.example/', {links})]))).toEqual([]);
+    expect(findFacetExplosions(snapshot([page('https://shop.example/', {links})])).found).toEqual(
+      []
+    );
   });
 
   it('survives malformed link URLs', () => {

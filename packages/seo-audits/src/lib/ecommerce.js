@@ -523,9 +523,17 @@ function isProductPage(page) {
  * Groups the internal links the crawl saw by path, and finds paths reached with many different combinations of facet
  * parameters: the shape of a faceted-navigation crawl trap. Tracking, session and pagination parameters are ignored.
  * @param {NonNullable<SiteCrawlArtifact['snapshot']>} snapshot
- * @return {Array<{path: string, urls: number, params: string[], example: string}>} Worst first.
+ * @return {{found: Array<{path: string, urls: number, params: string[], example: string}>, blocked: number}} `found` is worst
+ *   first. A path that robots.txt already keeps the crawler out of (the crawl recorded a URL of it as blocked) is not a trap
+ *   left open, so it is counted in `blocked`, not listed.
  */
 function findFacetExplosions(snapshot) {
+  const blockedPaths = new Set(
+    (snapshot.skipped || [])
+      .filter(s => s.reason === 'blocked-by-robots')
+      .map(s => pathKey(s.url))
+      .filter(Boolean)
+  );
   /** @type {Map<string, {signatures: Set<string>, names: Set<string>, example: string}>} */
   const byPath = new Map();
   /** @param {string} href */
@@ -564,8 +572,11 @@ function findFacetExplosions(snapshot) {
     add(page.url);
     for (const link of page.links) add(link.url);
   }
-  return [...byPath.entries()]
-    .filter(([, e]) => e.signatures.size >= MIN_FACET_URLS && e.names.size >= MIN_FACET_PARAMS)
+  const exploding = [...byPath.entries()].filter(
+    ([, e]) => e.signatures.size >= MIN_FACET_URLS && e.names.size >= MIN_FACET_PARAMS
+  );
+  const open = exploding.filter(([path]) => !blockedPaths.has(path));
+  const found = open
     .map(([path, e]) => ({
       path: clip(path),
       urls: e.signatures.size,
@@ -573,14 +584,37 @@ function findFacetExplosions(snapshot) {
       example: clip(e.example),
     }))
     .sort((a, b) => b.urls - a.urls);
+  return {found, blocked: exploding.length - open.length};
+}
+
+/**
+ * @param {string} href
+ * @return {string | null} Origin and path, without the query.
+ */
+function pathKey(href) {
+  try {
+    const u = new URL(href);
+    return `${u.origin}${u.pathname}`;
+  } catch (_) {
+    return null;
+  }
 }
 
 /** @param {SiteCrawlArtifact} artifact @return {Product} */
 function facetedProduct(artifact) {
   const usable = usableSnapshot(artifact);
   if (!('snapshot' in usable)) return notApplicable(usable.reason);
-  const found = findFacetExplosions(usable.snapshot);
-  if (found.length === 0) return {score: 1, displayValue: 'No facet explosion seen'};
+  const {found, blocked} = findFacetExplosions(usable.snapshot);
+  if (found.length === 0) {
+    return {
+      score: 1,
+      displayValue: blocked
+        ? `No open facet explosion seen (${count(blocked, 'path')} with many combinations ${
+            blocked === 1 ? 'is' : 'are'
+          } blocked by robots.txt)`
+        : 'No facet explosion seen',
+    };
+  }
   return {
     score: 0.5,
     displayValue: count(found.length, 'path'),
