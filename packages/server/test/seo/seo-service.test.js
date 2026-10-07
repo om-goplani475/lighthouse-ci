@@ -739,6 +739,127 @@ describe('SEO webhook service', () => {
       expect(list[0].result).toBeUndefined();
     });
 
+    describe('history and comparison', () => {
+      /** @param {number} score @param {string} auditStatus */
+      const summaryFor = (score, auditStatus) => ({
+        url: GOOD_URL,
+        fetchTime: '2026-10-07T10:00:00.000Z',
+        lighthouseVersion: '12.6.1',
+        overall: {name: 'Overall', score, grade: 'B', failures: 1, warnings: 0},
+        categories: [{name: 'Metadata', score}],
+        auditErrors: 0,
+        audits: [
+          {
+            id: 'canonical-https',
+            title: 'Canonical uses https',
+            category: 'Metadata',
+            tier: 'error',
+            status: auditStatus,
+            score: auditStatus === 'pass' ? 1 : 0,
+            reach: 1,
+            displayValue: '',
+            explanation: '',
+            description: '',
+          },
+        ],
+      });
+
+      /** Creates a finished run directly in the store. */
+      const finished = async (url, score, auditStatus, over = {}) => {
+        const run = await t.service.store.createRun({
+          trigger: 'manual',
+          projectId: t.project.id,
+          url,
+          branch: 'main',
+          ...over,
+        });
+        await t.service.store.updateRun(run.id, {
+          status: 'done',
+          result: {summary: summaryFor(score, auditStatus)},
+        });
+        return run.id;
+      };
+
+      it('serves the score history per page, as JSON and as CSV, for the admin only', async () => {
+        t = await startService({});
+        await t.setUp();
+        const a = await finished(GOOD_URL, 60, 'fail');
+        await new Promise(r => setTimeout(r, 15));
+        const b = await finished(GOOD_URL, 80, 'pass');
+        await finished('https://pr-1.stage.example.org/other', 70, 'pass');
+
+        expect((await t.api.get(`${t.base}/history`)).status).toBe(403);
+        const all = (await t.api.get(`${t.base}/history`, t.admin)).json;
+        expect(all.points).toHaveLength(3);
+        expect(all.pages.map(p => p.path)).toEqual(['/', '/other']);
+        const one = (await t.api.get(`${t.base}/history?path=/`, t.admin)).json;
+        expect(one.points.map(p => p.runId)).toEqual([a, b]);
+        expect(one.points.map(p => p.score)).toEqual([60, 80]);
+
+        const csv = await t.api.get(`${t.base}/history.csv?path=/`, t.admin);
+        expect(csv.status).toBe(200);
+        expect(csv.headers.get('content-type')).toContain('text/csv');
+        expect(csv.headers.get('content-disposition')).toContain('attachment');
+        expect(csv.text.trim().split('\r\n')).toHaveLength(3);
+        expect((await t.api.get(`${t.base}/history.csv`)).status).toBe(403);
+      });
+
+      it('has an empty history for a project with no finished runs, and 404 when not set up', async () => {
+        t = await startService({});
+        expect((await t.api.get(`${t.base}/history`, t.admin)).status).toBe(404);
+        await t.setUp();
+        expect((await t.api.get(`${t.base}/history`, t.admin)).json).toEqual({
+          points: [],
+          pages: [],
+        });
+      });
+
+      it('compares two finished runs, and refuses anything else', async () => {
+        t = await startService({});
+        await t.setUp();
+        const a = await finished(GOOD_URL, 60, 'fail');
+        const b = await finished(GOOD_URL, 80, 'pass');
+        const res = await t.api.get(`${t.base}/compare?from=${a}&to=${b}`, t.admin);
+        expect(res.status).toBe(200);
+        expect(res.json.comparison.fixed.map(x => x.id)).toEqual(['canonical-https']);
+        expect(res.json.comparison.overallDelta).toBe(20);
+
+        expect((await t.api.get(`${t.base}/compare?from=${a}&to=${b}`)).status).toBe(403);
+        expect((await t.api.get(`${t.base}/compare?from=x&to=${b}`, t.admin)).status).toBe(422);
+        expect((await t.api.get(`${t.base}/compare?from=${a}`, t.admin)).status).toBe(422);
+        const missing = '11111111-1111-4111-8111-111111111111';
+        expect((await t.api.get(`${t.base}/compare?from=${a}&to=${missing}`, t.admin)).status).toBe(
+          404
+        );
+        const queued = await t.service.store.createRun({
+          trigger: 'manual',
+          projectId: t.project.id,
+          url: GOOD_URL,
+        });
+        expect(
+          (await t.api.get(`${t.base}/compare?from=${a}&to=${queued.id}`, t.admin)).status
+        ).toBe(404);
+      });
+
+      it("never shows or compares another project's runs", async () => {
+        t = await startService({});
+        await t.setUp();
+        const mine = await finished(GOOD_URL, 60, 'fail');
+        const otherRun = await t.service.store.createRun({
+          trigger: 'manual',
+          projectId: t.other.id,
+          url: GOOD_URL,
+        });
+        await t.service.store.updateRun(otherRun.id, {
+          status: 'done',
+          result: {summary: summaryFor(90, 'pass')},
+        });
+        const res = await t.api.get(`${t.base}/compare?from=${mine}&to=${otherRun.id}`, t.admin);
+        expect(res.status).toBe(404);
+        expect((await t.api.get(`${t.base}/history`, t.admin)).json.points).toHaveLength(1);
+      });
+    });
+
     describe('SARIF export', () => {
       const sarifResult = {
         summary: {

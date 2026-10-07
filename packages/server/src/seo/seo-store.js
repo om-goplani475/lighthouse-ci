@@ -289,6 +289,40 @@ async function createSeoStore(sequelize, secretBox = createSecretBox()) {
     },
 
     /**
+     * @param {string} projectId
+     * @param {number} [limit]
+     * @return {Promise<any[]>} The newest finished runs with their stored summary (for history and comparison). Runs whose
+     *   stored result cannot be read are left out. Reads the stored results, so `limit` is capped at `MAX_LIST`.
+     */
+    async listDoneRuns(projectId, limit = MAX_LIST) {
+      const rows = await Run.findAll({
+        where: {projectId, status: 'done'},
+        order: [['createdAt', 'DESC']],
+        limit: Math.min(Math.max(1, limit | 0), MAX_LIST),
+      });
+      const runs = [];
+      for (const row of rows) {
+        const run = row.toJSON();
+        try {
+          const result = JSON.parse(run.result);
+          if (!result || !result.summary) continue;
+          runs.push({
+            id: run.id,
+            url: run.url,
+            branch: run.branch,
+            sha: run.sha,
+            trigger: run.trigger,
+            createdAt: run.createdAt,
+            summary: result.summary,
+          });
+        } catch (_) {
+          // an unreadable result has no history
+        }
+      }
+      return runs;
+    },
+
+    /**
      * The latest finished run of the same page on a branch, for comparing a new run against. Preview hosts change per
      * pull request, so the page is matched by path, not by host.
      * @param {{projectId: string, branch: string | null, url: string, excludeRunId?: string}} criteria

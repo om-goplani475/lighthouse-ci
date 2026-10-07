@@ -11,7 +11,7 @@
 /** @return {Promise<import('./seo-routes.js').SeoDeps>} */
 async function loadSeoDeps() {
   const base = '@lhci/seo-audits/src/service';
-  const [signature, payload, hosts, config, runner, notifier, outbound, sarif, result] =
+  const [signature, payload, hosts, config, runner, notifier, outbound, sarif, result, history] =
     await Promise.all([
       import(`${base}/webhook-signature.js`),
       import(`${base}/webhook-payload.js`),
@@ -22,6 +22,7 @@ async function loadSeoDeps() {
       import(`${base}/outbound.js`),
       import('@lhci/seo-audits/src/summary/sarif.js'),
       import(`${base}/run-result.js`),
+      import(`${base}/run-history.js`),
     ]);
   const recommended = require('@lhci/seo-audits/src/recommended-assertions.json');
   return {
@@ -43,6 +44,9 @@ async function loadSeoDeps() {
     toSarif: sarif.toSarif,
     isRepoPath: sarif.isRepoPath,
     reviveRun: result.reviveRun,
+    buildHistory: history.buildHistory,
+    historyToCsv: history.historyToCsv,
+    compareStored: history.compareStored,
     toolVersion: require('@lhci/seo-audits/package.json').version,
     runAudit: runner.createRunAudit({
       recommended,

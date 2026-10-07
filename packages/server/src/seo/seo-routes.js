@@ -46,6 +46,9 @@ const DISPATCH_TIMEOUT_MS = 60 * 1000;
  *   reviveRun?: (data: any) => any,
  *   isRepoPath?: (value: unknown) => boolean,
  *   toolVersion?: string,
+ *   buildHistory?: (runs: any[], filter?: any) => {points: any[], pages: any[]},
+ *   historyToCsv?: (points: any[]) => string,
+ *   compareStored?: (before: any, after: any) => any,
  * }} SeoDeps
  */
 
@@ -76,6 +79,21 @@ function publicProject(row) {
     webhookPath: `/api/v1/webhooks/${row.projectId}`,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+  };
+}
+
+/**
+ * @param {import('express').Request} req
+ * @return {{path?: string, branch?: string, limit?: number}}
+ */
+function historyFilter(req) {
+  const text = (/** @type {unknown} */ v) =>
+    typeof v === 'string' && v.length <= 300 ? v : undefined;
+  const limit = Number(req.query.limit);
+  return {
+    path: text(req.query.path),
+    branch: text(req.query.branch),
+    ...(Number.isFinite(limit) && limit > 0 && {limit}),
   };
 }
 
@@ -496,6 +514,75 @@ async function createSeoService(context, deps, limits = {}) {
         return res.status(404).json({message: 'not found'});
       }
       return res.json({...run, result: parseJson(run.result, null)});
+    })
+  );
+
+  // History: the scores of the finished runs over time, for one page (`?path=/x`) and branch (`?branch=main`), oldest first.
+  management.get(
+    '/projects/:projectId/history',
+    admin,
+    handleAsyncError(async (req, res) => {
+      if (!deps.buildHistory) {
+        return res.status(501).json({message: 'history is not available on this server'});
+      }
+      if (!(await store.getProject(req.params.projectId))) {
+        return res.status(404).json({message: 'not set up'});
+      }
+      return res.json(
+        deps.buildHistory(await store.listDoneRuns(req.params.projectId), historyFilter(req))
+      );
+    })
+  );
+
+  // The same series as a CSV file, one row per run.
+  management.get(
+    '/projects/:projectId/history.csv',
+    admin,
+    handleAsyncError(async (req, res) => {
+      if (!deps.buildHistory || !deps.historyToCsv) {
+        return res.status(501).json({message: 'history is not available on this server'});
+      }
+      if (!(await store.getProject(req.params.projectId))) {
+        return res.status(404).json({message: 'not set up'});
+      }
+      const {points} = deps.buildHistory(
+        await store.listDoneRuns(req.params.projectId),
+        historyFilter(req)
+      );
+      res.type('text/csv; charset=utf-8');
+      res.set('Content-Disposition', 'attachment; filename="seo-history.csv"');
+      return res.send(deps.historyToCsv(points));
+    })
+  );
+
+  // What changed between two finished runs of the project: `?from=<run id>&to=<run id>`.
+  management.get(
+    '/projects/:projectId/compare',
+    admin,
+    handleAsyncError(async (req, res) => {
+      if (!deps.compareStored) {
+        return res.status(501).json({message: 'comparison is not available on this server'});
+      }
+      const {from, to} = req.query;
+      if (
+        typeof from !== 'string' ||
+        typeof to !== 'string' ||
+        !UUID_PATTERN.test(from) ||
+        !UUID_PATTERN.test(to)
+      ) {
+        return res.status(422).json({message: 'give two run ids as ?from=...&to=...'});
+      }
+      const [before, after] = await Promise.all([store.getRun(from), store.getRun(to)]);
+      const readSummary = (/** @type {any} */ run) => {
+        if (!run || run.projectId !== req.params.projectId || run.status !== 'done') return null;
+        const result = parseJson(run.result, null);
+        return result && result.summary ? result.summary : null;
+      };
+      const comparison = deps.compareStored(readSummary(before), readSummary(after));
+      if (!comparison) {
+        return res.status(404).json({message: 'both runs must be finished runs of this project'});
+      }
+      return res.json({from, to, comparison});
     })
   );
 
