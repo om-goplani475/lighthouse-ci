@@ -25,6 +25,7 @@ const {
   formToNotifications,
   runPagePath,
   seoRequest,
+  chartGeometry,
 } = require('../../../src/ui/routes/seo/seo-model.js');
 
 describe('labels', () => {
@@ -213,5 +214,35 @@ describe('seoRequest', () => {
       throw new TypeError('Failed to fetch');
     });
     expect(res).toMatchObject({state: 'error', message: 'Could not reach the server.'});
+  });
+});
+
+describe('chartGeometry', () => {
+  const pt = (runId, score) => ({runId, score, at: '2026-10-01T00:00:00Z'});
+
+  it('puts 100 at the top and 0 at the bottom, oldest on the left', () => {
+    const g = chartGeometry([pt('a', 0), pt('b', 100)], {width: 200, height: 100, pad: 10});
+    expect(g.dots.map(d => [d.x, d.y])).toEqual([
+      [10, 90],
+      [190, 10],
+    ]);
+    expect(g.segments).toEqual(['10,90 190,10']);
+    expect(g.ticks.map(t => t.label)).toEqual(['0', '50', '100']);
+    expect(g.ticks[0].y).toBe(90);
+    expect(g.ticks[2].y).toBe(10);
+  });
+
+  it('leaves a gap for a run with no score instead of dropping to zero', () => {
+    const g = chartGeometry([pt('a', 80), pt('b', null), pt('c', 90)]);
+    expect(g.segments).toHaveLength(2);
+    expect(g.dots.map(d => d.runId)).toEqual(['a', 'c']);
+  });
+
+  it('centres a single point, copes with no points, and clamps wild scores', () => {
+    expect(chartGeometry([pt('a', 50)], {width: 200}).dots[0].x).toBe(100);
+    expect(chartGeometry([])).toMatchObject({segments: [], dots: []});
+    const g = chartGeometry([pt('a', 500), pt('b', -40)], {width: 200, height: 100, pad: 10});
+    expect(g.dots.map(d => d.y)).toEqual([10, 90]);
+    expect(chartGeometry([pt('a', NaN)]).dots).toEqual([]);
   });
 });

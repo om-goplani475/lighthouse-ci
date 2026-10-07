@@ -17,7 +17,7 @@ import {AsyncLoader} from '../../components/async-loader';
 import {LoadingSpinner} from '../../components/loading-spinner';
 import {useProjectBySlug, useAdminToken} from '../../hooks/use-api-data';
 import {useSeoResource} from '../../hooks/use-seo-resource';
-import {Panel, Tag, Notice, RequestProblem} from './seo-parts.jsx';
+import {Panel, Tag, Notice, RequestProblem, IssueList} from './seo-parts.jsx';
 import {
   describeOutcome,
   describeRunStatus,
@@ -34,6 +34,7 @@ import {
   formToNotifications,
   runPagePath,
   seoRequest,
+  chartGeometry,
 } from './seo-model.js';
 
 /** @param {string | undefined} iso */
@@ -112,6 +113,7 @@ const SeoProject_ = ({project}) => {
       <div className="seo-tabs">
         {[
           ['runs', 'Runs'],
+          ['history', 'History'],
           ['webhooks', 'Webhook log'],
           ['settings', 'Rules and destinations'],
         ].map(([id, label]) => (
@@ -128,6 +130,7 @@ const SeoProject_ = ({project}) => {
       {tab === 'runs' ? (
         <RunsTab project={project} adminToken={adminToken} config={config.data} />
       ) : null}
+      {tab === 'history' ? <HistoryTab project={project} adminToken={adminToken} /> : null}
       {tab === 'webhooks' ? <WebhooksTab project={project} adminToken={adminToken} /> : null}
       {tab === 'settings' ? (
         <SettingsTab
@@ -254,6 +257,218 @@ const SetupForm = ({project, adminToken, onCreated}) => {
         </button>
       </div>
     </Panel>
+  );
+};
+
+/** A score history as a line chart. @param {{points: any[]}} props */
+const HistoryChart = ({points}) => {
+  const g = chartGeometry(points);
+  return (
+    <svg
+      className="seo-chart"
+      viewBox={`0 0 ${g.width} ${g.height}`}
+      role="img"
+      aria-label="Overall score of each run, oldest on the left"
+    >
+      {g.ticks.map(t => (
+        <g key={t.label}>
+          <line x1="28" x2={g.width - 28} y1={t.y} y2={t.y} className="seo-chart__grid" />
+          <text x="2" y={t.y + 4} className="seo-chart__label">
+            {t.label}
+          </text>
+        </g>
+      ))}
+      {g.segments.map(s => (
+        <polyline key={s} points={s} className="seo-chart__line" />
+      ))}
+      {g.dots.map(d => (
+        <circle key={d.runId} cx={d.x} cy={d.y} r="3.5" className="seo-chart__dot">
+          <title>{`${formatScore(d.score)} on ${when(d.at)}`}</title>
+        </circle>
+      ))}
+    </svg>
+  );
+};
+
+/** Downloads the history as a CSV file; the admin token travels in a header, never in the address. */
+async function downloadHistoryCsv(
+  /** @type {string} */ projectId,
+  /** @type {string | undefined} */ adminToken,
+  /** @type {string} */ query
+) {
+  if (!adminToken) return 'Enter the project admin token first.';
+  try {
+    const res = await window.fetch(
+      `/api/v1/seo/projects/${encodeURIComponent(projectId)}/history.csv${query}`,
+      {headers: {'x-lhci-admin-token': adminToken}}
+    );
+    if (!res.ok) return `The server answered ${res.status}.`;
+    const url = URL.createObjectURL(await res.blob());
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'seo-history.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+    return '';
+  } catch (_) {
+    return 'The download failed.';
+  }
+}
+
+/** Scores over time for one page, a CSV export, and a comparison of any two runs. @param {{project: LHCI.ServerCommand.Project, adminToken: string | undefined}} props */
+const HistoryTab = ({project, adminToken}) => {
+  const [path, setPath] = useState('');
+  const query = path ? `?path=${encodeURIComponent(path)}` : '';
+  const [history] = useSeoResource(project.id, adminToken, `/history${query}`);
+  // One page at a time: several pages in one line would zigzag between them. Start with the page that has most runs.
+  useEffect(() => {
+    if (!path && history.state === 'ok' && history.data.pages.length) {
+      setPath(history.data.pages[0].path);
+    }
+  }, [path, history]);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [comparison, setComparison] = useState(/** @type {any} */ (null));
+  const [message, setMessage] = useState('');
+
+  const compare = async () => {
+    setMessage('');
+    setComparison(null);
+    const res = await seoRequest({
+      fetch: window.fetch.bind(window),
+      projectId: project.id,
+      adminToken,
+      path: `/compare?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+    });
+    if (res.state === 'ok') setComparison(res.data.comparison);
+    else setMessage(res.message);
+  };
+
+  if (history.state === 'loading') return <LoadingSpinner />;
+  if (history.state !== 'ok') return <RequestProblem result={history} onToken={() => {}} />;
+  const {points, pages} = history.data;
+  const newestFirst = [...points].reverse();
+
+  return (
+    <Fragment>
+      <Panel>
+        <h2>Score history</h2>
+        {points.length === 0 ? (
+          <p>No finished runs yet. Run an audit, or send a webhook.</p>
+        ) : (
+          <Fragment>
+            <div className="form-item">
+              <label>
+                Page{' '}
+                <select
+                  value={path}
+                  onChange={e => {
+                    setPath(/** @type {HTMLSelectElement} */ (e.target).value);
+                    setFrom('');
+                    setTo('');
+                    setComparison(null);
+                  }}
+                >
+                  {pages.map((/** @type {any} */ p) => (
+                    <option key={p.path} value={p.path}>
+                      {p.path} ({p.runs})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <span className="h-spacer" />
+              <button
+                type="button"
+                onClick={async () =>
+                  setMessage(await downloadHistoryCsv(project.id, adminToken, query))
+                }
+              >
+                Download CSV
+              </button>
+            </div>
+            {message ? <Notice tone="fail">{message}</Notice> : null}
+            <HistoryChart points={points} />
+            <p className="text--smaller">
+              Overall score of each finished run, oldest on the left (the newest {points.length}).
+            </p>
+          </Fragment>
+        )}
+      </Panel>
+      {points.length > 1 ? (
+        <Panel>
+          <h2>Compare two runs</h2>
+          <div className="form-item">
+            {[
+              ['Earlier', from, setFrom],
+              ['Later', to, setTo],
+            ].map(([label, value, set]) => (
+              <label key={String(label)}>
+                {String(label)}{' '}
+                <select
+                  value={String(value)}
+                  onChange={e =>
+                    /** @type {Function} */ (set)(/** @type {HTMLSelectElement} */ (e.target).value)
+                  }
+                >
+                  <option value="">Choose a run</option>
+                  {newestFirst.map((/** @type {any} */ p) => (
+                    <option key={p.runId} value={p.runId}>
+                      {when(p.at)} · {formatScore(p.score)} · {shortUrl(p.url)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+            <span className="h-spacer" />
+            <button type="button" disabled={!from || !to || from === to} onClick={compare}>
+              Compare
+            </button>
+          </div>
+          {comparison ? (
+            <Fragment>
+              <p>
+                Score {formatScore(comparison.overallBefore)} to{' '}
+                {formatScore(comparison.overallAfter)} {formatDelta(comparison.overallDelta)};{' '}
+                {comparison.stillFailing.length} still failing.
+              </p>
+              <IssueList title="New issues" items={comparison.newIssues} />
+              <IssueList title="Fixed" items={comparison.fixed} />
+            </Fragment>
+          ) : null}
+        </Panel>
+      ) : null}
+      {points.length ? (
+        <Panel>
+          <h2>Runs in this history</h2>
+          <table className="seo-table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Page</th>
+                <th>Score</th>
+                <th>Failing</th>
+              </tr>
+            </thead>
+            <tbody>
+              {newestFirst.slice(0, 30).map((/** @type {any} */ p) => (
+                <tr key={p.runId}>
+                  <td>
+                    <Link href={runPagePath(project.id, p.runId)}>{when(p.at)}</Link>
+                  </td>
+                  <td>{shortUrl(p.url)}</td>
+                  <td>
+                    <Tag tone={scoreTone(p.score)}>
+                      {formatScore(p.score)} {p.grade}
+                    </Tag>
+                  </td>
+                  <td>{p.failures + p.warnings}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Panel>
+      ) : null}
+    </Fragment>
   );
 };
 

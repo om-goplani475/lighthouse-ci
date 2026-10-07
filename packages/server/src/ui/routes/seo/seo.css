@@ -150,3 +150,30 @@
   cursor: pointer;
   font-weight: var(--medium-font-weight);
 }
+
+.seo-chart {
+  display: block;
+  width: 100%;
+  max-width: 640px;
+  height: auto;
+}
+
+.seo-chart__grid {
+  stroke: var(--base-border-color);
+  stroke-width: 1;
+}
+
+.seo-chart__label {
+  font-size: 10px;
+  fill: currentColor;
+}
+
+.seo-chart__line {
+  fill: none;
+  stroke: var(--color-blue-700, #1a73e8);
+  stroke-width: 2;
+}
+
+.seo-chart__dot {
+  fill: var(--color-blue-700, #1a73e8);
+}

@@ -104,6 +104,41 @@ export function formatDuration(startedAt, finishedAt) {
 }
 
 /**
+ * Where to draw a score history as a line chart (scores run from 0 at the bottom to 100 at the top). A run with no score
+ * leaves a gap in the line, not a drop to zero.
+ * @param {Array<{runId: string, score: number | null, at?: string}>} points Oldest first.
+ * @param {{width?: number, height?: number, pad?: number}} [size]
+ * @return {{width: number, height: number, segments: string[], dots: Array<{runId: string, x: number, y: number, score: number, at: string}>, ticks: Array<{y: number, label: string}>}}
+ */
+export function chartGeometry(points, size = {}) {
+  const {width = 560, height = 180, pad = 28} = size;
+  const x = (/** @type {number} */ i) =>
+    points.length <= 1 ? width / 2 : pad + (i * (width - 2 * pad)) / (points.length - 1);
+  const y = (/** @type {number} */ score) =>
+    height - pad - (Math.min(100, Math.max(0, score)) * (height - 2 * pad)) / 100;
+  /** @type {string[]} */
+  const segments = [];
+  /** @type {string[]} */
+  let current = [];
+  /** @type {Array<{runId: string, x: number, y: number, score: number, at: string}>} */
+  const dots = [];
+  points.forEach((p, i) => {
+    if (typeof p.score !== 'number' || !Number.isFinite(p.score)) {
+      if (current.length) segments.push(current.join(' '));
+      current = [];
+      return;
+    }
+    const px = Math.round(x(i) * 10) / 10;
+    const py = Math.round(y(p.score) * 10) / 10;
+    current.push(`${px},${py}`);
+    dots.push({runId: p.runId, x: px, y: py, score: p.score, at: p.at || ''});
+  });
+  if (current.length) segments.push(current.join(' '));
+  const ticks = [0, 50, 100].map(v => ({y: Math.round(y(v) * 10) / 10, label: String(v)}));
+  return {width, height, segments, dots, ticks};
+}
+
+/**
  * @param {string | null | undefined} sha
  * @return {string}
  */
