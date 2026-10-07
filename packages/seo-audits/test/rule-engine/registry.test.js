@@ -96,9 +96,10 @@ describe('rule registry — real production rulesets', () => {
     // Array-nested property (structured-data-remaining-types) — BreadcrumbList.itemListElement
     // is a list of ListItem, not a single object; confirms the engine's one-level nesting check
     // applies per-instance, same as a single nested object.
+    // `name|item.name`: the name may also be inside the `item` object (the older form, used by real shops).
     expect(google.types.BreadcrumbList.nested.itemListElement.required).toEqual([
       'position',
-      'name',
+      'name|item.name',
     ]);
 
     expect(eligibility.types.Product.supported).toBe(true);

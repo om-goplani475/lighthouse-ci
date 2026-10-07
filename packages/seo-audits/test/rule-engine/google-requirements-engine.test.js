@@ -22,6 +22,13 @@ const ruleset = {
       },
       conditional: [],
     },
+    BreadcrumbList: {
+      required: ['itemListElement'],
+      nested: {
+        itemListElement: {type: 'ListItem', required: ['position', 'name|item.name']},
+      },
+      conditional: [],
+    },
     Article: {
       required: ['headline', 'image', 'datePublished'],
       nested: {},
@@ -192,5 +199,41 @@ describe('google-requirements-engine', () => {
         message: expect.stringContaining('invalid'),
       }),
     ]);
+  });
+
+  describe('a required property that may also be given inside a nested object (`name|item.name`)', () => {
+    const crumbs = items => ({itemListElement: items});
+
+    it('accepts the name on the list item, or inside its item object (the older form, used by real shops)', () => {
+      expect(
+        validate(
+          'BreadcrumbList',
+          crumbs([{position: 1, name: 'Home', item: 'https://e.com/'}]),
+          ruleset
+        )
+      ).toEqual([]);
+      expect(
+        validate(
+          'BreadcrumbList',
+          crumbs([{position: 1, item: {'@id': 'https://e.com/', name: 'Home'}}]),
+          ruleset
+        )
+      ).toEqual([]);
+    });
+
+    it('still flags a list item with no name anywhere, and says both places', () => {
+      for (const item of [
+        {position: 1},
+        {position: 1, item: 'https://e.com/'},
+        {position: 1, item: {'@id': 'https://e.com/'}},
+        {position: 1, item: ['https://e.com/']},
+        {position: 1, item: null},
+      ]) {
+        const findings = validate('BreadcrumbList', crumbs([item]), ruleset);
+        expect(findings).toEqual([
+          expect.objectContaining({property: 'itemListElement.name or itemListElement.item.name'}),
+        ]);
+      }
+    });
   });
 });

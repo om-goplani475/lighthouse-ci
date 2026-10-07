@@ -86,9 +86,25 @@ function checkDatatypes(schemaType, object, datatypes, labelPrefix) {
 }
 
 /**
+ * @param {Record<string, unknown>} object
+ * @param {string} path A property name, or a path through nested objects such as `item.name`.
+ * @return {boolean} Whether the property is present (an array on the way is not followed).
+ */
+function hasProperty(object, path) {
+  /** @type {unknown} */
+  let current = object;
+  for (const part of path.split('.')) {
+    if (typeof current !== 'object' || current === null || Array.isArray(current)) return false;
+    if (!(part in current)) return false;
+    current = /** @type {Record<string, unknown>} */ (current)[part];
+  }
+  return true;
+}
+
+/**
  * @param {string} schemaType
  * @param {Record<string, unknown>} object
- * @param {string[] | undefined} required Property names; `a|b` accepts either.
+ * @param {string[] | undefined} required Property names; `a|b` accepts either; `item.name` means a name inside `item`.
  * @param {string[] | undefined} recommended
  * @param {string} labelPrefix
  * @return {import('./types.js').Finding[]}
@@ -98,7 +114,7 @@ function checkPresence(schemaType, object, required, recommended, labelPrefix) {
   const findings = [];
   for (const entry of required || []) {
     const options = entry.split('|');
-    if (options.some(option => option in object)) continue;
+    if (options.some(option => hasProperty(object, option))) continue;
     const label = options.map(option => `${labelPrefix}${option}`).join(' or ');
     findings.push({
       namespace: 'google-requirements',

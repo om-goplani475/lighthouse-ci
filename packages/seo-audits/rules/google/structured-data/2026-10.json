@@ -26,7 +26,7 @@
       "nested": {
         "itemListElement": {
           "type": "ListItem",
-          "required": ["position", "name"]
+          "required": ["position", "name|item.name"]
         }
       },
       "conditional": []

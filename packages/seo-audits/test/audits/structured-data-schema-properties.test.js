@@ -278,7 +278,7 @@ describe('structured-data-schema-properties audit', () => {
     const failure = result.details.items.find(
       /** @param {any} item */ item => item.namespace === 'google-requirements'
     );
-    expect(failure.property).toBe('itemListElement[1].name');
+    expect(failure.property).toBe('itemListElement[1].name or itemListElement[1].item.name');
   }, 30000);
 
   it('passes a Recipe with all required flat properties', async () => {
