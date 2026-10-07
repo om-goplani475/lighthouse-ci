@@ -687,6 +687,10 @@ New: `packages/seo-audits/src/service/` (project config, webhook signature, payl
 
 New command `send-test-webhook` (`packages/seo-audits/src/service/send-test-webhook.js`): sends one signed test delivery to a project's webhook so a setup can be checked without a real pull request. The manual workflow `.github/workflows/seo-audit.yml` now pins its runner to `ubuntu-24.04` (a new default image can no longer change Chrome and system libraries unnoticed) and uses the Node 24 majors of `checkout`, `setup-node` and `upload-artifact` (v7). It has not been re-run on GitHub yet. No change to the audits.
 
+## 2026-10-07 — SARIF export (Phase 19, slice 2)
+
+`seo-summary --format sarif` (and `--sarif-file <repo path>`) writes the issues as SARIF 2.1.0 for GitHub code scanning and other dashboards; the webhook service serves the same for a finished run at `GET /api/v1/seo/projects/:id/runs/:runId/sarif`. See the README. Not yet tried against GitHub itself.
+
 ## 2026-10-07 — secrets at rest (Phase 19, slice 1)
 
 The webhook service can now encrypt what it stores: each project's webhook secret and its notification settings (GitHub/GitLab tokens, Slack and Teams URLs) are sealed with AES-256-GCM when `LHCI_SEO_SECRET_KEY` is set (`openssl rand -hex 32`). Plain rows are sealed at the next start; `LHCI_SEO_SECRET_KEY_PREVIOUS` rotates the key. With a wrong or missing key a project's webhooks answer 503 and nothing falls back to plain text. Without a key nothing changes except a start-up warning. The `webhookSecret` column is now 255 wide (an existing MySQL table needs an `ALTER TABLE`, see `.ai-agents/state/security-findings.md`).
