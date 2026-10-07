@@ -28,6 +28,7 @@ import {resolveAssertions} from './project-config.js';
 import {summarizeRun} from '../summary/run-summary.js';
 import {compareRuns} from '../summary/compare.js';
 import {reviveSerpPreview, compareSerpPreviews} from '../lib/serp-preview.js';
+import {reviveTemplates} from '../lib/templates.js';
 import {loadLhrs} from '../summary/load.js';
 import {serializeRun, reviveRun} from './run-result.js';
 import {SIGNAL_IDS} from './notifier.js';
@@ -171,6 +172,16 @@ function serpOf(lhr) {
 
 /**
  * @param {any} lhr
+ * @return {import('../lib/templates.js').Template[]} The template groups the `template-groups-report` audit found (empty
+ *   when the crawl saw none, or the shape is not the expected one).
+ */
+function templatesOf(lhr) {
+  const a = lhr && lhr.audits && lhr.audits['template-groups-report'];
+  return reviveTemplates(a && a.details && a.details.templates);
+}
+
+/**
+ * @param {any} lhr
  * @return {Record<string, {score: number | null, title: string, displayValue: string}>}
  */
 function signalsOf(lhr) {
@@ -303,6 +314,8 @@ function createRunAudit(deps) {
         // Lighthouse's own crawlability and status audits, for the "page stopped being crawlable" alert.
         signals: signalsOf(lhr),
         // How the page may look in search results, and what changed since the baseline run.
+        // Pages grouped by the shape of their address, with the problems each group shares.
+        templates: templatesOf(lhr),
         serp,
         serpChange: compareSerpPreviews(baselineSerp, serp),
         baselineSignals,

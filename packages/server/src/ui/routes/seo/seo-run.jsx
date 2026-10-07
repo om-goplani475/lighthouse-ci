@@ -21,6 +21,7 @@ import {
   IssueList,
   CategoryTable,
   SerpPreview,
+  TemplateTable,
 } from './seo-parts.jsx';
 import {describeRunStatus, formatDuration, shortSha, safeLink} from './seo-model.js';
 
@@ -103,6 +104,16 @@ const RunDetail = ({run}) => {
         <Panel>
           <h2>Search result preview</h2>
           <SerpPreview serp={run.result.serp} change={run.result.serpChange} />
+        </Panel>
+      ) : null}
+      {run.result && run.result.templates && run.result.templates.length ? (
+        <Panel>
+          <h2>Templates</h2>
+          <p className="text--smaller">
+            Crawled pages grouped by the shape of their address. A problem on most of a template's
+            pages is one fix in one place. A heuristic on the pages the crawl reached.
+          </p>
+          <TemplateTable templates={run.result.templates} />
         </Panel>
       ) : null}
       {summary ? (

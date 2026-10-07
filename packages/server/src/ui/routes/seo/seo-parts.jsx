@@ -202,3 +202,55 @@ export const SerpPreview = ({serp, change}) => {
     </Fragment>
   );
 };
+
+/**
+ * The crawled pages grouped by template (`/blog/:slug`), with the problems most of a template's pages share: one fix in the
+ * template covers all of them.
+ * @param {{templates: any[] | undefined}} props
+ */
+export const TemplateTable = ({templates}) => {
+  if (!templates || templates.length === 0) return null;
+  return (
+    <table className="seo-table">
+      <thead>
+        <tr>
+          <th>Template</th>
+          <th>Pages</th>
+          <th>Problems on its pages</th>
+        </tr>
+      </thead>
+      <tbody>
+        {templates.map(t => (
+          <tr key={t.pattern}>
+            <td>
+              <code>{t.pattern}</code>
+            </td>
+            <td>{t.pages}</td>
+            <td>
+              {t.problems.length === 0 ? (
+                <span className="text--smaller">none found</span>
+              ) : (
+                <ul className="seo-issues">
+                  {t.problems.map((/** @type {any} */ p) => {
+                    const shared = (t.systemic || []).some(
+                      (/** @type {any} */ s) => s.key === p.key
+                    );
+                    return (
+                      <li key={p.key}>
+                        <Tag tone={shared ? 'fail' : 'neutral'}>
+                          {p.count} of {t.pages}
+                        </Tag>{' '}
+                        {p.label}
+                        {shared ? <strong> (one fix in the template)</strong> : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+};

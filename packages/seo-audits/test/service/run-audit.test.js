@@ -145,6 +145,34 @@ describe('runAudit', () => {
     expect(result.baselineNote).toBe('');
   });
 
+  describe('templates', () => {
+    const withTemplates = templates => ({
+      'template-groups-report': audit(1, {
+        scoreDisplayMode: 'informative',
+        details: {type: 'table', headings: [], items: [], templates},
+      }),
+    });
+    const tpl = {pattern: '/blog/:slug', pages: 4, examples: [], problems: [], systemic: []};
+
+    it('stores the template groups the audit found', async () => {
+      const {runAudit} = make({
+        collect: fakeCollect({'canonical-https': audit(1), ...withTemplates([tpl])}),
+      });
+      expect((await runAudit(input())).templates).toEqual([tpl]);
+    });
+
+    it('stores none for a page without the audit, and ignores a damaged value', async () => {
+      const none = await make({collect: fakeCollect({'canonical-https': audit(1)})}).runAudit(
+        input()
+      );
+      expect(none.templates).toEqual([]);
+      const damaged = await make({
+        collect: fakeCollect({'canonical-https': audit(1), ...withTemplates('<b>hostile</b>')}),
+      }).runAudit(input());
+      expect(damaged.templates).toEqual([]);
+    });
+  });
+
   describe('search result preview', () => {
     const {buildSerpPreview} = require('../../src/lib/serp-preview.js');
     const budgets = {title: {desktop: 600, mobile: 580}, description: {desktop: 920, mobile: 680}};
