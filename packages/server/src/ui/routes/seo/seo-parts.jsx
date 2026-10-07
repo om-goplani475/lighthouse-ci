@@ -148,3 +148,57 @@ export const CategoryTable = ({categories, comparison}) => {
     </table>
   );
 };
+
+/** @param {{text: {shown: string, truncated: boolean} | null, kind: 'title' | 'description'}} props */
+const SnippetText = ({text, kind}) =>
+  text ? (
+    <div className={`seo-serp__${kind}`}>{text.shown}</div>
+  ) : (
+    <div className={`seo-serp__${kind} seo-serp__missing`}>
+      {kind === 'title'
+        ? 'No title: Google will make one up.'
+        : 'No description: Google will pick text from the page.'}
+    </div>
+  );
+
+/**
+ * A model of the page's search result (desktop and mobile), and what changed since the baseline run. An approximation:
+ * Google does not publish its fonts or widths and often rewrites titles and descriptions.
+ * @param {{serp: any, change?: {titleChanged: boolean, descriptionChanged: boolean, urlChanged: boolean} | null}} props
+ */
+export const SerpPreview = ({serp, change}) => {
+  if (!serp || !serp.devices) return null;
+  return (
+    <Fragment>
+      <div className="seo-serp-grid">
+        {[
+          ['Desktop', serp.devices.desktop],
+          ['Mobile', serp.devices.mobile],
+        ].map(([label, device]) => (
+          <div key={String(label)} className="seo-serp">
+            <div className="text--smaller">{String(label)}</div>
+            <div className="seo-serp__url">{serp.displayUrl}</div>
+            <SnippetText kind="title" text={/** @type {any} */ (device).title} />
+            <SnippetText kind="description" text={/** @type {any} */ (device).description} />
+          </div>
+        ))}
+      </div>
+      {change && (change.titleChanged || change.descriptionChanged || change.urlChanged) ? (
+        <p className="text--smaller">
+          Changed since the earlier run:{' '}
+          {[
+            change.titleChanged && 'title',
+            change.descriptionChanged && 'description',
+            change.urlChanged && 'address',
+          ]
+            .filter(Boolean)
+            .join(', ')}
+        </p>
+      ) : null}
+      <p className="text--smaller">
+        An approximation (a font and widths of our own); Google often rewrites titles and
+        descriptions.
+      </p>
+    </Fragment>
+  );
+};

@@ -24,6 +24,8 @@ const {validateAdminTokenMiddleware, handleAsyncError} = require('../api/express
 const UUID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const PROVIDERS = ['github', 'gitlab', 'lhci'];
 const EVENT_HEADERS = {github: 'x-github-event', gitlab: 'x-gitlab-event', lhci: ''};
+// The plain-secrets warning is printed once per process, not once per service created.
+let warnedAboutPlainSecrets = false;
 const JOB_TIMEOUT_MS = 10 * 60 * 1000;
 const DISPATCH_TIMEOUT_MS = 60 * 1000;
 
@@ -109,7 +111,8 @@ async function createSeoService(context, deps, limits = {}) {
     previousKey: process.env.LHCI_SEO_SECRET_KEY_PREVIOUS,
   });
   const store = await createSeoStore(context.storageMethod._sql().sequelize, secretBox);
-  if (!secretBox.enabled) {
+  if (!secretBox.enabled && !warnedAboutPlainSecrets) {
+    warnedAboutPlainSecrets = true;
     process.emitWarning(
       'LHCI_SEO_SECRET_KEY is not set: the SEO service stores webhook secrets and notification tokens unencrypted.',
       'SeoServiceWarning'

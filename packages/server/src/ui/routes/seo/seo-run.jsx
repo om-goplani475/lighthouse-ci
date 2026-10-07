@@ -20,6 +20,7 @@ import {
   ScoreBadge,
   IssueList,
   CategoryTable,
+  SerpPreview,
 } from './seo-parts.jsx';
 import {describeRunStatus, formatDuration, shortSha, safeLink} from './seo-model.js';
 
@@ -98,6 +99,12 @@ const RunDetail = ({run}) => {
           </Notice>
         ) : null}
       </Panel>
+      {run.result && run.result.serp ? (
+        <Panel>
+          <h2>Search result preview</h2>
+          <SerpPreview serp={run.result.serp} change={run.result.serpChange} />
+        </Panel>
+      ) : null}
       {summary ? (
         <Panel>
           <h2>Categories</h2>
