@@ -16,7 +16,7 @@ done, decisions waiting, and deferred features. What was finished is in `docs/ph
 | Viewer | `@lhci/viewer` renders all 34 audits that had tables in five real reports (2026-10-06); the server and `seed-database` path was checked on 2026-10-05. |
 | Not built yet | Phase 19 (in progress): SARIF, reporting and history, SERP preview, template detection (secrets at rest is built). Phase 20: scheduled monitoring and the GitHub App. AI-generated fixes are not planned. See `docs/phases/phase-19-reporting-and-hardening.md`. |
 | Failing suites outside `seo-audits` | 6 screenshot suites in `server` and `viewer` fail on this machine only (see section 4); the rest pass. Not caused by this work. |
-| Not verified at all | The CrUX success path with a real key (E). A real pull request comment, Slack and Teams alert and GitHub/GitLab webhook delivery (H). The workflow after the 2026-10-07 change (actions v7, runner `ubuntu-24.04`) has not run on GitHub yet (A3). |
+| Not verified at all | A real pull request comment, Slack and Teams alert and GitHub/GitLab webhook delivery (H). The workflow after the 2026-10-07 change (actions v7, runner `ubuntu-24.04`) has not run on GitHub yet (A3). |
 
 ## 2. Checks still to do
 
@@ -24,14 +24,6 @@ done, decisions waiting, and deferred features. What was finished is in `docs/ph
 
 The first real run (2026-10-06, `https://web.dev/`) passed every check: the fork's `lhci` and the global `@lhci/cli` gave identical reports (0 differences), 57 of 57 scored audits ran then, the whole run took 71 s. Since then the workflow moved its actions to v7 and pinned the runner to `ubuntu-24.04`. **Run "SEO audit (A3 check)" once more** after pushing `main`: it should pass the same way, and print the `collect+assert took N s` line. A red job from real findings (assertions failing on web.dev's own issues) is expected, not a failure of the workflow.
 Optional: run it on **your own site**, and once with `runs: 3`, to see whether your site's WAF tolerates the repeated requests; if not, lower `LHCI_SEO_CRAWL_MAX_PAGES`, `LHCI_SEO_CRAWL_MAX_LINK_CHECKS`, `LHCI_SEO_CRAWL_MAX_EXTERNAL_CHECKS` and `LHCI_SEO_HREFLANG_MAX_CHECKS` (the README's request-budget table lists them all).
-
-### E. Phase 13: verify `core-web-vitals-field` with a real key (needs you)
-
-The audit was built and run live without a key (not applicable), with a key on localhost (nothing sent) and against the real Google endpoint with a fake key (a clear 400), but **the
-success path has never seen real data**. Create a Google Cloud API key, enable the "Chrome UX Report API" (free), then
-`LHCI_SEO_CRUX_API_KEY=<key> npx lhci collect --url=<a busy public site, for example https://web.dev/> --settings.configPath=packages/seo-audits/src/lighthouse-config.js` and read the table.
-**Pass when** it shows LCP, INP and CLS with a Google rating and a collection period, says whether the URL or the whole site answered, and the key does not appear in the report JSON.
-A low-traffic site returns "no data", which is expected. Anything off is a `fix(seo-audits)` commit with a test using the real response shape.
 
 ### H. Phase 17: verify the real destinations (needs you)
 

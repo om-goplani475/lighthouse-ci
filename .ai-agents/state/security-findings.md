@@ -870,7 +870,7 @@ The first audit that sends a **secret** and the audited page's address to a **th
 
 ### Not verified
 
-- The success path with a real key and real CrUX data.
+- ~~The success path with a real key and real CrUX data.~~ Verified 2026-10-07 on web.dev: real LCP, INP, CLS, FCP and TTFB came back, and the key appeared in neither the JSON nor the HTML report.
 - Behaviour at the API quota (a 429 is reported as "quota exceeded", unit-tested only).
 
 No `critical`, `high` or `medium` findings, and no new `low` finding; Finding 10 remains open and accepted.

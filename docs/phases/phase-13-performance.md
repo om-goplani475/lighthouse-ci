@@ -2,7 +2,7 @@
 
 Live tracker for this phase's work in `packages/seo-audits`. Branch: `phase-13-performance` (off `main`). Lighthouse core already covers the lab metrics; this phase adds real-visitor data and two crawl-weight reports.
 
-**Status: done (2026-10-05): built, QA'd and merged into `main`; recalibrated on 2026-10-06 (a poor whole-site result is a note).** The CrUX success path (real data) is **not verified**: it needs a real Google API key (open item).
+**Status: done (2026-10-05): built, QA'd and merged into `main`; recalibrated on 2026-10-06 (a poor whole-site result is a note).** The CrUX success path was **verified with a real key on 2026-10-07** (web.dev: LCP 3.1 s, INP 216 ms, CLS 0.01 at the 75th percentile, answered for the URL on phone, scored 1 as only "needs improvement"; the key was absent from the JSON and HTML reports).
 
 ## Planning decisions (2026-10-05, lightweight with a plain-language explanation; the developer had no CrUX background)
 
