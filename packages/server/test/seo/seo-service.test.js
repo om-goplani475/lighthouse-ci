@@ -191,6 +191,32 @@ describe('SEO webhook service', () => {
     if (t) await t.stop();
   });
 
+  describe('secrets at rest', () => {
+    const KEY = 'c'.repeat(64);
+    afterEach(() => {
+      delete process.env.LHCI_SEO_SECRET_KEY;
+    });
+
+    it('stores the secret sealed, still accepts signed deliveries, and refuses when it cannot be opened', async () => {
+      process.env.LHCI_SEO_SECRET_KEY = KEY;
+      t = await startService({}, async () => ({summary: {}}));
+      const secret = await t.setUp();
+      const sequelize = t.storageMethod._sql().sequelize;
+      const [[row]] = await sequelize.query('select webhookSecret from seo_projects');
+      expect(row.webhookSecret.startsWith('enc:v1:')).toBe(true);
+      expect(row.webhookSecret).not.toContain(secret);
+
+      const body = eventBody();
+      const ok = await t.api.post(t.hook, undefined, signLhci(secret, body), body);
+      expect(ok.status).toBe(202);
+
+      await sequelize.query(`update seo_projects set webhookSecret = 'enc:v1:AAAA.AAAA.AAAA'`);
+      const refused = await t.api.post(t.hook, undefined, signLhci(secret, body), body);
+      expect(refused.status).toBe(503);
+      expect(refused.text).not.toContain(secret);
+    });
+  });
+
   describe('management', () => {
     it('needs the project admin token', async () => {
       t = await startService({});

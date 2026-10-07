@@ -17,6 +17,7 @@
 
 const express = require('express');
 const {createSeoStore} = require('./seo-store.js');
+const {createSecretBox} = require('./secret-box.js');
 const {createQueue, createRateLimiter} = require('./seo-queue.js');
 const {validateAdminTokenMiddleware, handleAsyncError} = require('../api/express-utils.js');
 
@@ -81,7 +82,18 @@ function publicProject(row) {
  * @return {Promise<{webhooks: import('express').Router, management: import('express').Router, store: any, queue: any}>}
  */
 async function createSeoService(context, deps, limits = {}) {
-  const store = await createSeoStore(context.storageMethod._sql().sequelize);
+  const secretBox = createSecretBox({
+    key: process.env.LHCI_SEO_SECRET_KEY,
+    previousKey: process.env.LHCI_SEO_SECRET_KEY_PREVIOUS,
+  });
+  const store = await createSeoStore(context.storageMethod._sql().sequelize, secretBox);
+  if (!secretBox.enabled) {
+    process.emitWarning(
+      'LHCI_SEO_SECRET_KEY is not set: the SEO service stores webhook secrets and notification tokens unencrypted.',
+      'SeoServiceWarning'
+    );
+  }
+  await store.sealStoredSecrets();
   await store.failOrphans();
   const replay = deps.createReplayGuard();
   // Failed signatures are logged so an owner can see them, but anyone who knows a project's webhook URL can send them, so
@@ -228,6 +240,13 @@ async function createSeoService(context, deps, limits = {}) {
       if (!(await context.storageMethod.findProjectById(projectId))) {
         await store.deleteProject(projectId);
         return res.status(404).json({message: 'not found'});
+      }
+
+      if (seo.secretUnreadable) {
+        // Never verify against a guess: without the right key no delivery can be trusted.
+        return res
+          .status(503)
+          .json({message: "this project's secrets cannot be read; check LHCI_SEO_SECRET_KEY"});
       }
 
       const rawBody = /** @type {any} */ (req).rawBody;

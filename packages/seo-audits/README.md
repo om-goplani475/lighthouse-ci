@@ -1038,11 +1038,13 @@ The LHCI server (`packages/server`) can run the audits for other repositories, s
 | Variable | Default | Meaning |
 |---|---|---|
 | `LHCI_SEO_SERVICE` | on | Set to `off` to turn the whole service off (no tables, no routes). |
+| `LHCI_SEO_SECRET_KEY` | unset | 32 bytes (64 hex characters, or base64) that encrypt the stored webhook secrets and notification settings with AES-256-GCM. Generate one with `openssl rand -hex 32` and keep it outside the database and its backups. Unset: stored in clear and a warning is printed at start-up. Plain rows are sealed at the next start. A bad key stops the server at start-up. |
+| `LHCI_SEO_SECRET_KEY_PREVIOUS` | unset | The old key while rotating: set it next to the new `LHCI_SEO_SECRET_KEY`, restart once (everything is re-sealed under the new key), then remove it. |
 | `LHCI_SEO_PUBLIC_URL` | unset | The server's public address, for the "Full report" link in comments and alerts (`<this>/app/seo/<project>/runs/<run>`). No link when unset. |
 | `LHCI_SEO_SERVICE_CHROME_FLAGS` | unset | Extra Chrome flags for service runs, for example `--no-sandbox` inside a container. A flag that could undo the proxy (`--proxy-server`, `--proxy-bypass-list`, `--host-resolver-rules`) is dropped. |
 | `LHCI_SEO_CRAWL_*`, `LHCI_SEO_HREFLANG_MAX_CHECKS`, `LHCI_SEO_SAMEAS_MAX_CHECKS`, `LHCI_SEO_CRUX_API_KEY` | (service defaults: 30 pages, 60 s) | Passed to service runs like any run. `LHCI_SEO_ALLOW_PRIVATE_NETWORK` is **never** passed. |
 
-**Run it behind a reverse proxy** that rate-limits by address (the signature check is cheap but not free) and give the container limits on memory and CPU: a page can keep Chrome busy for the 10-minute run limit. The webhook routes are mounted before the server's basic-auth; the management routes are behind it and the project admin token. Webhook secrets, GitHub/GitLab tokens and Slack/Teams URLs are stored in the server's database in clear (like the project build token), so protect the database and its backups.
+**Run it behind a reverse proxy** that rate-limits by address (the signature check is cheap but not free) and give the container limits on memory and CPU: a page can keep Chrome busy for the 10-minute run limit. The webhook routes are mounted before the server's basic-auth; the management routes are behind it and the project admin token. Webhook secrets, GitHub/GitLab tokens and Slack/Teams URLs are encrypted in the database when `LHCI_SEO_SECRET_KEY` is set (without it they are stored in clear, like the project build token, and the server warns at start-up). If the key is lost or wrong, a project's secrets cannot be read: its webhooks answer `503`, its alerts are not sent, and nothing is ever treated as unsigned or plain. Rotate the key with `LHCI_SEO_SECRET_KEY_PREVIOUS`.
 
 ### Audit index (all 125 audits)
 

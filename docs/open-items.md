@@ -14,7 +14,7 @@ done, decisions waiting, and deferred features. What was finished is in `docs/ph
 | `seo-audits` tests | 117 suites / 2,027 tests pass, on Node 24 and on Node 18.20.8 (what CI pins), checked 2026-10-06. Typecheck, lint and prettier clean. |
 | Security findings | **None open.** Findings 1-10 are fixed. One risk is *accepted*, not fixed: `LHCI_SEO_ALLOW_PRIVATE_NETWORK` lets the audits reach private addresses; set it only on jobs that audit hosts you control (the README says so). |
 | Viewer | `@lhci/viewer` renders all 34 audits that had tables in five real reports (2026-10-06); the server and `seed-database` path was checked on 2026-10-05. |
-| Phase 17 not built | Per-template grouping of pages, scheduled crawl diffs with alerting, SARIF output, GitHub App registration, a stored score column for the run list, secrets encrypted at rest. See `docs/phases/phase-17-webhook-platform.md`. |
+| Phase 17 not built | Per-template grouping of pages, scheduled crawl diffs with alerting, SARIF output, GitHub App registration, a stored score column for the run list. (Secrets at rest: built in Phase 19.) See `docs/phases/phase-17-webhook-platform.md`. |
 | Failing suites outside `seo-audits` | 6 screenshot suites in `server` and `viewer` fail on this machine only (see section 4); the rest pass. Not caused by this work. |
 | Not verified at all | The CrUX success path with a real key (E). A real pull request comment, Slack and Teams alert and GitHub/GitLab webhook delivery (H). The real GitHub Actions run (A3) passed on 2026-10-06. |
 

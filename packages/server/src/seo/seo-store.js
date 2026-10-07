@@ -20,6 +20,7 @@
 const crypto = require('crypto');
 const Sequelize = require('sequelize');
 const uuid = require('uuid');
+const {createSecretBox} = require('./secret-box.js');
 
 /* eslint-disable new-cap */
 
@@ -41,11 +42,12 @@ function clip(value, max) {
 /**
  * @param {import('sequelize').Sequelize} sequelize
  */
-async function createSeoStore(sequelize) {
+async function createSeoStore(sequelize, secretBox = createSecretBox()) {
   const Project = sequelize.define('seo_projects', {
     projectId: {type: Sequelize.UUID(), primaryKey: true},
     provider: {type: Sequelize.STRING(10), allowNull: false},
-    webhookSecret: {type: Sequelize.STRING(128), allowNull: false},
+    // 255: the sealed form of a 64-character secret is about 190 characters.
+    webhookSecret: {type: Sequelize.STRING(255), allowNull: false},
     config: {type: Sequelize.TEXT()},
     allowedHosts: {type: Sequelize.TEXT()},
     defaultUrl: {type: Sequelize.STRING(2048)},
@@ -104,11 +106,68 @@ async function createSeoStore(sequelize) {
 
   let lastPrune = 0;
 
+  const secretContext = (/** @type {string} */ projectId) =>
+    `seo_projects.webhookSecret:${projectId}`;
+  const notificationContext = (/** @type {string} */ projectId) =>
+    `seo_notifications.config:${projectId}`;
+
+  /**
+   * @param {any} row A project row as a plain object.
+   * @return {any} The row with its secret opened. When it cannot be opened the secret is null and `secretUnreadable` is
+   *   set, so the caller refuses the request instead of guessing.
+   */
+  const openProject = row => {
+    try {
+      return {
+        ...row,
+        webhookSecret: secretBox.open(row.webhookSecret, secretContext(row.projectId)).text,
+      };
+    } catch (_) {
+      return {...row, webhookSecret: null, secretUnreadable: true};
+    }
+  };
+
   return {
+    secretBox,
+
+    /**
+     * Seals every secret still stored plain (or under the previous key) with the current key. Run once at start-up.
+     * @return {Promise<number>} How many values were rewritten.
+     */
+    async sealStoredSecrets() {
+      if (!secretBox.enabled) return 0;
+      let rewritten = 0;
+      for (const row of await Project.findAll()) {
+        const {projectId, webhookSecret} = row.toJSON();
+        try {
+          const {text, stale} = secretBox.open(webhookSecret, secretContext(projectId));
+          if (stale) {
+            await row.update({webhookSecret: secretBox.seal(text, secretContext(projectId))});
+            rewritten++;
+          }
+        } catch (_) {
+          // unreadable with this key: left as it is, and reported when it is used
+        }
+      }
+      for (const row of await Notifications.findAll()) {
+        const {projectId, config} = row.toJSON();
+        try {
+          const {text, stale} = secretBox.open(config, notificationContext(projectId));
+          if (stale) {
+            await row.update({config: secretBox.seal(text, notificationContext(projectId))});
+            rewritten++;
+          }
+        } catch (_) {
+          // as above
+        }
+      }
+      return rewritten;
+    },
+
     /** @param {string} projectId @return {Promise<any>} */
     async getProject(projectId) {
       const row = await Project.findByPk(projectId);
-      return row ? row.toJSON() : null;
+      return row ? openProject(row.toJSON()) : null;
     },
 
     /**
@@ -128,12 +187,12 @@ async function createSeoStore(sequelize) {
           allowedHosts: JSON.stringify(fields.allowedHosts),
         }),
         ...(fields.defaultUrl !== undefined && {defaultUrl: fields.defaultUrl}),
-        ...(secret && {webhookSecret: secret}),
+        ...(secret && {webhookSecret: secretBox.seal(secret, secretContext(projectId))}),
       };
       if (existing) await existing.update(values);
       else await Project.create({projectId, ...values});
       const saved = await Project.findByPk(projectId);
-      return {project: saved ? saved.toJSON() : null, secret};
+      return {project: saved ? openProject(saved.toJSON()) : null, secret};
     },
 
     /** @param {string} projectId */
@@ -146,8 +205,10 @@ async function createSeoStore(sequelize) {
     async getNotifications(projectId) {
       const row = await Notifications.findByPk(projectId);
       if (!row) return null;
+      // An unreadable (not merely empty) value throws: the caller must not mistake it for "no notifications set up".
+      const {text} = secretBox.open(row.toJSON().config, notificationContext(projectId));
       try {
-        return JSON.parse(row.toJSON().config) || null;
+        return JSON.parse(text) || null;
       } catch (_) {
         return null;
       }
@@ -155,7 +216,7 @@ async function createSeoStore(sequelize) {
 
     /** @param {string} projectId @param {any} config */
     async saveNotifications(projectId, config) {
-      const text = JSON.stringify(config || {});
+      const text = secretBox.seal(JSON.stringify(config || {}), notificationContext(projectId));
       const existing = await Notifications.findByPk(projectId);
       if (existing) await existing.update({config: text});
       else await Notifications.create({projectId, config: text});
