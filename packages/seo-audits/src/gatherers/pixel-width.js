@@ -10,7 +10,9 @@ import {resolveSerpPixelBudgetsRuleset} from '../rule-engine/registry.js';
 /* eslint-env browser */
 
 /**
- * @typedef {{text: string, widthPx: number} | null} PixelWidthMeasurement
+ * @typedef {{text: string, widthPx: number, prefixWidths: number[]} | null} PixelWidthMeasurement
+ * `prefixWidths[i]` is the width of the first `i + 1` characters (code points), for the first 400 only; the SERP preview
+ * uses it to find where a text stops fitting.
  */
 /**
  * @typedef {{
@@ -44,7 +46,14 @@ function collectPixelWidth(titleFont, descriptionFont) {
   function measure(text, font) {
     if (!text) return null;
     ctx.font = font;
-    return {text, widthPx: ctx.measureText(text).width};
+    /** @type {number[]} */
+    const prefixWidths = [];
+    let prefix = '';
+    for (const character of Array.from(text).slice(0, 400)) {
+      prefix += character;
+      prefixWidths.push(Math.round(ctx.measureText(prefix).width * 10) / 10);
+    }
+    return {text, widthPx: ctx.measureText(text).width, prefixWidths};
   }
 
   const descriptionEl = document.querySelector('meta[name="description"]');

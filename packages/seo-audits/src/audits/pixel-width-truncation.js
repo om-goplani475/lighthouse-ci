@@ -6,6 +6,7 @@
 
 import {Audit} from 'lighthouse/core/audits/audit.js';
 import {resolveSerpPixelBudgetsRuleset} from '../rule-engine/registry.js';
+import {buildSerpPreview} from '../lib/serp-preview.js';
 
 const serpPixelBudgetsRuleset = resolveSerpPixelBudgetsRuleset();
 
@@ -61,12 +62,12 @@ class PixelWidthTruncation extends Audit {
       description: UIStrings.description,
       scoreDisplayMode: Audit.SCORING_MODES.INFORMATIVE,
       // @ts-expect-error - see the class-level @ts-expect-error above.
-      requiredArtifacts: ['PixelWidth'],
+      requiredArtifacts: ['PixelWidth', 'URL'],
     };
   }
 
   /**
-   * @param {{PixelWidth: import('../gatherers/pixel-width.js').PixelWidthArtifact}} artifacts
+   * @param {{PixelWidth: import('../gatherers/pixel-width.js').PixelWidthArtifact, URL?: {finalDisplayedUrl?: string}}} artifacts
    * @param {import('lighthouse/types/audit.js').default.Context} context
    * @return {import('lighthouse/types/audit.js').default.Product}
    */
@@ -99,6 +100,21 @@ class PixelWidthTruncation extends Audit {
     // @ts-expect-error - rulesetVersions isn't part of Lighthouse's Details.Table type — see the
     // sibling structured-data audits for the same reproducibility-stamp rationale.
     details.rulesetVersions = {serpPixelBudgets: serpPixelBudgetsRuleset.version};
+    // A model of the search snippet (both devices), for the SEO service's dashboard. Not a table: reports ignore it.
+    // @ts-expect-error - `serpPreview` isn't part of Lighthouse's Details.Table type, as with `rulesetVersions`.
+    details.serpPreview = buildSerpPreview({
+      url: (artifacts.URL && artifacts.URL.finalDisplayedUrl) || '',
+      title,
+      description,
+      budgets: {
+        title: serpPixelBudgetsRuleset.title.maxWidthPx,
+        description: serpPixelBudgetsRuleset.description.maxWidthPx,
+      },
+      fonts: {
+        title: serpPixelBudgetsRuleset.title.font,
+        description: serpPixelBudgetsRuleset.description.font,
+      },
+    });
 
     return {
       score: null,

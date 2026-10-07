@@ -32,8 +32,8 @@ console.log(JSON.stringify({...result, scoreDisplayMode: Audit.meta.scoreDisplay
  * @param {'desktop' | 'mobile'} [formFactor]
  * @return {Promise<any>}
  */
-async function runAudit(pixelWidth, formFactor = 'desktop') {
-  const artifacts = {PixelWidth: pixelWidth};
+async function runAudit(pixelWidth, formFactor = 'desktop', url) {
+  const artifacts = {PixelWidth: pixelWidth, ...(url && {URL: {finalDisplayedUrl: url}})};
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'seo-audits-test-'));
   const inputPath = path.join(tmpDir, 'input.json');
@@ -147,4 +147,21 @@ describe('pixel-width-truncation audit', () => {
     // these two very-different-composition measurements independently, not as interchangeable.
     expect(result.details.items).toEqual([]);
   }, 30000);
+  it('puts a model of the search snippet in the details, cut at the budget on each device', async () => {
+    const text = 'word '.repeat(30).trim();
+    const widths = Array.from(text).map((_, i) => (i + 1) * 10);
+    const result = await runAudit(
+      {title: {text, widthPx: text.length * 10, prefixWidths: widths}, description: null},
+      'desktop',
+      'https://example.com/shop/boots'
+    );
+    const preview = result.details.serpPreview;
+    expect(preview.displayUrl).toBe('example.com › shop › boots');
+    expect(preview.devices.desktop.title.truncated).toBe(true);
+    expect(preview.devices.desktop.title.shown.endsWith('…')).toBe(true);
+    expect(preview.devices.mobile.title.shown.length).toBeLessThanOrEqual(
+      preview.devices.desktop.title.shown.length
+    );
+    expect(preview.devices.desktop.description).toBeNull();
+  });
 });
