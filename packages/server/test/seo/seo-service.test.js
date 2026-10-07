@@ -185,6 +185,10 @@ async function startService(limits, runAudit, send) {
 }
 
 describe('SEO webhook service', () => {
+  // Each test starts a real server and a database file. Under the full suite's load (two workers, Chrome running in other
+  // suites) that has taken more than jest's 5 s default, so the limit is wider here. A hung test still fails, after 30 s.
+  jest.setTimeout(30000);
+
   /** @type {Awaited<ReturnType<typeof startService>>} */
   let t;
   afterEach(async () => {
