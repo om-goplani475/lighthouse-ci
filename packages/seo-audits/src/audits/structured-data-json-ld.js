@@ -55,6 +55,24 @@ function evaluateBlock(entry, index) {
     return {index, valid: false, reason: UIStrings.reasonMissingFields, snippet};
   }
 
+  // A top-level array is valid JSON-LD (each element is its own object with its own @context): judge every element, and
+  // an empty array has nothing in it.
+  if (Array.isArray(parsed)) {
+    const allValid =
+      parsed.length > 0 &&
+      parsed.every(
+        item =>
+          typeof item === 'object' &&
+          item !== null &&
+          !Array.isArray(item) &&
+          validateSchemaOrg(/** @type {Record<string, unknown>} */ (item), schemaOrgRuleset)
+            .length === 0
+      );
+    return allValid
+      ? {index, valid: true, reason: '', snippet}
+      : {index, valid: false, reason: UIStrings.reasonMissingFields, snippet};
+  }
+
   // Migrated onto the schema-org rule engine (was an inline '@context'/'@type' presence
   // check). Collapsed to the same fixed message regardless of which field(s) are missing,
   // preserving the exact pre-migration behavior/wording rather than surfacing the engine's

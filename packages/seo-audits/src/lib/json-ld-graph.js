@@ -93,7 +93,8 @@ function resolveReferences(entity, idMap) {
 
 /**
  * @param {string} content raw text content of one `<script type="application/ld+json">` block
- * @return {TypedEntity[]}
+ * @return {TypedEntity[]} The typed entities of the block. A block may be one object, an object with a `@graph`, or (valid
+ *   JSON-LD, and used by real shops such as Patagonia) a top-level array of those objects.
  */
 export function extractTypedEntities(content) {
   /** @type {unknown} */
@@ -103,6 +104,15 @@ export function extractTypedEntities(content) {
   } catch {
     return [];
   }
+  if (Array.isArray(parsed)) return parsed.flatMap(item => entitiesOfNode(item));
+  return entitiesOfNode(parsed);
+}
+
+/**
+ * @param {unknown} parsed One JSON-LD object (a container with a `@graph`, or a single entity).
+ * @return {TypedEntity[]}
+ */
+function entitiesOfNode(parsed) {
   if (!isPlainObject(parsed)) return [];
 
   const graph = parsed['@graph'];

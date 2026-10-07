@@ -137,4 +137,29 @@ describe('structured-data-json-ld audit', () => {
     expect(result.score).toBe(0);
     expect(result.details.items[0].reason).toBe('Missing @context or @type');
   }, 30000);
+  describe('a top-level array of objects (valid JSON-LD)', () => {
+    const el = type => ({'@context': 'https://schema.org', '@type': type, name: 'x'});
+
+    it('is valid when every element has @context and @type', async () => {
+      const result = await runAudit([
+        {content: JSON.stringify([el('ProductGroup'), el('Product')])},
+      ]);
+      expect(result.score).toBe(1);
+      expect(result.details.items[0].valid).toBe('Yes');
+    });
+
+    it('is invalid when an element is not an object or lacks @type or @context', async () => {
+      for (const bad of [
+        [el('Product'), {'@context': 'https://schema.org', name: 'no type'}],
+        [el('Product'), {'@type': 'Product', name: 'no context'}],
+        [el('Product'), 42],
+        [el('Product'), [el('Product')]],
+        [],
+      ]) {
+        const result = await runAudit([{content: JSON.stringify(bad)}]);
+        expect(result.score).toBe(0);
+        expect(result.details.items[0].reason).toBe('Missing @context or @type');
+      }
+    });
+  });
 });

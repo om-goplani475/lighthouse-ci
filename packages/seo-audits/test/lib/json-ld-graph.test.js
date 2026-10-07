@@ -135,3 +135,36 @@ describe('extractTypedEntities — @id reference resolution', () => {
     expect(article.data.author.address).toEqual({'@id': '#country'});
   });
 });
+
+describe('extractTypedEntities: a top-level array (valid JSON-LD, used by real shops)', () => {
+  const product = name => ({'@context': 'https://schema.org', '@type': 'Product', name});
+
+  it('returns the typed entities of every element', () => {
+    const content = JSON.stringify([
+      product('A'),
+      {'@context': 'https://schema.org', '@type': 'Organization', name: 'O'},
+      product('B'),
+    ]);
+    expect(extractTypedEntities(content).map(e => [e.type, e.data.name])).toEqual([
+      ['Product', 'A'],
+      ['Organization', 'O'],
+      ['Product', 'B'],
+    ]);
+  });
+
+  it('unwraps a @graph inside an element, and skips elements that are not objects or have no type', () => {
+    const content = JSON.stringify([
+      {'@context': 'https://schema.org', '@graph': [{'@type': 'Article', headline: 'H'}]},
+      42,
+      null,
+      'text',
+      {'@context': 'https://schema.org'},
+      [product('nested arrays are not JSON-LD documents')],
+    ]);
+    expect(extractTypedEntities(content).map(e => e.type)).toEqual(['Article']);
+  });
+
+  it('is empty for an empty array', () => {
+    expect(extractTypedEntities('[]')).toEqual([]);
+  });
+});
