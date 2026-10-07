@@ -1020,6 +1020,15 @@ It reads the `lhr-*.json` files (the latest run of each page), sends nothing any
 - **Fix guidance** for the top issues (`--guidance N`, default 10): the audit's own explanation of what is wrong and its description.
 - **`--compare <earlier folder>`:** per page, the score change, the **new** issues, the **fixed** ones and how many are **still failing** (worse or better). Pages are paired by URL; pages in only one of the two folders are named.
 
+**SARIF output (Phase 19).** `--format sarif` writes the issues as SARIF 2.1.0, the format GitHub code scanning and other dashboards read: one rule per failing audit, one result per audit and page (a failing error-tier audit is `error`, anything else `warning`; passes, not-applicable and informational audits are left out), each with a stable fingerprint so an alert stays the same alert between runs. At most 5,000 results are written (GitHub's limit) and the log says if it cut.
+
+```
+node packages/seo-audits/src/summary/cli.js .lighthouseci --format sarif --out seo.sarif
+node packages/seo-audits/src/summary/cli.js .lighthouseci --format sarif --sarif-file lighthouserc.js --out seo.sarif
+```
+
+A page is not a file. By default each result's location is the **page URL**, which any SARIF viewer shows. GitHub code scanning only displays alerts that point at **a file in the repository**, so `--sarif-file <path>` attaches every result to that file at line 1 (use your `lighthouserc.js`, or the template that renders the page); the page stays in each message and in the result's properties. The path must be relative, without `..`, a scheme or a backslash. **Not yet tried against GitHub itself** (the output is checked against the official SARIF 2.1.0 schema, and a real report is in the tests); the upload step is `github/codeql-action/upload-sarif` with `sarif_file: seo.sarif` and `security-events: write` permission. The webhook service serves the same thing for a finished run: `GET /api/v1/seo/projects/:id/runs/:runId/sarif[?file=<path>]` (admin token).
+
 It always exits 0 when it can read the reports (it reports; `lhci assert` gates) and 2 on a usage error. The A3 workflow (`.github/workflows/seo-audit.yml`) appends its output to the job summary.
 
 ### The webhook service (Phase 17)

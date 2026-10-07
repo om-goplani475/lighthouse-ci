@@ -19,12 +19,15 @@ import {summarizeRun} from './run-summary.js';
 import {compareAll} from './compare.js';
 import {renderMarkdown, toData} from './render.js';
 import {loadLhrs} from './load.js';
+import {toSarif, isRepoPath} from './sarif.js';
 
-const USAGE = `Usage: seo-summary <folder-or-lhr.json> [--compare <earlier-folder>] [--format markdown|json] [--top N] [--guidance N] [--out file]
+const USAGE = `Usage: seo-summary <folder-or-lhr.json> [--compare <earlier-folder>] [--format markdown|json|sarif] [--sarif-file <repo path>] [--top N] [--guidance N] [--out file]
 
   <folder>      where lhci wrote its lhr-*.json files (usually .lighthouseci)
   --compare     an earlier report folder: lists new, fixed and still-failing issues per page
-  --format      markdown (default) or json
+  --format      markdown (default), json, or sarif (SARIF 2.1.0 for GitHub code scanning and other dashboards)
+  --sarif-file  with --format sarif: a file in your repository to attach every result to (GitHub only shows alerts
+                that point at a repository file; the page URL stays in each message). Default: the page URL.
   --top         how many issues to list per page (default 25)
   --guidance    how many of the top issues get fix guidance (default 10)
   --out         write to this file instead of the terminal
@@ -32,7 +35,7 @@ const USAGE = `Usage: seo-summary <folder-or-lhr.json> [--compare <earlier-folde
 
 /**
  * @param {string[]} argv
- * @return {{location?: string, compare?: string, format: string, top: number, guidance: number, out?: string, help: boolean, error?: string}}
+ * @return {{location?: string, compare?: string, format: string, sarifFile?: string, top: number, guidance: number, out?: string, help: boolean, error?: string}}
  */
 function parseArgs(argv) {
   /** @type {ReturnType<typeof parseArgs>} */
@@ -43,6 +46,7 @@ function parseArgs(argv) {
     if (a === '--help' || a === '-h') args.help = true;
     else if (a === '--compare') args.compare = value();
     else if (a === '--format') args.format = String(value());
+    else if (a === '--sarif-file') args.sarifFile = value();
     else if (a === '--top') args.top = Number(value());
     else if (a === '--guidance') args.guidance = Number(value());
     else if (a === '--out') args.out = value();
@@ -50,7 +54,12 @@ function parseArgs(argv) {
     else if (!args.location) args.location = a;
     else args.error = 'Only one report folder can be given (use --compare for a second).';
   }
-  if (!['markdown', 'json'].includes(args.format)) args.error = '--format must be markdown or json';
+  if (!['markdown', 'json', 'sarif'].includes(args.format)) {
+    args.error = '--format must be markdown, json or sarif';
+  }
+  if (args.sarifFile !== undefined && !isRepoPath(args.sarifFile)) {
+    args.error = '--sarif-file must be a relative path inside the repository, without ".."';
+  }
   if (!Number.isInteger(args.top) || args.top < 1) {
     args.error = '--top must be a whole number of at least 1';
   }
@@ -67,6 +76,16 @@ function parseArgs(argv) {
 function summarizeFolder(location, recommended) {
   const {lhrs, skipped} = loadLhrs(location);
   return {runs: lhrs.map(lhr => summarizeRun(lhr, recommended)), skipped};
+}
+
+function packageVersion() {
+  try {
+    // @ts-expect-error - `import.meta` is valid ESM syntax; this file runs as real ESM (see rule-engine/registry.js).
+    const file = fileURLToPath(new URL('../../package.json', import.meta.url));
+    return String(JSON.parse(fs.readFileSync(file, 'utf8')).version);
+  } catch (_) {
+    return '0.0.0';
+  }
 }
 
 function main() {
@@ -96,7 +115,13 @@ function main() {
   }
   const comparisons = compared ? compared.comparisons : undefined;
   const output =
-    args.format === 'json'
+    args.format === 'sarif'
+      ? `${JSON.stringify(
+          toSarif(now.runs, {toolVersion: packageVersion(), fileUri: args.sarifFile || null}),
+          null,
+          2
+        )}\n`
+      : args.format === 'json'
       ? `${JSON.stringify({...toData({runs: now.runs, comparisons}), skipped}, null, 2)}\n`
       : renderMarkdown({
           runs: now.runs,
