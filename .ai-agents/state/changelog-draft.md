@@ -687,6 +687,10 @@ New: `packages/seo-audits/src/service/` (project config, webhook signature, payl
 
 New command `send-test-webhook` (`packages/seo-audits/src/service/send-test-webhook.js`): sends one signed test delivery to a project's webhook so a setup can be checked without a real pull request. The manual workflow `.github/workflows/seo-audit.yml` now pins its runner to `ubuntu-24.04` (a new default image can no longer change Chrome and system libraries unnoticed) and uses the Node 24 majors of `checkout`, `setup-node` and `upload-artifact` (v7). It has not been re-run on GitHub yet. No change to the audits.
 
+## 2026-10-07 — SERP preview (Phase 19, slice 4)
+
+The run page of the webhook service shows how the page may look in search results (desktop and mobile), cut at the pixel budget of `pixel-width-truncation`, and says if the title, description or address changed since the baseline run. The preview comes from the existing `pixel-width-truncation` audit (its details now carry it; the gatherer also records prefix widths), so there is no new audit and no new request. See the README.
+
 ## 2026-10-07 — history and comparison (Phase 19, slice 3)
 
 The dashboard has a **History** tab per project: a score chart for one page across its finished runs, a CSV download, and a comparison of any two runs (new, fixed, still failing). Same data over the API: `GET /api/v1/seo/projects/:id/history`, `history.csv` and `compare`. See the README.

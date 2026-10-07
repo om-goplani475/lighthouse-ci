@@ -21,6 +21,8 @@ Order: 1, 2, 3, 4, 5 (security first, then the cheapest, then the ones that touc
 
 - **3. Reporting and history: built.** `service/run-history.js` (pure: series, CSV, comparison), three routes (`history`, `history.csv`, `compare`), and a **History** tab in the dashboard (line chart for one page at a time, CSV download, compare any two runs, runs table). Checked live with a real server and Chrome (`docs/qa/webhook-platform.md`). Bounded: the newest 200 finished runs; the 180-day run retention already in place limits the depth. Not built: PDF export and evidence/DOM-location capture (they need design).
 
+- **4. SERP preview: built.** `lib/serp-preview.js` (pure), the gatherer now also measures the width of every prefix of the first 400 characters (`prefixWidths`, so the cut is placed by the browser's real measurements, not an average), `pixel-width-truncation` carries `details.serpPreview`, the service stores `result.serp` and `result.serpChange` (title, description, address changed since the baseline), and the run page has a "Search result preview" panel. **No new audit** (still 125) and no new request. Checked live with real Chrome on a page with an over-long title and description (title cut at the 600 px desktop and 580 px mobile budgets) and rendered in the dashboard. Costs about 400 numbers per text in every report (the audit result grew by well under 10 KB). **Not built:** a live "type a title and see the snippet" editor and rich-result variants (stars, prices).
+
 ## Phase 20 (next branch, not started)
 
 - **Monitoring**: per-project schedule (daily, weekly) in the server process, reusing the Phase 17 queue and rate limit, comparing each run with the previous one and alerting on regressions through the existing notifier.

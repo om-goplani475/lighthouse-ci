@@ -34,6 +34,10 @@ Design: `docs/phases/phase-17-webhook-platform.md`. What was checked on 2026-10-
 - Secrets are stored in clear unless `LHCI_SEO_SECRET_KEY` is set (Phase 19).
 - The run list reads each finished run's stored report to show its score (25 rows).
 
+## Search result preview (Phase 19, slice 4), checked live 2026-10-07
+
+Real `lhci collect` (Chrome) on a page with a 140-character title and a 330-character description: the audit's details carried the preview; the title was cut at "...Handmade Leather Boots Online…" on desktop (600 px) and one word earlier on mobile (580 px), the description at the ruleset's budget. The real preview was stored with a run and rendered on the run page by Chrome: two cards, "Changed since the earlier run: title", and the note that it is an approximation. Unit tests cover the cut (emoji never split, trailing punctuation dropped, a long word backed up to the previous word, no title or description, hostile text kept as plain strings, a huge text bounded) and the service test covers the stored preview and the change flags. **Not checked:** how close the cut is to what Google really shows (Google does not publish it).
+
 ## History and comparison (Phase 19, slice 3), checked live 2026-10-07
 
 Real server (`lhci server`, SQLite), real dashboard built with `build:esbuild`, 16 finished runs of two pages seeded from a real Lighthouse report with one more audit fixed per day, Chrome driving the page:
