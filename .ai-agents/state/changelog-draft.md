@@ -687,6 +687,10 @@ New: `packages/seo-audits/src/service/` (project config, webhook signature, payl
 
 New command `send-test-webhook` (`packages/seo-audits/src/service/send-test-webhook.js`): sends one signed test delivery to a project's webhook so a setup can be checked without a real pull request. The manual workflow `.github/workflows/seo-audit.yml` now pins its runner to `ubuntu-24.04` (a new default image can no longer change Chrome and system libraries unnoticed) and uses the Node 24 majors of `checkout`, `setup-node` and `upload-artifact` (v7). It has not been re-run on GitHub yet. No change to the audits.
 
+## 2026-10-07 — history and comparison (Phase 19, slice 3)
+
+The dashboard has a **History** tab per project: a score chart for one page across its finished runs, a CSV download, and a comparison of any two runs (new, fixed, still failing). Same data over the API: `GET /api/v1/seo/projects/:id/history`, `history.csv` and `compare`. See the README.
+
 ## 2026-10-07 — SARIF export (Phase 19, slice 2)
 
 `seo-summary --format sarif` (and `--sarif-file <repo path>`) writes the issues as SARIF 2.1.0 for GitHub code scanning and other dashboards; the webhook service serves the same for a finished run at `GET /api/v1/seo/projects/:id/runs/:runId/sarif`. See the README. Not yet tried against GitHub itself.

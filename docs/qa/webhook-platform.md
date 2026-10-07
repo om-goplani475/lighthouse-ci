@@ -31,5 +31,15 @@ Design: `docs/phases/phase-17-webhook-platform.md`. What was checked on 2026-10-
 - The queue and the replay memory are in the server's memory: a restart closes unfinished runs as failed, and a GitHub delivery id replayed after a restart inside the 10-minute window is accepted once more.
 - GitHub's **Redeliver** button reuses the delivery id, so a redelivery within 10 minutes is answered `duplicate` and ignored.
 - A hostile page can keep Chrome busy for the 10-minute limit.
-- Secrets are stored in clear in the database.
+- Secrets are stored in clear unless `LHCI_SEO_SECRET_KEY` is set (Phase 19).
 - The run list reads each finished run's stored report to show its score (25 rows).
+
+## History and comparison (Phase 19, slice 3), checked live 2026-10-07
+
+Real server (`lhci server`, SQLite), real dashboard built with `build:esbuild`, 16 finished runs of two pages seeded from a real Lighthouse report with one more audit fixed per day, Chrome driving the page:
+
+- **History tab**: the chart draws one dot per run for the chosen page (8 for 8 runs); the page list is ordered by number of runs and the first is chosen at start (one page per line: with two pages in one line the chart zigzagged, found here and fixed).
+- **Compare two runs**: 76.2 to 97.6 (+21.4), 5 issues listed as fixed, 2 still failing, matching the numbers in the table below it.
+- **CSV** (`GET .../history.csv`): header plus a column per category, one row per run; cells that start with `=`, `+`, `-` or `@` are prefixed so a spreadsheet does not run them (unit tested).
+- **Not checked**: the browser's "Download CSV" button saving a file (the same request is tested over HTTP); a project with more than 200 finished runs (only the newest 200 are read).
+

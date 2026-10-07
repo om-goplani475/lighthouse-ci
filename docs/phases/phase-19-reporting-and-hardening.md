@@ -19,6 +19,8 @@ Order: 1, 2, 3, 4, 5 (security first, then the cheapest, then the ones that touc
 - **1. Encrypted secrets: built** (60 server tests, three new files; see `.ai-agents/state/security-findings.md`).
 - **2. SARIF: built.** `summary/sarif.js` (pure), `--format sarif` and `--sarif-file` on the summary command, and `GET /api/v1/seo/projects/:id/runs/:runId/sarif[?file=]`. A real Chrome run on a page with known defects gave 8 results and 8 rules and **validates against the official OASIS SARIF 2.1.0 schema** (a deliberately wrong log does not). One design decision worth knowing: a web page is not a repository file, so by default the location is the page URL; GitHub only shows file-based alerts, hence the optional `file` mapping. **Not verified:** a real `upload-sarif` to GitHub code scanning (open-items J).
 
+- **3. Reporting and history: built.** `service/run-history.js` (pure: series, CSV, comparison), three routes (`history`, `history.csv`, `compare`), and a **History** tab in the dashboard (line chart for one page at a time, CSV download, compare any two runs, runs table). Checked live with a real server and Chrome (`docs/qa/webhook-platform.md`). Bounded: the newest 200 finished runs; the 180-day run retention already in place limits the depth. Not built: PDF export and evidence/DOM-location capture (they need design).
+
 ## Phase 20 (next branch, not started)
 
 - **Monitoring**: per-project schedule (daily, weekly) in the server process, reusing the Phase 17 queue and rate limit, comparing each run with the previous one and alerting on regressions through the existing notifier.
